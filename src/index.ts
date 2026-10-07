@@ -20,6 +20,22 @@ const ROUTE: Route = {
   decisionEntity: true,
   reviewActions: PERSON_ACTIONS,
 };
+/**
+ * Step 2 of the chain (pointsman#66): for reports that step 1 decided
+ * urgent or review (the subscription's q), does the closure cut people off
+ * from their evacuation site? An alert creates an Alert entity.
+ */
+const EVACUATION_ROUTE: Route = {
+  type: 'RoadRestriction',
+  profile: 'evacuation-access-check',
+  inputs: ['description', 'check'],
+  attribute: 'evacuation',
+  decisionEntity: true,
+  reviewActions: ['review'],
+  name: 'evacuation',
+  informedBy: 'check',
+};
+const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 /** Demo data lives this long. */
 const KEEP_MS = 24 * 3600_000;
 const KV_TTL = 2 * 24 * 3600;
@@ -64,7 +80,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
 
 function bridgeConfig(env: Env): BridgeConfig {
   return {
-    routes: [ROUTE],
+    routes: [ROUTE, EVACUATION_ROUTE],
     notifySecret: env.NOTIFY_SECRET,
     pointsman: { url: trimUrl(env.POINTSMAN_URL), token: env.POINTSMAN_TOKEN },
     broker: { url: trimUrl(env.BROKER_URL), apiKey: env.BROKER_API_KEY, tenant: env.BROKER_TENANT, context: TRANSPORTATION_CONTEXT },
@@ -77,10 +93,60 @@ async function notify(request: Request, env: Env, ctx: ExecutionContext): Promis
   if (response.status === 200 || response.status === 502) {
     const { handled } = (await response.clone().json()) as { handled: { id: string; action?: string; decision?: string }[] };
     // Issues after the answer, so the broker is not kept waiting.
+    if (new URL(request.url).searchParams.get('route') === EVACUATION_ROUTE.name) {
+      // Step 2: alerts for the evacuation sites' staff, nothing for GitHub.
+      const alerts = handled.filter((h) => h.action === 'alert' && h.decision);
+      if (alerts.length) ctx.waitUntil(Promise.all(alerts.map((h) => createAlert(env, h.id, h.decision!).catch((err) => console.error(`alert for ${h.decision}: ${(err as Error).message}`)))));
+      return response;
+    }
     const forPeople = handled.filter((h) => h.action && h.decision && PERSON_ACTIONS.includes(h.action));
     if (forPeople.length) ctx.waitUntil(Promise.all(forPeople.map((h) => openIssue(env, h.id, h.decision!, h.action!).catch((err) => console.error(`issue for ${h.decision}: ${(err as Error).message}`)))));
   }
   return response;
+}
+
+/**
+ * An Alert (Smart Data Models) for the staff of the evacuation site: where
+ * the road is closed, which site, how much longer the way on foot is, and
+ * the decision that raised it.
+ */
+async function createAlert(env: Env, entityId: string, decision: string, attempts = 3, pauseMs = 1000): Promise<void> {
+  const broker = new Broker(env);
+  // The Alert is written once (a later retry gets 409), so it waits for the
+  // complete facts: the Decision entity may not be readable at once.
+  let entity: Entity | null = null;
+  let site: Record<string, unknown> | undefined;
+  let walk: Record<string, unknown> | undefined;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, pauseMs));
+    const [e, decided] = await Promise.all([broker.getRoadRestriction(entityId, { sysAttrs: false }), broker.getDecision(decisionEntityId(decision))]);
+    const facts = factsOf(decided);
+    const fact = (name: string) => (facts.find((f) => f.name === name && !f.missing) as { values: Record<string, unknown> } | undefined)?.values;
+    entity = e;
+    site = fact('shelter');
+    walk = fact('walk');
+    if (entity && typeof site?.name === 'string' && typeof site.distance_m === 'number' && typeof walk?.extra_m === 'number') break;
+  }
+  if (!entity) throw new Error('report not found in the broker');
+  if (typeof site?.name !== 'string' || typeof site.distance_m !== 'number' || typeof walk?.extra_m !== 'number') throw new Error('decision facts not readable: no alert written');
+  const P = (value: unknown) => ({ type: 'Property', value });
+  const description = [
+    `Road closed near the evacuation site ${site.name} (${site.distance_m} m).`,
+    `On foot, the closed section cannot be passed; the way around is ${walk.extra_m} m longer.`,
+    String((entity.description as { value?: unknown } | undefined)?.value ?? ''),
+  ].join(' ');
+  await broker.createAlert({
+    id: alertId(decision),
+    type: 'Alert',
+    category: P('traffic'),
+    subCategory: P('roadClosed'),
+    severity: P('high'),
+    description: P(description),
+    location: entity.location,
+    dateIssued: P({ '@type': 'DateTime', '@value': new Date().toISOString() }),
+    // A Relationship in the Smart Data Models Alert: the decision that raised it.
+    alertSource: { type: 'Relationship', object: decisionEntityId(decision) },
+  });
 }
 
 async function openIssue(env: Env, entityId: string, decision: string, action: string): Promise<void> {
@@ -288,8 +354,9 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       env.DEMO.get<ReportRecord>(`report:${entity.id}`, 'json'),
     ]);
     const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
+    const evacuation = await evacuationOf(broker, entity);
     // Only prepared reports go to the GitHub queue; the page says so.
-    return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), ngsi: { entity, decision: decisionEntity } }, 200, cors);
+    return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
@@ -399,6 +466,22 @@ export function pendingOf(e: Entity): PendingDecision {
 
 // --- Shapes for the page ---------------------------------------------------------
 
+/** Step 2 of the chain for the page: its action, facts, Alert and NGSI-LD data; null before it ran. */
+async function evacuationOf(broker: Broker, entity: Entity) {
+  const attr = entity.evacuation as Attr | undefined;
+  if (!attr || typeof attr.value !== 'string') return null;
+  const decision = (attr.decision as Attr | undefined)?.object;
+  const decisionEntity = typeof decision === 'string' ? await broker.getDecision(decision) : null;
+  const alert = attr.value === 'alert' && typeof decision === 'string' ? await broker.getEntity(alertId(decision.split(':').pop()!)) : null;
+  return {
+    action: attr.value,
+    ...(typeof attr.observedAt === 'string' && { decidedAt: attr.observedAt }),
+    ...(typeof val(attr.policyRule) === 'string' && { policyRule: val(attr.policyRule) as string }),
+    facts: factsOf(decisionEntity),
+    ngsi: { decision: decisionEntity, alert },
+  };
+}
+
 /** One spatial fact as the page shows it (pointsman docs/profile-format.md#facts). */
 export type PageFact =
   | { name: string; missing: false; values: Record<string, string | number | boolean | null>; source: string }
@@ -500,6 +583,12 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     if (!(now - created > KEEP_MS)) continue;
     const decision = ((e.check as Attr | undefined)?.decision as Attr | undefined)?.object;
     if (typeof decision === 'string') await broker.delete(decision);
+    // Step 2: its Decision entity and the Alert it raised.
+    const second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
+    if (typeof second === 'string') {
+      await broker.delete(second);
+      await broker.delete(alertId(second.split(':').pop()!));
+    }
     await broker.delete(e.id);
     deleted += 1;
   }

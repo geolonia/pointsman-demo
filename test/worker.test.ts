@@ -136,7 +136,7 @@ describe('reports from the page', () => {
   it('serves the configuration for the page', async () => {
     const res = await worker('/api/config', { headers: { origin: PAGE } });
     const c = await res.json<any>();
-    expect(c.prepared).toHaveLength(7);
+    expect(c.prepared).toHaveLength(9);
     expect(c.freeText).toBe(false);
     expect(c.today).toEqual({ used: 0, limit: 300 });
   });
@@ -275,7 +275,8 @@ describe('cleanup', () => {
     answer = (c) => {
       if (c.method === 'GET' && c.url.includes('/entities?type=RoadRestriction')) {
         return Response.json([
-          { id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old, check: { type: 'Property', value: 'review', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-old' } } },
+          { id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old, check: { type: 'Property', value: 'review', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-old' } },
+            evacuation: { type: 'Property', value: 'alert', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-old' } } },
           { id: 'urn:ngsi-ld:RoadRestriction:demo-new', type: 'RoadRestriction', createdAt: new Date().toISOString() },
         ]);
       }
@@ -287,8 +288,98 @@ describe('cleanup', () => {
     await env.DEMO.put('issue:9', JSON.stringify({ decision: 'd-old', entity: 'urn:ngsi-ld:RoadRestriction:demo-old', action: 'review', corrections: [], createdAt: old }));
     await env.DEMO.put('issue:10', JSON.stringify({ decision: 'd-new', entity: 'urn:ngsi-ld:RoadRestriction:demo-new', action: 'review', corrections: [], createdAt: new Date().toISOString() }));
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+    // Step 1's and step 2's Decision entities, step 2's Alert, then the report.
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });
 });
+
+describe('the chain (step 2)', () => {
+  const location = { type: 'GeoProperty', value: { type: 'LineString', coordinates: [[139.7505, 35.7025], [139.7507, 35.7010]] } };
+  const report = {
+    id: 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-000000000002', type: 'RoadRestriction', roadName: P('飯田橋三丁目の橋'),
+    description: P('倒木で道路がふさがれ、車も歩行者も通れない。'), location,
+    check: { type: 'Property', value: 'urgent', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' } },
+  };
+  const step2 = (action: string) => ({
+    decision_id: '33333333-3333-4333-8333-333333333333', action, profile: 'evacuation-access-check', profile_version: 1, model: 'clef-flash',
+    created_at: '2026-10-07T01:00:05.000Z', rule: 0,
+    answers: { foot_passable: { type: 'noul', value: false, p: 0.98, yes: 0.02 } },
+    facts: {
+      shelter: { missing: false, values: { found: true, distance_m: 443, name: '日本大学法学部①' }, source: 'GSI' },
+      walk: { missing: false, values: { possible: true, extra_m: 316 }, source: 'OSM' },
+    },
+  });
+  const FACTS = 'https://datamodels.jp/ns/decision/facts';
+  const notify = (route = 'evacuation') => worker(`/notify?route=${route}`, { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) });
+
+  function pointsmanSays(action: string) {
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/evacuation-access-check') return Response.json(step2(action));
+      if (c.method === 'GET' && c.url === `${BROKER}/entities/${encodeURIComponent(report.id)}`) return Response.json(report);
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Decision:33333333')}`)) {
+        return Response.json({ id: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333', type: 'Decision', [FACTS]: { type: 'JsonProperty', json: Object.entries(step2(action).facts).map(([name, f]) => ({ name, ...f })) } });
+      }
+      return undefined;
+    };
+  }
+
+  it('decides with the second profile, links step 1, and raises an Alert for the site', async () => {
+    pointsmanSays('alert');
+    expect((await notify()).status).toBe(200);
+    const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision')!;
+    expect(decisionEntity.body.wasInformedBy).toEqual({ type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' });
+    expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/evacuation'))).toBe(true);
+    await vi.waitFor(() => expect(calls.some((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Alert')).toBe(true));
+    const alert = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Alert')!;
+    expect(alert.headers.get('link')).toContain('https://smartdatamodels.org/context.jsonld');
+    expect(alert.body).toMatchObject({
+      id: 'urn:ngsi-ld:Alert:demo-33333333-3333-4333-8333-333333333333',
+      category: P('traffic'), subCategory: P('roadClosed'), severity: P('high'),
+      alertSource: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333' }, location,
+    });
+    expect(alert.body.description.value).toContain('日本大学法学部①');
+    expect(alert.body.description.value).toContain('316 m');
+    // Step 2 never opens GitHub issues.
+    expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
+  });
+
+  it('writes no Alert while the decision facts cannot be read', async () => {
+    pointsmanSays('alert');
+    const base = answer;
+    // The Decision entity stays unreadable (404).
+    answer = (c) => (c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:33333333')) ? new Response(null, { status: 404 }) : base(c));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await notify()).status).toBe(200);
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('no alert written')), { timeout: 5000 });
+    expect(calls.some((c) => c.body?.type === 'Alert')).toBe(false);
+    // It tried three times.
+    expect(calls.filter((c) => c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:33333333'))).length).toBe(3);
+  });
+
+  it('raises no Alert when step 2 says none', async () => {
+    pointsmanSays('none');
+    expect((await notify()).status).toBe(200);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(calls.some((c) => c.body?.type === 'Alert')).toBe(false);
+  });
+
+  it('shows step 2 with the report: action, facts and the Alert', async () => {
+    const decided = { ...report, evacuation: { type: 'Property', value: 'alert', observedAt: '2026-10-07T01:00:05Z', policyRule: P('0'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333' } } };
+    answer = (c) => {
+      if (c.method !== 'GET') return undefined;
+      if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(report.id)}`)) return Response.json(decided);
+      if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Decision:33333333')}`)) {
+        return Response.json({ id: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333', type: 'Decision', [FACTS]: { type: 'JsonProperty', json: [{ name: 'walk', missing: false, values: { possible: true, extra_m: 316 }, source: 'OSM' }] } });
+      }
+      if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Alert:demo-33333333')}`)) return Response.json({ id: 'urn:ngsi-ld:Alert:demo-33333333-3333-4333-8333-333333333333', type: 'Alert' });
+      if (c.url.startsWith(`${BROKER}/entities/`)) return new Response(null, { status: 404 });
+      return undefined;
+    };
+    const r = await (await worker(`/api/reports/${encodeURIComponent(report.id)}`, { headers: { origin: PAGE } })).json<any>();
+    expect(r.evacuation).toMatchObject({ action: 'alert', decidedAt: '2026-10-07T01:00:05Z', policyRule: '0', facts: [{ name: 'walk', values: { extra_m: 316 } }] });
+    expect(r.evacuation.ngsi.alert.type).toBe('Alert');
+  });
+});
+

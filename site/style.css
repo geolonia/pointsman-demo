@@ -103,6 +103,9 @@ pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 
 .badge { font: 600 0.85rem var(--mono); padding: 3px 10px; border-radius: 999px; color: #fff; }
 .badge.publish { background: #1E7A50; } .badge.review { background: #8A5A0C; } .badge.urgent { background: #A8352B; }
 .badge.reject { background: #5E4FA0; } .badge.pending { background: #5E5A54; }
+.badge.alert { background: #A8352B; } .badge.none { background: #1E7A50; }
+.chain-box { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--violet); border-radius: 8px; }
+.chain-box h3 { font: 600 0.85rem var(--mono); margin: 0 0 6px; }
 .answers { display: grid; gap: 8px; margin: 8px 0 12px; }
 .answer .label { display: flex; justify-content: space-between; font-size: 0.9rem; }
 .answer .label code { color: var(--fg); }

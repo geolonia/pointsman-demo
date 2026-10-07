@@ -39,6 +39,14 @@
       fSource: 'Source: ',
       nDeep: 'Deep flood zone (3 m or more): a rule on the facts sends the report to a person first, even though the text alone was not clear enough.',
       floodLayer: 'river flood zone (maximum assumed rainfall)',
+      s5: 'Step 2: a second profile checked the way to the evacuation site (chained decision)',
+      evacTitle: 'Step 2 · Evacuation access',
+      eAlert: 'Alert for the evacuation site’s staff: people on foot cannot pass the closed section and need a longer way to the site.',
+      eNone: 'No alert: the way to the evacuation site is not cut.',
+      eReview: 'The way around could not be checked: a person looks at it.',
+      fWalk: function (m) { return 'On foot, the way around the closed section is ' + m + ' m longer'; },
+      showDecision2: 'Decision entity of step 2 (wasInformedBy: step 1)', showAlert: 'Alert entity (Smart Data Models)',
+      alert: 'alert', none: 'no alert',
       nIssue: 'It waits in the review queue: ', nIssueCmd: 'members resolve it with /publish or /reject.',
       nResolved: 'Resolved by a person: ', nNoIssue: 'Only prepared reports go to the GitHub queue.', nOpening: 'Opening an issue in the review queue\u2026',
       q: { category: 'Category', status_matches: 'Status matches the text', danger: 'People in danger', clarity: 'Clear enough to publish' },
@@ -81,6 +89,14 @@
       fSource: '出典: ',
       nDeep: '深い浸水想定区域（3 m 以上）: 本文だけでは判断がつかなくても、事実にもとづく規則で真っ先に人が確認します。',
       floodLayer: '洪水浸水想定区域（想定最大規模）',
+      s5: '第 2 段階：2 つ目のプロファイルが避難場所への道を確認（判定の連鎖）',
+      evacTitle: '第 2 段階・避難経路',
+      eAlert: '避難場所の担当者への警報：歩く人は閉鎖区間を通れず、避難場所へは遠回りが必要です。',
+      eNone: '警報なし：避難場所への道は断たれていません。',
+      eReview: '迂回路を確認できなかったので、人が確認します。',
+      fWalk: function (m) { return '歩いて閉鎖区間を迂回すると ' + m + ' m 長くなる'; },
+      showDecision2: '第 2 段階の Decision エンティティ（wasInformedBy：第 1 段階）', showAlert: 'Alert エンティティ（Smart Data Models）',
+      alert: '警報', none: '警報なし',
       nIssue: '確認待ちの一覧にあります：', nIssueCmd: 'メンバーが /publish か /reject で決めます。',
       nResolved: '人が確認しました：', nNoIssue: 'GitHub の確認待ちに回るのは用意した報告だけです。', nOpening: '確認待ちの Issue を作成中…',
       q: { category: '規制区分', status_matches: '状態と本文が合っている', danger: '人に危険がある', clarity: '公開できるほど明確' },
@@ -238,7 +254,12 @@
     api('/api/reports/' + encodeURIComponent(me.id)).then(function (r) {
       if (current !== me) return;
       if (r.ok) { me.last = r.body; renderCurrent(r.body); }
-      var done = r.ok && r.body.check && (r.body.ngsi && r.body.ngsi.decision);
+      var chained = r.ok && r.body.check && (r.body.check.action === 'urgent' || r.body.check.action === 'review');
+      var decidedNow = r.ok && r.body.check && (r.body.ngsi && r.body.ngsi.decision);
+      if (decidedNow && chained && !me.chainSince) me.chainSince = Date.now();
+      // Step 2 comes a few seconds later; if it does not come within a
+      // minute, poll slowly instead of fast forever.
+      var done = decidedNow && (!chained || r.body.evacuation || Date.now() - me.chainSince > 60000);
       var resolved = done && (r.body.check.finalAction || r.body.check.action === 'publish');
       // Fast until the decision is there, then slowly, waiting for a person.
       me.poll = setTimeout(poll, !done ? 1200 : resolved ? 30000 : 5000);
@@ -276,6 +297,13 @@
     tl.appendChild(step(t('s3'), decided ? 'done' : 'wait', decided ? seconds(r.createdAt, r.check.decidedAt) : ''));
     tl.appendChild(step(t('s4'), written ? 'done' : 'wait', '',
       written ? el('div', null, [json(t('showEntity'), r.ngsi.entity), json(t('showDecision'), r.ngsi.decision)]) : null));
+    // Step 2 of the chain runs only for urgent and review (pointsman#66).
+    var chained = decided && (r.check.action === 'urgent' || r.check.action === 'review');
+    if (chained) {
+      var ev = r.evacuation;
+      tl.appendChild(step(t('s5'), ev ? 'done' : 'wait', ev ? seconds(r.check.decidedAt, ev.decidedAt) : '',
+        ev ? el('div', null, [json(t('showDecision2'), ev.ngsi.decision), ev.ngsi.alert ? json(t('showAlert'), ev.ngsi.alert) : null]) : null));
+    }
     if (!decided) return;
 
     var outcome = outcomeOf(r);
@@ -313,6 +341,19 @@
       else note.appendChild(el('span', { class: 'muted', text: t(r.prepared ? 'nOpening' : 'nNoIssue') }));
     }
     result.appendChild(note);
+    if (r.evacuation) result.appendChild(renderEvacuation(r.evacuation));
+  }
+
+  function renderEvacuation(ev) {
+    var box = el('div', { class: 'chain-box' }, [
+      el('h3', { text: t('evacTitle') }),
+      el('div', { class: 'outcome' }, [el('span', { class: 'badge ' + ev.action, text: t(ev.action) || ev.action })]),
+    ]);
+    var facts = renderFacts(ev.facts || []);
+    if (facts) box.appendChild(facts);
+    var text = { alert: 'eAlert', none: 'eNone', review: 'eReview' }[ev.action];
+    if (text) box.appendChild(el('p', { class: 'note' + (ev.action === 'none' ? ' go' : ''), text: t(text) }));
+    return box;
   }
 
   // Facts come from the broker: shown only as text.
@@ -325,6 +366,7 @@
       if (f.missing) text = t('fMissing')(f.name, f.reason);
       else if (f.name === 'flood') text = f.values.inside ? t('fFlood')(String(f.values.class)) : t('fNoFlood');
       else if (f.name === 'shelter') text = f.values.found ? t('fShelter')(String(f.values.name), f.values.distance_m) : t('fNoShelter');
+      else if (f.name === 'walk' && typeof f.values.extra_m === 'number') text = t('fWalk')(f.values.extra_m);
       else text = f.name + ': ' + JSON.stringify(f.values);
       list.appendChild(el('li', { text: text }));
       if (!f.missing && sources.indexOf(f.source) < 0) sources.push(f.source);

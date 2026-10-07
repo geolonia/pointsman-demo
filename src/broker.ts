@@ -8,6 +8,8 @@ import { fetchWithAgent } from './http';
 /** The datamodels.jp transportation context: RoadRestriction and its attributes. */
 export const TRANSPORTATION_CONTEXT = 'https://datamodels.jp/context/transportation/v1.jsonld';
 const CORE_CONTEXT = 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.8.jsonld';
+/** Smart Data Models, all subjects (Alert among them). */
+export const SDM_CONTEXT = 'https://smartdatamodels.org/context.jsonld';
 const link = (ctx: string) => `<${ctx}>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"`;
 
 export type Entity = { id: string; type: string; [attribute: string]: unknown };
@@ -118,6 +120,23 @@ export class Broker {
       if (batch.length < page) break;
     }
     return { query: base, pages, decisions };
+  }
+
+  /** An entity as stored, without a context (terms as full IRIs), or null. */
+  async getEntity(id: string): Promise<Entity | null> {
+    const res = await this.call('GET', `/entities/${encodeURIComponent(id)}`, { headers: { accept: 'application/json' } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new BrokerError('get entity', res.status);
+    return (await res.json()) as Entity;
+  }
+
+  /**
+   * Creates an Alert (Smart Data Models, dataModel.Alert) with the Smart
+   * Data Models context. An Alert that already exists (a retry) is fine.
+   */
+  async createAlert(alert: Entity): Promise<void> {
+    const res = await this.call('POST', '/entities', { body: alert, headers: { 'content-type': 'application/json', link: link(SDM_CONTEXT) } });
+    if (res.status !== 201 && res.status !== 409) throw new BrokerError('create alert', res.status);
   }
 
   /** Deletes an entity; a missing one is fine. */

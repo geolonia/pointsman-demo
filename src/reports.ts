@@ -87,6 +87,33 @@ export const PREPARED: Prepared[] = [
     expected: 'urgent',
   },
   {
+    // The chain (pointsman#66), same text at two places. Step 1: urgent
+    // (Clef-flash danger about 0.77). Step 2: no way through on foot. On the
+    // bridge the way around on foot is about 316 m longer, with an evacuation
+    // site 443 m away: an Alert for its staff. In the street grid it is about
+    // 143 m: no alert.
+    id: 'bridge-blocked',
+    roadName: '飯田橋三丁目の橋',
+    status: 'closed',
+    description: {
+      ja: '倒木で道路がふさがれ、車も歩行者も通れない。',
+      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass.',
+    },
+    location: { type: 'LineString', coordinates: [[139.750481, 35.702539], [139.750472, 35.702397], [139.750458, 35.701952], [139.750476, 35.701524], [139.750613, 35.701197], [139.750727, 35.700972]] },
+    expected: 'urgent',
+  },
+  {
+    id: 'street-blocked',
+    roadName: '飯田橋四丁目の通り',
+    status: 'closed',
+    description: {
+      ja: '倒木で道路がふさがれ、車も歩行者も通れない。',
+      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass.',
+    },
+    location: { type: 'LineString', coordinates: [[139.746432, 35.701305], [139.7461, 35.700931], [139.745926, 35.700653]] },
+    expected: 'urgent',
+  },
+  {
     id: 'fallen-tree',
     roadName: '日比谷通り',
     status: 'closed',
