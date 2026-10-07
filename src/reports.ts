@@ -74,6 +74,19 @@ export const PREPARED: Prepared[] = [
     expected: 'review',
   },
   {
+    // In a river flood zone of 3 to 5 m (maximum assumed rainfall): the
+    // profile's rule on the flood fact makes it urgent (pointsman#70).
+    id: 'water-rising',
+    roadName: '靖国通り',
+    status: 'closed',
+    description: {
+      ja: '両国橋の手前で道路が冠水し、水かさが増えてきている。',
+      en: 'The road before Ryogoku Bridge is flooded, and the water is rising.',
+    },
+    location: { type: 'Point', coordinates: [139.788, 35.692] },
+    expected: 'urgent',
+  },
+  {
     id: 'fallen-tree',
     roadName: '日比谷通り',
     status: 'closed',

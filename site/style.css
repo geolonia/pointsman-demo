@@ -73,6 +73,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 8px; display: grid;
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .dot.publish { background: var(--green); } .dot.review { background: var(--amber); } .dot.urgent { background: var(--red); }
 .dot.reject { background: var(--violet); } .dot.pending { background: var(--grey); }
+/* The flood layer (headquarters map): the 0.5 to 3 m colour of the GSI legend. */
+.swatch { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.swatch.flood { background: #FFD8C0; border: 1px solid #FFB7B7; }
 
 .work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px; align-items: start; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
@@ -107,6 +110,9 @@ pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 
 .bar span { display: block; height: 100%; background: var(--fg-2); }
 .note { border-left: 3px solid var(--amber); padding: 6px 10px; background: var(--panel-2); border-radius: 6px; font-size: 0.92rem; }
 .note.go { border-color: var(--green); }
+.facts-box { margin: 0 0 12px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 8px; }
+.facts-box h3 { font: 600 0.85rem var(--mono); margin: 0 0 4px; }
+.facts { margin: 0 0 4px; padding-left: 1.1rem; font-size: 0.9rem; }
 
 .reports { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .reports button { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left;

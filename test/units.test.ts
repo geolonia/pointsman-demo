@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { appJwt, verifyWebhook } from '../src/github';
-import { summarize } from '../src/index';
+import { factsOf, summarize } from '../src/index';
 import { AREA, PREPARED, parseReport, toEntity } from '../src/reports';
 import { mayReview, parseCommand } from '../src/review';
 
@@ -189,5 +189,34 @@ describe('listing pending decisions', () => {
     expect(pages).toBe(2);
     expect(decisions).toHaveLength(1003);
     expect(query).not.toContain('offset');
+  });
+});
+
+describe('facts for the page', () => {
+  const FACTS = 'https://datamodels.jp/ns/decision/facts';
+  it('reads the facts of a Decision entity, missing ones too', () => {
+    const decision = {
+      id: 'urn:ngsi-ld:Decision:d-1', type: 'https://datamodels.jp/ns/decision/Decision',
+      [FACTS]: { type: 'JsonProperty', json: [
+        { name: 'flood', missing: false, values: { inside: true, rank: 5, class: '3 to 5 m' }, source: 'GSI' },
+        { name: 'shelter', missing: true, reason: 'timeout' },
+      ] },
+    };
+    expect(factsOf(decision)).toEqual([
+      { name: 'flood', missing: false, values: { inside: true, rank: 5, class: '3 to 5 m' }, source: 'GSI' },
+      { name: 'shelter', missing: true, reason: 'timeout' },
+    ]);
+  });
+
+  it('leaves out what does not have the expected shape', () => {
+    expect(factsOf(null)).toEqual([]);
+    expect(factsOf({ id: 'x', type: 'Decision' })).toEqual([]);
+    const odd = { id: 'x', type: 'Decision', [FACTS]: { json: [
+      { name: 'a', missing: false, values: { inside: true, extra: { nested: 1 } }, source: 's' },
+      { missing: true, reason: 'error' },
+      { name: 'b', missing: false, values: [], source: 's' },
+      'text',
+    ] } };
+    expect(factsOf(odd)).toEqual([{ name: 'a', missing: false, values: { inside: true }, source: 's' }]);
   });
 });

@@ -19,17 +19,26 @@
       what: 'What just happened',
       w1: 'The page created a <code>RoadRestriction</code> entity (<a href="https://datamodels.jp/models/transportation/RoadRestriction/">datamodels.jp</a>) in GeonicDB, an NGSI-LD context broker.',
       w2: 'A subscription notified the bridge. It sent the entity, as it is, to Pointsman: the profile reads the attributes it needs, no mapping code.',
-      w3: 'Pointsman asked the model four typed questions and turned the answers into an action with the city’s rules. The bridge wrote the result back to the entity (<code>check</code>) and as a <code>Decision</code> entity, so other FIWARE apps can subscribe to it.',
+      w3: 'Pointsman asked the model four typed questions, looked up facts about the place (flood zone, nearest evacuation site) from public data, and turned both into an action with the city’s rules. The model does not see the facts: rules use them directly. The bridge wrote the result back to the entity (<code>check</code>) and as a <code>Decision</code> entity, so other FIWARE apps can subscribe to it.',
       w4: 'Reports that need a person became GitHub issues. A member resolves one with <code>/publish</code> or <code>/reject</code>; the answer goes back to Pointsman as feedback.',
       lProfile: 'The profile', lBridge: 'The bridge', lStory: 'Why it works this way', lSource: 'Source of this demo', lQueue: 'The review queue',
       footer: 'Invented events at real places. Do not enter personal data. Map: <a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>.',
-      s1: 'Stored in the context broker', s2: 'Broker notified the bridge (subscription)', s3: 'Pointsman answered the four questions',
+      s1: 'Stored in the context broker', s2: 'Broker notified the bridge (subscription)', s3: 'Pointsman answered the four questions and looked up facts about the place',
       s4: 'Result written back to the entity and as a Decision entity', waiting: 'waiting…',
       showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showRequest: 'request',
       rule: 'rule', ruleDefault: 'no rule matched: default action',
       nPublish: 'Clear and consistent: published to the residents’ map without waiting for a person.',
       nReview: 'Not clear enough to publish on its own: a person checks it.',
       nUrgent: 'Someone may be in danger: a person looks at it first.',
+      facts: 'Facts about the place (looked up, not from the model)',
+      fFlood: function (c) { return 'Inside a river flood zone (maximum assumed rainfall), expected depth ' + c; },
+      fNoFlood: 'Not inside a published river flood zone',
+      fShelter: function (n, m) { return 'Nearest evacuation site for floods: ' + n + ', ' + m + ' m'; },
+      fNoShelter: 'No evacuation site for floods within 5 km',
+      fMissing: function (n, r) { return n + ': could not be looked up (' + r + ')'; },
+      fSource: 'Source: ',
+      nDeep: 'Deep flood zone (3 m or more): a rule on the facts sends the report to a person first, even though the text alone was not clear enough.',
+      floodLayer: 'river flood zone (maximum assumed rainfall)',
       nIssue: 'It waits in the review queue: ', nIssueCmd: 'members resolve it with /publish or /reject.',
       nResolved: 'Resolved by a person: ', nNoIssue: 'Only prepared reports go to the GitHub queue.', nOpening: 'Opening an issue in the review queue\u2026',
       q: { category: 'Category', status_matches: 'Status matches the text', danger: 'People in danger', clarity: 'Clear enough to publish' },
@@ -52,17 +61,26 @@
       what: '何が起きたか',
       w1: 'ページが GeonicDB（NGSI-LD のコンテキストブローカー）に <code>RoadRestriction</code> エンティティ（<a href="https://datamodels.jp/models/transportation/RoadRestriction/">datamodels.jp</a>）を作りました。',
       w2: 'サブスクリプションがブリッジに通知し、ブリッジはエンティティをそのまま Pointsman に送りました。プロファイルが必要な属性を読むので、変換のコードはいりません。',
-      w3: 'Pointsman がモデルに型のある 4 つの問いを出し、答えを市の規則で行動に変えました。ブリッジは結果をエンティティ（<code>check</code>）と <code>Decision</code> エンティティに書き戻したので、ほかの FIWARE アプリもサブスクライブできます。',
+      w3: 'Pointsman がモデルに型のある 4 つの問いを出し、公開データから場所の事実（浸水想定区域、最寄りの避難場所）を調べ、両方を市の規則で行動に変えました。事実はモデルには見せず、規則が直接使います。ブリッジは結果をエンティティ（<code>check</code>）と <code>Decision</code> エンティティに書き戻したので、ほかの FIWARE アプリもサブスクライブできます。',
       w4: '人の確認が必要な報告は GitHub の Issue になりました。メンバーが <code>/publish</code> か <code>/reject</code> で決めると、その答えはフィードバックとして Pointsman に戻ります。',
       lProfile: 'プロファイル', lBridge: 'ブリッジ', lStory: 'この仕組みの理由', lSource: 'このデモのソース', lQueue: '確認待ちの一覧',
       footer: '場所は実在、出来事は架空です。個人情報は入れないでください。地図：<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>。',
-      s1: 'コンテキストブローカーに保存', s2: 'ブローカーがブリッジに通知（サブスクリプション）', s3: 'Pointsman が 4 つの問いに回答',
+      s1: 'コンテキストブローカーに保存', s2: 'ブローカーがブリッジに通知（サブスクリプション）', s3: 'Pointsman が 4 つの問いに回答し、場所の事実を調査',
       s4: '結果をエンティティと Decision エンティティに書き戻し', waiting: '待機中…',
       showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showRequest: 'リクエスト',
       rule: '規則', ruleDefault: 'どの規則にも当たらず既定の行動',
       nPublish: 'はっきりしていて矛盾もないので、人を待たずに住民向けの地図に公開しました。',
       nReview: 'そのまま公開するには不明な点があるので、人が確認します。',
       nUrgent: '人に危険が及んでいるかもしれないので、真っ先に人が確認します。',
+      facts: '場所の事実（モデルではなく調べた値）',
+      fFlood: function (c) { return '洪水浸水想定区域（想定最大規模）の中、想定される深さ ' + c; },
+      fNoFlood: '公開されている洪水浸水想定区域の外',
+      fShelter: function (n, m) { return '最寄りの指定緊急避難場所（洪水）: ' + n + '、' + m + ' m'; },
+      fNoShelter: '5 km 以内に指定緊急避難場所（洪水）はない',
+      fMissing: function (n, r) { return n + ': 調べられなかった（' + r + '）'; },
+      fSource: '出典: ',
+      nDeep: '深い浸水想定区域（3 m 以上）: 本文だけでは判断がつかなくても、事実にもとづく規則で真っ先に人が確認します。',
+      floodLayer: '洪水浸水想定区域（想定最大規模）',
       nIssue: '確認待ちの一覧にあります：', nIssueCmd: 'メンバーが /publish か /reject で決めます。',
       nResolved: '人が確認しました：', nNoIssue: 'GitHub の確認待ちに回るのは用意した報告だけです。', nOpening: '確認待ちの Issue を作成中…',
       q: { category: '規制区分', status_matches: '状態と本文が合っている', danger: '人に危険がある', clarity: '公開できるほど明確' },
@@ -277,15 +295,45 @@
       ]));
     });
     result.appendChild(answers);
+    var facts = renderFacts(r.facts || []);
+    if (facts) result.appendChild(facts);
 
     var noteText = r.check.finalAction ? t('nResolved') + t(r.check.finalAction) : t({ publish: 'nPublish', review: 'nReview', urgent: 'nUrgent' }[r.check.action] || 'nReview');
     var note = el('p', { class: 'note' + (outcome === 'publish' ? ' go' : ''), text: noteText });
+    // The demo profile's rule on the flood fact (pointsman#70): not rule 0,
+    // which is danger alone.
+    var flood = (r.facts || []).filter(function (f) { return f.name === 'flood' && !f.missing; })[0];
+    if (r.check.action === 'urgent' && rule !== '0' && flood && flood.values.rank >= 5) {
+      note.appendChild(el('br'));
+      note.appendChild(el('span', { text: t('nDeep') }));
+    }
     if (!r.check.finalAction && r.check.action !== 'publish') {
       note.appendChild(el('br'));
       if (r.issue) note.appendChild(el('span', null, [t('nIssue'), el('a', { href: r.issue, target: '_blank', rel: 'noopener', text: r.issue.replace('https://github.com/', '') }), ' — ' + t('nIssueCmd')]));
       else note.appendChild(el('span', { class: 'muted', text: t(r.prepared ? 'nOpening' : 'nNoIssue') }));
     }
     result.appendChild(note);
+  }
+
+  // Facts come from the broker: shown only as text.
+  function renderFacts(facts) {
+    if (!facts.length) return null;
+    var list = el('ul', { class: 'facts' });
+    var sources = [];
+    facts.forEach(function (f) {
+      var text;
+      if (f.missing) text = t('fMissing')(f.name, f.reason);
+      else if (f.name === 'flood') text = f.values.inside ? t('fFlood')(String(f.values.class)) : t('fNoFlood');
+      else if (f.name === 'shelter') text = f.values.found ? t('fShelter')(String(f.values.name), f.values.distance_m) : t('fNoShelter');
+      else text = f.name + ': ' + JSON.stringify(f.values);
+      list.appendChild(el('li', { text: text }));
+      if (!f.missing && sources.indexOf(f.source) < 0) sources.push(f.source);
+    });
+    return el('div', { class: 'facts-box' }, [
+      el('h3', { text: t('facts') }),
+      list,
+      sources.length ? el('p', { class: 'muted small', text: t('fSource') + sources.join(' / ') }) : null,
+    ]);
   }
 
   // --- Recent reports ------------------------------------------------------------------
@@ -340,16 +388,22 @@
 
   // --- Maps -----------------------------------------------------------------------------
 
-  function style() {
-    return {
+  // The headquarters map also shows the river flood zones the facts come from.
+  function style(withFlood) {
+    var s = {
       version: 8,
       sources: { gsi: { type: 'raster', tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'], tileSize: 256, attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>', maxzoom: 18 } },
       layers: [{ id: 'gsi', type: 'raster', source: 'gsi' }],
     };
+    if (withFlood) {
+      s.sources.flood = { type: 'raster', tiles: ['https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png'], tileSize: 256, minzoom: 2, maxzoom: 17, attribution: '<a href="https://disaportal.gsi.go.jp/hazardmap/copyright/opendata.html">「ハザードマップポータルサイト」</a>洪水浸水想定区域' };
+      s.layers.push({ id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.55 } });
+    }
+    return s;
   }
 
-  function makeMap(id) {
-    var map = new maplibregl.Map({ container: id, style: style(), center: CENTER, zoom: 13.4, attributionControl: { compact: true } });
+  function makeMap(id, withFlood) {
+    var map = new maplibregl.Map({ container: id, style: style(withFlood), center: CENTER, zoom: 13.4, attributionControl: { compact: true } });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.on('load', function () {
       map.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -399,7 +453,7 @@
   });
 
   applyLang();
-  if (window.maplibregl) { maps.hq = makeMap('map-hq'); maps.pub = makeMap('map-public'); }
+  if (window.maplibregl) { maps.hq = makeMap('map-hq', true); maps.pub = makeMap('map-public', false); }
   loadConfig();
   loadReports();
   loadPending();

@@ -136,7 +136,7 @@ describe('reports from the page', () => {
   it('serves the configuration for the page', async () => {
     const res = await worker('/api/config', { headers: { origin: PAGE } });
     const c = await res.json<any>();
-    expect(c.prepared).toHaveLength(6);
+    expect(c.prepared).toHaveLength(7);
     expect(c.freeText).toBe(false);
     expect(c.today).toEqual({ used: 0, limit: 300 });
   });
@@ -169,13 +169,15 @@ describe('notifications (the bridge)', () => {
     await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))).toBe(true));
     const decide = calls.find((c) => c.url.includes('/v1/decide/'))!;
     expect(decide.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
-    expect(decide.headers.get('user-agent')).toMatch(/^pointsman-demo/);
+    // The bridge names itself on the requests it makes (pointsman#61).
+    expect(decide.headers.get('user-agent')).toMatch(/^pointsman-(demo|bridge)/);
     const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision')!;
     expect(decisionEntity.body.humanInvolvement).toEqual({ type: 'VocabProperty', vocab: 'dpv:HumanInvolvementForVerification' });
     // Every broker request carries the demo's API key, tenant and a User-Agent
-    // (GeonicDB's firewall refuses requests without one).
+    // (GeonicDB's firewall refuses requests without one): the demo's, or the
+    // bridge's for the requests the bridge makes.
     for (const c of calls.filter((x) => x.url.startsWith(BROKER))) {
-      expect(c.headers.get('user-agent')).toMatch(/^pointsman-demo/);
+      expect(c.headers.get('user-agent')).toMatch(/^pointsman-(demo|bridge)/);
       expect(c.headers.get('x-api-key')).toBe(env.BROKER_API_KEY);
       expect(c.headers.get('ngsild-tenant')).toBe('pointsman_demo');
     }
