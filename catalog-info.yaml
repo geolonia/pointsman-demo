@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  namespace: geolonia
+  name: pointsman-demo
+  description: Demo of Pointsman with an NGSI-LD context broker (GeonicDB) and a GitHub review queue.
+  annotations:
+    github.com/project-slug: geolonia/pointsman-demo
+  tags: ['demo', 'cloudflare-workers', 'fiware', 'ngsi-ld']
+spec:
+  type: 'website'
+  lifecycle: 'experimental'
+  owner: group:geolonia/geonicdb
+  system: system:geolonia/standards
+  dependsOn:
+    - component:geolonia/pointsman
