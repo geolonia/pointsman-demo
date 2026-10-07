@@ -19,7 +19,14 @@
     "GITHUB_APP_ID": "5219531",
     "GITHUB_INSTALLATION_ID": "168739763",
     "DAILY_LIMIT": "300",
-    "ALLOWED_ORIGINS": "https://geolonia.github.io,http://localhost:8765"
+    "ALLOWED_ORIGINS": "https://pointsman-demo.geolonia.workers.dev,http://localhost:8787"
+  },
+  // The demo page (site/). The Worker answers only the API, the bridge and
+  // the GitHub webhook; everything else is a static file.
+  "assets": {
+    "directory": "./site",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/notify", "/github/*"]
   },
   "kv_namespaces": [{ "binding": "DEMO", "id": "local-dev-only" }],
   // Reports per visitor (IP) and minute.

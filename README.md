@@ -36,16 +36,31 @@ flowchart LR
    in Pointsman, updates the broker, and closes the issue.
 5. Every hour, data older than a day is deleted and its issues are closed.
 
+## The page
+
+https://pointsman-demo.geolonia.workers.dev — `site/`, served by the Worker
+(static assets), in English and Japanese, light and dark:
+
+- two maps (headquarters: every report; residents: only what is published),
+  on GSI tiles (地理院タイル);
+- the six prepared reports; a click sends one and shows each step with its
+  time, the answers with their probabilities, the outcome, and the review issue;
+- the real NGSI-LD data of the report and its `Decision` entity;
+- recent reports, shared by all visitors.
+
+No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
+(with integrity hashes).
+
 ## API for the page
 
 | Endpoint | |
 |---|---|
 | `GET /api/config` | Prepared reports, the demo area, whether free text is on, today's usage |
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
-| `GET /api/reports/{id}` | One report |
+| `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`) |
 | `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}` |
 
-Only the origins in `ALLOWED_ORIGINS` may call it.
+Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.
 
 ## Limits
 

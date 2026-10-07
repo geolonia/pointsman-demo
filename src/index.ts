@@ -41,8 +41,8 @@ export default {
       if (url.pathname === '/notify') return await notify(request, env, ctx);
       if (url.pathname === '/github/webhook' && request.method === 'POST') return await webhook(request, env);
       if (url.pathname.startsWith('/api/')) return await api(request, url, env, ctx);
-      if (url.pathname === '/') return json({ name: 'Pointsman FIWARE demo', source: 'https://github.com/geolonia/pointsman-demo' });
-      return json({ error: 'not found' }, 404);
+      // The page and its files (wrangler.jsonc "assets").
+      return env.ASSETS.fetch(request);
     } catch (err) {
       console.error(`${request.method} ${url.pathname}: ${(err as Error).message}`);
       return json({ error: 'something went wrong' }, 502);
@@ -261,10 +261,25 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
-  const one = url.pathname.match(/^\/api\/reports\/(urn:ngsi-ld:RoadRestriction:demo-[0-9a-f-]{36})$/);
+  // Browsers send the id percent-encoded (urn%3Angsi-ld%3A…).
+  let path = url.pathname;
+  try { path = decodeURIComponent(path); } catch { /* malformed: no match below */ }
+  const one = path.match(/^\/api\/reports\/(urn:ngsi-ld:RoadRestriction:demo-[0-9a-f-]{36})$/);
   if (one && request.method === 'GET') {
-    const entity = await new Broker(env).getRoadRestriction(decodeURIComponent(one[1]!));
-    return entity ? json(summarize(entity), 200, cors) : json({ error: 'not found' }, 404, cors);
+    // The summary for the page, and the real NGSI-LD data for developers.
+    const broker = new Broker(env);
+    const entity = await broker.getRoadRestriction(one[1]!);
+    if (!entity) return json({ error: 'not found' }, 404, cors);
+    const summary = summarize(entity);
+    const decisionId = summary.check?.decision;
+    const [decisionEntity, issueNumber, report] = await Promise.all([
+      decisionId ? broker.getDecision(decisionId) : null,
+      decisionId ? env.DEMO.get(`decision-issue:${decisionId.split(':').pop()}`) : null,
+      env.DEMO.get<ReportRecord>(`report:${entity.id}`, 'json'),
+    ]);
+    const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
+    // Only prepared reports go to the GitHub queue; the page says so.
+    return json({ ...summary, prepared: Boolean(report?.prepared), issue, ngsi: { entity, decision: decisionEntity } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
@@ -378,7 +393,7 @@ export function summarize(e: Entity): Summary {
 export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: number; closed: number }> {
   const broker = new Broker(env);
   let deleted = 0;
-  for (const e of await broker.listRoadRestrictions(1000)) {
+  for (const e of await broker.listRoadRestrictions()) {
     const created = Date.parse(String(e.createdAt ?? ''));
     if (!(now - created > KEEP_MS)) continue;
     const decision = ((e.check as Attr | undefined)?.decision as Attr | undefined)?.object;

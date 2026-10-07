@@ -38,14 +38,24 @@ export class Broker {
     if (res.status !== 201) throw new BrokerError('create', res.status);
   }
 
-  /** Road restrictions, newest first, with system attributes (createdAt). */
-  async listRoadRestrictions(limit = 100): Promise<Entity[]> {
-    const res = await this.call('GET', `/entities?type=RoadRestriction&limit=${limit}&options=sysAttrs`, {
-      headers: { accept: 'application/json', link: link(TRANSPORTATION_CONTEXT) },
-    });
-    if (!res.ok) throw new BrokerError('list', res.status);
-    const list = (await res.json()) as Entity[];
-    return list.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+  /**
+   * All road restrictions, newest first, with system attributes (createdAt).
+   * Paged (NGSI-LD brokers cap a page; GeonicDB at 1000); `max` bounds the
+   * total, far above what a day of demo data holds.
+   */
+  async listRoadRestrictions(max = 5000): Promise<Entity[]> {
+    const page = 1000;
+    const all: Entity[] = [];
+    for (let offset = 0; offset < max; offset += page) {
+      const res = await this.call('GET', `/entities?type=RoadRestriction&limit=${page}&offset=${offset}&options=sysAttrs`, {
+        headers: { accept: 'application/json', link: link(TRANSPORTATION_CONTEXT) },
+      });
+      if (!res.ok) throw new BrokerError('list', res.status);
+      const batch = (await res.json()) as Entity[];
+      all.push(...batch);
+      if (batch.length < page) break;
+    }
+    return all.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
   }
 
   /** With sysAttrs, attributes and sub-attributes carry createdAt/modifiedAt: never write those back. */
@@ -73,6 +83,17 @@ export class Broker {
       headers: { 'content-type': 'application/ld+json' },
     });
     if (!res.ok) throw new BrokerError('update decision', res.status);
+  }
+
+  /**
+   * A Decision entity as stored, without a context: its terms come back as
+   * full IRIs (prov:, dpv:, datamodels.jp), which is what the page shows.
+   */
+  async getDecision(id: string): Promise<Entity | null> {
+    const res = await this.call('GET', `/entities/${encodeURIComponent(id)}`, { headers: { accept: 'application/json' } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new BrokerError('get decision', res.status);
+    return (await res.json()) as Entity;
   }
 
   /** Deletes an entity; a missing one is fine. */

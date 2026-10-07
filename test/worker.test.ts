@@ -12,7 +12,7 @@ type Call = { method: string; url: string; headers: Headers; body: any };
 let calls: Call[] = [];
 let answer: (c: Call) => Response | undefined;
 const P = (value: unknown) => ({ type: 'Property', value });
-const PAGE = 'https://geolonia.github.io';
+const PAGE = 'https://pointsman-demo.geolonia.workers.dev';
 const BROKER = 'https://geolonia-demo.geonicdb.jp/ngsi-ld/v1';
 // Made at run time: no token-looking literal in the repository.
 const GH_TOKEN = `ghs_${crypto.randomUUID().replaceAll('-', '')}`;
@@ -73,6 +73,26 @@ describe('reports from the page', () => {
     await env.DEMO.put(`day:${new Date().toISOString().slice(0, 10)}`, '300');
     expect((await post('/api/reports', { prepared: 'vague', lang: 'en' })).status).toBe(429);
     expect(calls).toHaveLength(0);
+  });
+
+  it('shows one report with its NGSI-LD data and issue', async () => {
+    const id = 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-0000000000aa';
+    await env.DEMO.put('decision-issue:d-9', '12');
+    answer = (c) => {
+      if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
+        return Response.json({ id, type: 'RoadRestriction', description: P('blocked'), check: { type: 'Property', value: 'review', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-9' } } });
+      }
+      if (c.url === `${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Decision:d-9')}`) {
+        expect(c.headers.get('link')).toBeNull(); // full IRIs for the page
+        return Response.json({ id: 'urn:ngsi-ld:Decision:d-9', type: 'https://datamodels.jp/ns/decision/Decision' });
+      }
+      return undefined;
+    };
+    // As the page asks: percent-encoded.
+    const r = await (await worker(`/api/reports/${encodeURIComponent(id)}`)).json<any>();
+    expect(r).toMatchObject({ id, prepared: false, check: { action: 'review', decision: 'urn:ngsi-ld:Decision:d-9' }, issue: 'https://github.com/geolonia/pointsman-demo/issues/12' });
+    expect(r.ngsi.entity.id).toBe(id);
+    expect(r.ngsi.decision.type).toBe('https://datamodels.jp/ns/decision/Decision');
   });
 
   it('serves the configuration for the page', async () => {
