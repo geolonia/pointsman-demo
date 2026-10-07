@@ -1,7 +1,7 @@
 // The demo Worker: the page's API, the FIWARE bridge on /notify, the GitHub
 // review queue, and the daily cleanup. See README.md.
 
-import { type BridgeConfig, DECISION_TERMS, type Route, decisionEntityId, handleRequest } from '../engine/bridge/src/bridge';
+import { type BridgeConfig, DECISION_CONTEXT, type Route, decisionEntityId, handleRequest } from '../engine/bridge/src/bridge';
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
@@ -57,7 +57,6 @@ export default {
       if (url.pathname === '/notify') return await notify(request, env, ctx);
       if (url.pathname === '/github/webhook' && request.method === 'POST') return await webhook(request, env);
       if (url.pathname.startsWith('/api/')) return await api(request, url, env, ctx);
-      if (url.pathname === CONTEXT_PATH && request.method === 'GET') return decisionContext();
       // The page and its files (wrangler.jsonc "assets").
       return env.ASSETS.fetch(request);
     } catch (err) {
@@ -404,19 +403,6 @@ async function turnstileOk(secret: string, token: unknown, ip: string): Promise<
 
 // --- Decisions across entities ----------------------------------------------------
 
-/**
- * The Decision terms (the bridge's DECISION_TERMS), served so the broker can
- * read short names in queries. GeonicDB fetches a context only from a URL
- * served as application/ld+json.
- */
-const CONTEXT_PATH = '/context/decision.jsonld';
-
-function decisionContext(): Response {
-  return new Response(JSON.stringify({ '@context': DECISION_TERMS }, null, 2), {
-    headers: { 'content-type': 'application/ld+json', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' },
-  });
-}
-
 export interface PendingDecision {
   id: string;
   /** The entity the decision is about. */
@@ -434,7 +420,9 @@ const PENDING_SHOWN = 50;
  * (the first page; `pages` says how many pages it took).
  */
 async function pendingDecisions(env: Env): Promise<{ request: { method: 'GET'; url: string; tenant: string; link: string; pages: number }; total: number; decisions: PendingDecision[] }> {
-  const contextUrl = `${trimUrl(env.PUBLIC_URL)}${CONTEXT_PATH}`;
+  // The published Decision context (datamodels.jp): the broker reads the
+  // short names in the query (Decision, reviewStatus) from it.
+  const contextUrl = DECISION_CONTEXT;
   const { query, pages, decisions } = await new Broker(env).listPendingDecisions(contextUrl);
   const shown = decisions.map(pendingOf).sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? '')).slice(0, PENDING_SHOWN);
   await Promise.all(shown.map(async (d) => {
