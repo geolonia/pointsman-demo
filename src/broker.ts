@@ -13,7 +13,9 @@ export type Entity = { id: string; type: string; [attribute: string]: unknown };
 
 export class Broker {
   private readonly base: string;
-  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = fetch) {
+  // A wrapper, not `fetch` itself: Workers refuse `this.fetchFn()` with the
+  // global fetch as a property ("Illegal invocation").
+  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = (input, init) => fetch(input, init)) {
     this.base = `${trimUrl(env.BROKER_URL)}/ngsi-ld/v1`;
   }
 
