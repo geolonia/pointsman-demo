@@ -75,8 +75,9 @@ Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.
 - Prepared reports by default; free text only with Cloudflare Turnstile
   (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET`), at most 300 characters, inside
   the demo area.
-- 10 reports per visitor and minute; `DAILY_LIMIT` reports a day (each is one
-  Pointsman call).
+- 10 reports per visitor and minute; `DAILY_LIMIT` reports a day. A report
+  is one Pointsman call, or two when step 1 decides `urgent` or `review` and
+  the chain runs.
 - Everything is deleted after a day. Do not write personal data.
 
 ## Setup
@@ -87,13 +88,13 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 |---|---|
 | `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check` and `evacuation-access-check` |
 | `BROKER_API_KEY` | 1Password `geonic-apps` / `geonicdb-production-geolonia-demo-pointsman_demo-apikey` |
-| `NOTIFY_SECRET` | Random; the subscription sends it (`scripts/setup.mjs`) |
+| `NOTIFY_SECRET` | Random; both subscriptions send it (`scripts/setup.mjs`) |
 | `GITHUB_WEBHOOK_SECRET` | 1Password `geolonia-ops` / "Pointsman demo GitHub App" (password) |
 | `GITHUB_APP_PRIVATE_KEY` | Same item, the private key converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt` |
 | `TURNSTILE_SECRET` | Optional |
 
-Then, once: `node scripts/setup.mjs` creates the subscription in the broker and
-the issue labels.
+Then, once: `node scripts/setup.mjs` creates both subscriptions in the broker
+(new reports, and the chain's step 2) and the issue labels.
 
 ## Deployment
 
