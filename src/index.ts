@@ -362,17 +362,20 @@ export interface PendingDecision {
 /** At most this many are listed (newest first); each needs a KV read for its issue. */
 const PENDING_SHOWN = 50;
 
-/** Decisions waiting for a person, with the NGSI-LD request that found them. */
-async function pendingDecisions(env: Env): Promise<{ request: { method: 'GET'; url: string; tenant: string; link: string }; total: number; decisions: PendingDecision[] }> {
+/**
+ * Decisions waiting for a person, with the NGSI-LD request that found them
+ * (the first page; `pages` says how many pages it took).
+ */
+async function pendingDecisions(env: Env): Promise<{ request: { method: 'GET'; url: string; tenant: string; link: string; pages: number }; total: number; decisions: PendingDecision[] }> {
   const contextUrl = `${trimUrl(env.PUBLIC_URL)}${CONTEXT_PATH}`;
-  const { query, decisions } = await new Broker(env).listPendingDecisions(contextUrl);
+  const { query, pages, decisions } = await new Broker(env).listPendingDecisions(contextUrl);
   const shown = decisions.map(pendingOf).sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? '')).slice(0, PENDING_SHOWN);
   await Promise.all(shown.map(async (d) => {
     const n = await env.DEMO.get(`decision-issue:${d.id.split(':').pop()}`);
     d.issue = n && /^\d+$/.test(n) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${n}` : null;
   }));
   return {
-    request: { method: 'GET', url: `${trimUrl(env.BROKER_URL)}/ngsi-ld/v1${query}`, tenant: env.BROKER_TENANT, link: contextUrl },
+    request: { method: 'GET', url: `${trimUrl(env.BROKER_URL)}/ngsi-ld/v1${query}`, tenant: env.BROKER_TENANT, link: contextUrl, pages },
     total: decisions.length,
     decisions: shown,
   };

@@ -100,14 +100,24 @@ export class Broker {
    * Decision entities that wait for a person (reviewStatus "pending"), across
    * all entities, in one NGSI-LD query. The broker reads the short names
    * (Decision, reviewStatus) from `contextUrl`: it must be a URL the broker
-   * can fetch, served as application/ld+json. One page: a day of demo data
-   * stays far below it.
+   * can fetch, served as application/ld+json. Paged like
+   * listRoadRestrictions; `query` is the first page's request, `pages` how
+   * many were read.
    */
-  async listPendingDecisions(contextUrl: string): Promise<{ query: string; decisions: Entity[] }> {
-    const query = `/entities?type=Decision&q=${encodeURIComponent('reviewStatus=="pending"')}&limit=1000`;
-    const res = await this.call('GET', query, { headers: { accept: 'application/json', link: link(contextUrl) } });
-    if (!res.ok) throw new BrokerError('list decisions', res.status);
-    return { query, decisions: (await res.json()) as Entity[] };
+  async listPendingDecisions(contextUrl: string, max = 5000): Promise<{ query: string; pages: number; decisions: Entity[] }> {
+    const page = 1000;
+    const base = `/entities?type=Decision&q=${encodeURIComponent('reviewStatus=="pending"')}&limit=${page}`;
+    const decisions: Entity[] = [];
+    let pages = 0;
+    for (let offset = 0; offset < max; offset += page) {
+      const res = await this.call('GET', offset ? `${base}&offset=${offset}` : base, { headers: { accept: 'application/json', link: link(contextUrl) } });
+      if (!res.ok) throw new BrokerError('list decisions', res.status);
+      const batch = (await res.json()) as Entity[];
+      decisions.push(...batch);
+      pages += 1;
+      if (batch.length < page) break;
+    }
+    return { query: base, pages, decisions };
   }
 
   /** Deletes an entity; a missing one is fine. */

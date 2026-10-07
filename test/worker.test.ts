@@ -118,7 +118,7 @@ describe('reports from the page', () => {
     expect(list.headers.get('link')).toContain('<https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld>');
     const body = await res.json<any>();
     expect(body.total).toBe(2);
-    expect(body.request).toMatchObject({ method: 'GET', tenant: 'pointsman_demo', link: 'https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld' });
+    expect(body.request).toMatchObject({ method: 'GET', tenant: 'pointsman_demo', pages: 1, link: 'https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld' });
     expect(body.request.url).toBe(list.url);
     expect(body.decisions).toEqual([
       { id: 'urn:ngsi-ld:Decision:d-2', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-2', action: 'urgent', decidedAt: '2026-10-07T02:00:00Z', issue: 'https://github.com/geolonia/pointsman-demo/issues/21' },

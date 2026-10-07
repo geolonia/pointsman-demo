@@ -39,6 +39,7 @@
       waitingTitle: 'Waiting for a person',
       waitingNote: 'One NGSI-LD query across all reports: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can ask the broker the same.',
       waitingNone: 'Nothing is waiting right now.', showQuery: 'the query', more: function (n) { return n + ' more'; },
+      waitingFailed: 'Could not load the list.', waitingStale: 'Could not update the list; it may be out of date.',
     },
     ja: {
       demo: 'FIWARE デモ', title: '大雨。通行止めの報告が次々に届く。',
@@ -71,6 +72,7 @@
       waitingTitle: '人の確認待ち',
       waitingNote: 'すべての報告をまたぐ NGSI-LD のクエリ 1 つで、<code>reviewStatus</code> が "pending" の <code>Decision</code> エンティティを探しています。ほかの FIWARE アプリも同じ問い合わせができます。',
       waitingNone: '今は確認待ちはありません。', showQuery: 'クエリ', more: function (n) { return 'ほか ' + n + ' 件'; },
+      waitingFailed: '一覧を読み込めませんでした。', waitingStale: '一覧を更新できませんでした。古い可能性があります。',
     },
   };
 
@@ -78,6 +80,7 @@
   var config = null;
   var reports = [];
   var pending = null; // { request, total, decisions } from /api/decisions
+  var pendingFailed = false; // the last update failed (the list, if any, is older)
   var current = null; // { id, sentAt, request, poll }
   var maps = {};
 
@@ -157,10 +160,12 @@
 
   function loadPending() {
     return api('/api/decisions').then(function (r) {
-      if (!r.ok) return;
+      if (!r.ok || !r.body || !Array.isArray(r.body.decisions)) throw new Error(String(r.status));
       pending = r.body;
-      renderPending();
-    }).catch(function () {});
+      pendingFailed = false;
+    }).catch(function () {
+      pendingFailed = true;
+    }).then(renderPending);
   }
 
   // --- Sending ----------------------------------------------------------------
@@ -306,6 +311,8 @@
     var info = document.getElementById('pending-info');
     list.textContent = '';
     info.textContent = '';
+    // Without a list, say so; with one, keep it and say it may be old.
+    if (pendingFailed) info.appendChild(el('p', { class: 'error small', text: t(pending ? 'waitingStale' : 'waitingFailed') }));
     if (!pending) return;
     var now = Date.now();
     var byId = {};
