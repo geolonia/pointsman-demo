@@ -11,6 +11,8 @@ export interface Env {
   GITHUB_INSTALLATION_ID: string;
   /** Pointsman calls allowed per UTC day; reports beyond it are refused. */
   DAILY_LIMIT: string;
+  /** Where this Worker is reachable from the broker (serves /context/decision.jsonld). */
+  PUBLIC_URL: string;
   /** Origins allowed to call /api (the demo page). */
   ALLOWED_ORIGINS: string;
   TURNSTILE_SITE_KEY?: string;
@@ -33,14 +35,14 @@ export interface Env {
 
 const REQUIRED = [
   'POINTSMAN_URL', 'BROKER_URL', 'BROKER_TENANT', 'GITHUB_REPOSITORY', 'GITHUB_APP_ID', 'GITHUB_INSTALLATION_ID',
-  'DAILY_LIMIT', 'ALLOWED_ORIGINS', 'POINTSMAN_TOKEN', 'BROKER_API_KEY', 'NOTIFY_SECRET', 'GITHUB_WEBHOOK_SECRET',
+  'DAILY_LIMIT', 'PUBLIC_URL', 'ALLOWED_ORIGINS', 'POINTSMAN_TOKEN', 'BROKER_API_KEY', 'NOTIFY_SECRET', 'GITHUB_WEBHOOK_SECRET',
   'GITHUB_APP_PRIVATE_KEY',
 ] as const;
 
 /** Throws naming the first missing or invalid setting. */
 export function checkEnv(env: Env): void {
   for (const name of REQUIRED) if (!env[name]) throw new Error(`${name} is not set`);
-  for (const name of ['POINTSMAN_URL', 'BROKER_URL'] as const) {
+  for (const name of ['POINTSMAN_URL', 'BROKER_URL', 'PUBLIC_URL'] as const) {
     const u = URL.parse(env[name]);
     if (!u || (u.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(u.hostname))) {
       throw new Error(`${name} must be an https URL (http only for localhost)`);

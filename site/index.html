@@ -78,6 +78,13 @@
     <ul id="reports" class="reports"></ul>
   </section>
 
+  <section class="panel">
+    <h2 data-i18n="waitingTitle">Waiting for a person</h2>
+    <p class="muted small" data-i18n="waitingNote">One NGSI-LD query across all reports: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can ask the broker the same.</p>
+    <ul id="pending" class="reports pending"></ul>
+    <div id="pending-info"></div>
+  </section>
+
   <section class="panel explain">
     <h2 data-i18n="what">What just happened</h2>
     <ol>

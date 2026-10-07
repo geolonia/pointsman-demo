@@ -114,6 +114,9 @@ pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 
 .reports button:hover { border-color: var(--muted); }
 .reports .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
 .reports .time { font: 0.78rem var(--mono); color: var(--muted); }
+.pending li { display: grid; grid-template-columns: minmax(0, 1fr) 3.5rem; gap: 8px; align-items: center; }
+.pending .issue { font: 0.85rem var(--mono); text-align: right; }
+#pending-info p { margin: 8px 0 0; }
 
 .explain ol { margin: 0 0 10px; padding-left: 1.2rem; color: var(--fg-2); }
 .explain li { margin-bottom: 6px; }

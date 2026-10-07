@@ -96,6 +96,20 @@ export class Broker {
     return (await res.json()) as Entity;
   }
 
+  /**
+   * Decision entities that wait for a person (reviewStatus "pending"), across
+   * all entities, in one NGSI-LD query. The broker reads the short names
+   * (Decision, reviewStatus) from `contextUrl`: it must be a URL the broker
+   * can fetch, served as application/ld+json. One page: a day of demo data
+   * stays far below it.
+   */
+  async listPendingDecisions(contextUrl: string): Promise<{ query: string; decisions: Entity[] }> {
+    const query = `/entities?type=Decision&q=${encodeURIComponent('reviewStatus=="pending"')}&limit=1000`;
+    const res = await this.call('GET', query, { headers: { accept: 'application/json', link: link(contextUrl) } });
+    if (!res.ok) throw new BrokerError('list decisions', res.status);
+    return { query, decisions: (await res.json()) as Entity[] };
+  }
+
   /** Deletes an entity; a missing one is fine. */
   async delete(id: string): Promise<void> {
     const res = await this.call('DELETE', `/entities/${encodeURIComponent(id)}`);

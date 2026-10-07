@@ -36,6 +36,9 @@
       yes: 'yes', no: 'no', usage: function (u, l) { return u + ' of ' + l + ' reports today'; },
       sent: 'sent', limit: 'The demo reached its limit for today.', failed: 'Could not send the report: ',
       ago: function (s) { return s < 60 ? s + ' s ago' : Math.round(s / 60) + ' min ago'; },
+      waitingTitle: 'Waiting for a person',
+      waitingNote: 'One NGSI-LD query across all reports: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can ask the broker the same.',
+      waitingNone: 'Nothing is waiting right now.', showQuery: 'the query', more: function (n) { return n + ' more'; },
     },
     ja: {
       demo: 'FIWARE デモ', title: '大雨。通行止めの報告が次々に届く。',
@@ -65,12 +68,16 @@
       yes: 'はい', no: 'いいえ', usage: function (u, l) { return '本日 ' + u + ' / ' + l + ' 件'; },
       sent: '送信済み', limit: '本日のデモの上限に達しました。', failed: '報告を送れませんでした：',
       ago: function (s) { return s < 60 ? s + ' 秒前' : Math.round(s / 60) + ' 分前'; },
+      waitingTitle: '人の確認待ち',
+      waitingNote: 'すべての報告をまたぐ NGSI-LD のクエリ 1 つで、<code>reviewStatus</code> が "pending" の <code>Decision</code> エンティティを探しています。ほかの FIWARE アプリも同じ問い合わせができます。',
+      waitingNone: '今は確認待ちはありません。', showQuery: 'クエリ', more: function (n) { return 'ほか ' + n + ' 件'; },
     },
   };
 
   var lang = pickLang();
   var config = null;
   var reports = [];
+  var pending = null; // { request, total, decisions } from /api/decisions
   var current = null; // { id, sentAt, request, poll }
   var maps = {};
 
@@ -101,6 +108,7 @@
     document.getElementById('lang').textContent = lang === 'ja' ? 'English' : '日本語';
     renderPrepared();
     renderReports();
+    renderPending();
     if (current) renderCurrent(current.last);
   }
 
@@ -145,6 +153,14 @@
       renderReports();
       updateMaps();
     });
+  }
+
+  function loadPending() {
+    return api('/api/decisions').then(function (r) {
+      if (!r.ok) return;
+      pending = r.body;
+      renderPending();
+    }).catch(function () {});
   }
 
   // --- Sending ----------------------------------------------------------------
@@ -283,6 +299,38 @@
     });
   }
 
+  // --- Waiting for a person (Decision entities) ---------------------------------------
+
+  function renderPending() {
+    var list = document.getElementById('pending');
+    var info = document.getElementById('pending-info');
+    list.textContent = '';
+    info.textContent = '';
+    if (!pending) return;
+    var now = Date.now();
+    var byId = {};
+    reports.forEach(function (r) { byId[r.id] = r; });
+    pending.decisions.forEach(function (d) {
+      var r = d.refersTo && byId[d.refersTo];
+      var a = d.action || 'review';
+      list.appendChild(el('li', null, [
+        el('button', { type: 'button', onclick: function () { if (d.refersTo) { watch(d.refersTo, null); if (r) focus(r); } } }, [
+          el('span', { class: 'badge ' + a, text: t(a) || a }),
+          el('span', { class: 'text', text: r ? (r.roadName ? r.roadName + ' — ' : '') + r.description : d.id }),
+          el('span', { class: 'time', text: d.decidedAt ? t('ago')(Math.max(0, Math.round((now - Date.parse(d.decidedAt)) / 1000))) : '' }),
+        ]),
+        d.issue ? el('a', { class: 'issue', href: d.issue, target: '_blank', rel: 'noopener', text: '#' + d.issue.split('/').pop() }) : el('span'),
+      ]));
+    });
+    if (pending.total === 0) info.appendChild(el('p', { class: 'muted small', text: t('waitingNone') }));
+    else if (pending.total > pending.decisions.length) info.appendChild(el('p', { class: 'muted small', text: t('more')(pending.total - pending.decisions.length) }));
+    var q = pending.request;
+    var url = q.url;
+    try { url = decodeURIComponent(q.url); } catch (e) {}
+    info.appendChild(el('details', null, [el('summary', { text: t('showQuery') }),
+      el('pre', { text: q.method + ' ' + url + '\nNGSILD-Tenant: ' + q.tenant + '\nLink: <' + q.link + '>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"' })]));
+  }
+
   // --- Maps -----------------------------------------------------------------------------
 
   function style() {
@@ -347,5 +395,6 @@
   if (window.maplibregl) { maps.hq = makeMap('map-hq'); maps.pub = makeMap('map-public'); }
   loadConfig();
   loadReports();
-  setInterval(loadReports, 8000);
+  loadPending();
+  setInterval(function () { loadReports(); loadPending(); }, 8000);
 })();
