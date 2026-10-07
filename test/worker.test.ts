@@ -133,7 +133,7 @@ describe('notifications (the bridge)', () => {
     answer = (c) => (c.url.endsWith('/issues') ? (++issueCalls === 1 ? new Response(null, { status: 502 }) : undefined) : decide(c));
     await notify();
     await vi.waitFor(() => expect(issueCalls).toBe(1));
-    await vi.waitFor(async () => expect(await env.DEMO.get('decision-issue:11111111-1111-4111-8111-111111111111')).toBeNull());
+    await vi.waitFor(async () => expect(await env.DEMO.get('decision-pending:11111111-1111-4111-8111-111111111111')).toBeNull());
     await notify();
     await vi.waitFor(async () => expect(await env.DEMO.get('issue:7')).not.toBeNull());
     expect(issueCalls).toBe(2);

@@ -85,14 +85,19 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // Free text from visitors never goes to GitHub: only prepared reports.
   if (!report?.prepared) return;
   // A retried notification must not open a second issue.
-  if (await env.DEMO.get(`decision-issue:${decision}`)) return;
-  await env.DEMO.put(`decision-issue:${decision}`, 'pending', { expirationTtl: KV_TTL });
+  // Workers KV takes one write per second per key, so the in-flight marker and
+  // the final record are different keys, each written once.
+  const [opened, inFlight] = await Promise.all([env.DEMO.get(`decision-issue:${decision}`), env.DEMO.get(`decision-pending:${decision}`)]);
+  if (opened || inFlight) return;
+  // Short-lived (60 s is the KV minimum): only guards against parallel retries.
+  await env.DEMO.put(`decision-pending:${decision}`, '1', { expirationTtl: 60 });
   let issue: Issue;
   try {
     issue = await createIssueFor(env, entityId, decision, action);
   } catch (err) {
-    // No issue was created: let a retried notification try again.
-    await env.DEMO.delete(`decision-issue:${decision}`);
+    // No issue was created: let a retried notification try again (if this
+    // delete is refused, the marker expires within a minute anyway).
+    await env.DEMO.delete(`decision-pending:${decision}`).catch(() => {});
     throw err;
   }
   // The issue exists now: keep the marker even if a write below fails, so a
@@ -283,8 +288,11 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     await env.DEMO.put(`report:${entity.id}`, JSON.stringify(record), { expirationTtl: KV_TTL });
     await new Broker(env).createRoadRestriction(entity);
     // Counted once the broker has the report (each one is a Pointsman call).
-    // KV counts approximately (eventual consistency); good enough for a ceiling.
-    await env.DEMO.put(`day:${today}`, String(used + 1), { expirationTtl: KV_TTL });
+    // Best effort: KV is eventually consistent and takes one write per second
+    // per key, so at busy moments a count is lost; the ceiling is approximate,
+    // and an accepted report must never answer with an error.
+    ctx.waitUntil(env.DEMO.put(`day:${today}`, String(used + 1), { expirationTtl: KV_TTL })
+      .catch((err) => console.error(`daily count: ${(err as Error).message}`)));
     return json({ id: entity.id }, 201, cors);
   }
 
