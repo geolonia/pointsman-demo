@@ -26,6 +26,7 @@ export interface Env {
   TURNSTILE_SECRET?: string;
 
   // Bindings
+  ASSETS: Fetcher;
   DEMO: KVNamespace;
   REPORT_LIMIT: RateLimit;
 }

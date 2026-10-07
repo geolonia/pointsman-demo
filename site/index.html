@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointsman FIWARE demo</title>
+<meta name="description" content="Road restriction reports in an NGSI-LD context broker, checked by Pointsman before they are published.">
+<meta name="theme-color" content="#141414">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" integrity="sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK" crossorigin="anonymous">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Theme before the first paint (same rule as the Pointsman landing page).
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="https://github.com/geolonia/pointsman"><img class="mark light" src="favicon.svg" alt="" width="22" height="22"><img class="mark dark" src="mark-on-dark.svg" alt="" width="22" height="22"><span>Pointsman</span><span class="tag" data-i18n="demo">FIWARE demo</span></a>
+  <nav>
+    <button class="chip" id="lang" type="button">日本語</button>
+    <button class="chip" id="theme" type="button" aria-label="Switch theme">◐</button>
+  </nav>
+</header>
+
+<main>
+  <section class="intro">
+    <h1 data-i18n="title">Heavy rain. Reports of closed roads are coming in.</h1>
+    <p data-i18n="lead">Each report becomes a <code>RoadRestriction</code> entity in an NGSI-LD context broker. Pointsman checks it within seconds: clear reports go straight to the residents' map, unclear ones to a person, urgent ones first.</p>
+  </section>
+
+  <section class="maps">
+    <figure class="map-card">
+      <figcaption><strong data-i18n="hq">Headquarters</strong> <span class="muted" data-i18n="hqNote">every report</span></figcaption>
+      <div id="map-hq" class="map" role="img" aria-label="Map of all reports"></div>
+    </figure>
+    <figure class="map-card">
+      <figcaption><strong data-i18n="residents">Residents</strong> <span class="muted" data-i18n="residentsNote">only what is published</span></figcaption>
+      <div id="map-public" class="map" role="img" aria-label="Map of published reports"></div>
+    </figure>
+    <ul class="legend">
+      <li><span class="dot publish"></span><span data-i18n="publish">publish</span></li>
+      <li><span class="dot review"></span><span data-i18n="review">review</span></li>
+      <li><span class="dot urgent"></span><span data-i18n="urgent">urgent</span></li>
+      <li><span class="dot reject"></span><span data-i18n="reject">rejected</span></li>
+      <li><span class="dot pending"></span><span data-i18n="pending">waiting for Pointsman</span></li>
+    </ul>
+  </section>
+
+  <section class="work">
+    <div class="panel">
+      <h2 data-i18n="send">1. Send a report</h2>
+      <p class="muted" data-i18n="sendNote">Pick one. Each is a real request to the broker; Pointsman answers it live.</p>
+      <ul id="prepared" class="prepared"></ul>
+      <p id="free-note" class="muted small" data-i18n="freeOff">Free text is switched off in this demo: only prepared reports.</p>
+      <p id="send-error" class="error" hidden></p>
+      <p id="usage" class="muted small"></p>
+    </div>
+
+    <div class="panel" id="current" hidden>
+      <h2 data-i18n="watch">2. Watch</h2>
+      <ol class="timeline" id="timeline"></ol>
+      <div id="result"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 data-i18n="recent">Recent reports</h2>
+    <p class="muted small" data-i18n="recentNote">Everyone sees the same reports. Demo data is deleted after a day.</p>
+    <ul id="reports" class="reports"></ul>
+  </section>
+
+  <section class="panel explain">
+    <h2 data-i18n="what">What just happened</h2>
+    <ol>
+      <li data-i18n="w1">The page created a <code>RoadRestriction</code> entity (<a href="https://datamodels.jp/models/transportation/RoadRestriction/">datamodels.jp</a>) in GeonicDB, an NGSI-LD context broker.</li>
+      <li data-i18n="w2">A subscription notified the bridge. It sent the entity, as it is, to Pointsman: the profile reads the attributes it needs, no mapping code.</li>
+      <li data-i18n="w3">Pointsman asked the model four typed questions and turned the answers into an action with the city's rules. The bridge wrote the result back to the entity (<code>check</code>) and as a <code>Decision</code> entity, so other FIWARE apps can subscribe to it.</li>
+      <li data-i18n="w4">Reports that need a person became GitHub issues. A member resolves one with <code>/publish</code> or <code>/reject</code>; the answer goes back to Pointsman as feedback.</li>
+    </ol>
+    <p class="links">
+      <a href="https://github.com/geolonia/pointsman/blob/main/examples/profiles/road-restriction-check.yaml" data-i18n="lProfile">The profile</a>
+      <a href="https://github.com/geolonia/pointsman/tree/main/bridge" data-i18n="lBridge">The bridge</a>
+      <a href="https://github.com/geolonia/pointsman/blob/main/docs/fiware-demo.md" data-i18n="lStory">Why it works this way</a>
+      <a href="https://github.com/geolonia/pointsman-demo" data-i18n="lSource">Source of this demo</a>
+      <a href="https://github.com/geolonia/pointsman-demo/issues?q=label%3Ademo" data-i18n="lQueue">The review queue</a>
+    </p>
+  </section>
+</main>
+
+<footer>
+  <p class="muted small" data-i18n="footer">Invented events at real places. Do not enter personal data. Map: <a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>.</p>
+</footer>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js" integrity="sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp" crossorigin="anonymous"></script>
+<script src="app.js"></script>
+</body>
+</html>

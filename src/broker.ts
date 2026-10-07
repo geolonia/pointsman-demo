@@ -75,6 +75,17 @@ export class Broker {
     if (!res.ok) throw new BrokerError('update decision', res.status);
   }
 
+  /**
+   * A Decision entity as stored, without a context: its terms come back as
+   * full IRIs (prov:, dpv:, datamodels.jp), which is what the page shows.
+   */
+  async getDecision(id: string): Promise<Entity | null> {
+    const res = await this.call('GET', `/entities/${encodeURIComponent(id)}`, { headers: { accept: 'application/json' } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new BrokerError('get decision', res.status);
+    return (await res.json()) as Entity;
+  }
+
   /** Deletes an entity; a missing one is fine. */
   async delete(id: string): Promise<void> {
     const res = await this.call('DELETE', `/entities/${encodeURIComponent(id)}`);
