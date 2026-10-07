@@ -59,6 +59,12 @@ describe('reports from the page', () => {
     expect(await env.DEMO.get(`day:${new Date().toISOString().slice(0, 10)}`)).toBe('1');
   });
 
+  it('does not count a report the broker refused', async () => {
+    answer = (c) => (c.url === `${BROKER}/entities` ? new Response(null, { status: 503 }) : undefined);
+    expect((await post('/api/reports', { prepared: 'vague', lang: 'en' })).status).toBe(502);
+    expect(await env.DEMO.get(`day:${new Date().toISOString().slice(0, 10)}`)).toBeNull();
+  });
+
   it('refuses other origins, free text without Turnstile, and the day after the limit', async () => {
     expect((await post('/api/reports', { prepared: 'vague', lang: 'en' }, { origin: 'https://evil.example' })).status).toBe(403);
     const free = { roadName: 'x', status: 'closed', description: 'road blocked', location: { type: 'Point', coordinates: [139.75, 35.69] } };

@@ -4,7 +4,7 @@
 import { type BridgeConfig, type Route, decisionEntityId, handleRequest } from '../engine/bridge/src/bridge';
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
-import { GitHub, verifyWebhook } from './github';
+import { GitHub, type Issue, verifyWebhook } from './github';
 import { AREA, PREPARED, parseReport, toEntity } from './reports';
 import { mayReview, parseCommand } from './review';
 
@@ -87,16 +87,22 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // A retried notification must not open a second issue.
   if (await env.DEMO.get(`decision-issue:${decision}`)) return;
   await env.DEMO.put(`decision-issue:${decision}`, 'pending', { expirationTtl: KV_TTL });
+  let issue: Issue;
   try {
-    await createIssueFor(env, entityId, decision, action);
+    issue = await createIssueFor(env, entityId, decision, action);
   } catch (err) {
-    // Let a retried notification try again.
+    // No issue was created: let a retried notification try again.
     await env.DEMO.delete(`decision-issue:${decision}`);
     throw err;
   }
+  // The issue exists now: keep the marker even if a write below fails, so a
+  // retry never opens a second issue for the same decision.
+  const record: IssueRecord = { decision, entity: entityId, action, corrections: [], createdAt: new Date().toISOString() };
+  await env.DEMO.put(`decision-issue:${decision}`, String(issue.number), { expirationTtl: KV_TTL });
+  await env.DEMO.put(`issue:${issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
 }
 
-async function createIssueFor(env: Env, entityId: string, decision: string, action: string): Promise<void> {
+async function createIssueFor(env: Env, entityId: string, decision: string, action: string): Promise<Issue> {
   const entity = await new Broker(env).getRoadRestriction(entityId);
   if (!entity) throw new Error('report not found in the broker');
   const r = summarize(entity);
@@ -120,10 +126,7 @@ async function createIssueFor(env: Env, entityId: string, decision: string, acti
     `<!-- decision: ${decision} entity: ${entityId} -->`,
   ].join('\n');
   const title = `[${action}] ${r.roadName || 'Report'}: ${r.description.slice(0, 60)}${r.description.length > 60 ? '…' : ''}`;
-  const issue = await new GitHub(env).createIssue(title, body, ['demo', action]);
-  const record: IssueRecord = { decision, entity: entityId, action, corrections: [], createdAt: new Date().toISOString() };
-  await env.DEMO.put(`issue:${issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
-  await env.DEMO.put(`decision-issue:${decision}`, String(issue.number), { expirationTtl: KV_TTL });
+  return new GitHub(env).createIssue(title, body, ['demo', action]);
 }
 
 // --- Reviews from GitHub -----------------------------------------------------
@@ -274,13 +277,14 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       if (!env.TURNSTILE_SECRET) return json({ error: 'only prepared reports in this demo' }, 403, cors);
       if (!(await turnstileOk(env.TURNSTILE_SECRET, turnstile, ip))) return json({ error: 'please confirm you are human' }, 403, cors);
     }
-    // KV counts approximately (eventual consistency); good enough for a ceiling.
-    await env.DEMO.put(`day:${today}`, String(used + 1), { expirationTtl: KV_TTL });
     const { entity, prepared } = toEntity(input);
     const record: ReportRecord = { ...(prepared && { prepared }), createdAt: new Date().toISOString() };
     // Before the entity: the notification may arrive before this call returns.
     await env.DEMO.put(`report:${entity.id}`, JSON.stringify(record), { expirationTtl: KV_TTL });
     await new Broker(env).createRoadRestriction(entity);
+    // Counted once the broker has the report (each one is a Pointsman call).
+    // KV counts approximately (eventual consistency); good enough for a ceiling.
+    await env.DEMO.put(`day:${today}`, String(used + 1), { expirationTtl: KV_TTL });
     return json({ id: entity.id }, 201, cors);
   }
 
