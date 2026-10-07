@@ -31,10 +31,17 @@ flowchart LR
    the entity as `check`, plus a `Decision` entity.
 3. `review` and `urgent` reports become issues here, for prepared reports only
    (free text from visitors never goes to GitHub).
-4. A member comments `/publish` or `/reject`, optionally with corrections
+4. The chain: a second subscription sends `urgent` and `review` results to
+   `/notify?route=evacuation`. The bridge asks Pointsman again (profile
+   `evacuation-access-check`: does the closure cut people off from their
+   evacuation site?) and writes `evacuation`, plus a `Decision` entity that
+   links the first one (`wasInformedBy`). An `alert` creates an `Alert`
+   entity (Smart Data Models) for the site's staff.
+5. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
    in Pointsman, updates the broker, and closes the issue.
-5. Every hour, data older than a day is deleted and its issues are closed.
+6. Every hour, data older than a day is deleted (with its Decision and Alert
+   entities) and its issues are closed.
 
 ## The page
 
@@ -78,7 +85,7 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 
 | Secret | Source |
 |---|---|
-| `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check` |
+| `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check` and `evacuation-access-check` |
 | `BROKER_API_KEY` | 1Password `geonic-apps` / `geonicdb-production-geolonia-demo-pointsman_demo-apikey` |
 | `NOTIFY_SECRET` | Random; the subscription sends it (`scripts/setup.mjs`) |
 | `GITHUB_WEBHOOK_SECRET` | 1Password `geolonia-ops` / "Pointsman demo GitHub App" (password) |
