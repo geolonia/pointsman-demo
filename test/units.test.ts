@@ -151,3 +151,22 @@ describe('the default fetch', () => {
     await expect(gh.fetchFn('http://127.0.0.1:9')).rejects.not.toThrow(/Illegal invocation/);
   });
 });
+
+describe('listing reports', () => {
+  it('pages through all of them, newest first', async () => {
+    const { Broker } = await import('../src/broker');
+    const offsets: number[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      const u = new URL(String(input));
+      const offset = Number(u.searchParams.get('offset'));
+      offsets.push(offset);
+      const n = offset === 0 ? 1000 : 5; // a full page, then the rest
+      return Response.json(Array.from({ length: n }, (_, i) => ({ id: `r${offset + i}`, type: 'RoadRestriction', createdAt: new Date(Date.UTC(2026, 9, 7) + (offset + i) * 1000).toISOString() })));
+    }) as typeof fetch;
+    const env = { BROKER_URL: 'https://broker.test', BROKER_API_KEY: 'k', BROKER_TENANT: 't' } as never;
+    const list = await new Broker(env, fakeFetch).listRoadRestrictions();
+    expect(offsets).toEqual([0, 1000]);
+    expect(list).toHaveLength(1005);
+    expect(list[0]!.id).toBe('r1004');
+  });
+});

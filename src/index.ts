@@ -393,7 +393,7 @@ export function summarize(e: Entity): Summary {
 export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: number; closed: number }> {
   const broker = new Broker(env);
   let deleted = 0;
-  for (const e of await broker.listRoadRestrictions(1000)) {
+  for (const e of await broker.listRoadRestrictions()) {
     const created = Date.parse(String(e.createdAt ?? ''));
     if (!(now - created > KEEP_MS)) continue;
     const decision = ((e.check as Attr | undefined)?.decision as Attr | undefined)?.object;

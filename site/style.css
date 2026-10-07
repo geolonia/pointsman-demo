@@ -96,9 +96,10 @@ details summary { cursor: pointer; font: 0.8rem var(--mono); color: var(--muted)
 pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; max-height: 320px; margin: 6px 0 0; }
 
 .outcome { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+/* Darker than the map colours, so white text keeps at least 4.5:1 (WCAG AA). */
 .badge { font: 600 0.85rem var(--mono); padding: 3px 10px; border-radius: 999px; color: #fff; }
-.badge.publish { background: var(--green); } .badge.review { background: var(--amber); } .badge.urgent { background: var(--red); }
-.badge.reject { background: var(--violet); } .badge.pending { background: var(--grey); }
+.badge.publish { background: #1E7A50; } .badge.review { background: #8A5A0C; } .badge.urgent { background: #A8352B; }
+.badge.reject { background: #5E4FA0; } .badge.pending { background: #5E5A54; }
 .answers { display: grid; gap: 8px; margin: 8px 0 12px; }
 .answer .label { display: flex; justify-content: space-between; font-size: 0.9rem; }
 .answer .label code { color: var(--fg); }

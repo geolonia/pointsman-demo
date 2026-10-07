@@ -38,14 +38,24 @@ export class Broker {
     if (res.status !== 201) throw new BrokerError('create', res.status);
   }
 
-  /** Road restrictions, newest first, with system attributes (createdAt). */
-  async listRoadRestrictions(limit = 100): Promise<Entity[]> {
-    const res = await this.call('GET', `/entities?type=RoadRestriction&limit=${limit}&options=sysAttrs`, {
-      headers: { accept: 'application/json', link: link(TRANSPORTATION_CONTEXT) },
-    });
-    if (!res.ok) throw new BrokerError('list', res.status);
-    const list = (await res.json()) as Entity[];
-    return list.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+  /**
+   * All road restrictions, newest first, with system attributes (createdAt).
+   * Paged (NGSI-LD brokers cap a page; GeonicDB at 1000); `max` bounds the
+   * total, far above what a day of demo data holds.
+   */
+  async listRoadRestrictions(max = 5000): Promise<Entity[]> {
+    const page = 1000;
+    const all: Entity[] = [];
+    for (let offset = 0; offset < max; offset += page) {
+      const res = await this.call('GET', `/entities?type=RoadRestriction&limit=${page}&offset=${offset}&options=sysAttrs`, {
+        headers: { accept: 'application/json', link: link(TRANSPORTATION_CONTEXT) },
+      });
+      if (!res.ok) throw new BrokerError('list', res.status);
+      const batch = (await res.json()) as Entity[];
+      all.push(...batch);
+      if (batch.length < page) break;
+    }
+    return all.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
   }
 
   /** With sysAttrs, attributes and sub-attributes carry createdAt/modifiedAt: never write those back. */

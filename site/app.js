@@ -117,12 +117,20 @@
     });
   }
 
+  // Without the configuration there are no buttons: show the error and retry.
   function loadConfig() {
+    var err = document.getElementById('send-error');
     return api('/api/config').then(function (r) {
+      if (!r.ok || !r.body || !Array.isArray(r.body.prepared)) throw new Error(r.body && r.body.error || String(r.status));
       config = r.body;
+      err.hidden = true;
       document.getElementById('free-note').hidden = config.freeText;
       renderUsage();
       renderPrepared();
+    }).catch(function (e) {
+      err.textContent = t('failed') + e.message;
+      err.hidden = false;
+      setTimeout(loadConfig, 5000);
     });
   }
 
