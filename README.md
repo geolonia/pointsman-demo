@@ -31,10 +31,17 @@ flowchart LR
    the entity as `check`, plus a `Decision` entity.
 3. `review` and `urgent` reports become issues here, for prepared reports only
    (free text from visitors never goes to GitHub).
-4. A member comments `/publish` or `/reject`, optionally with corrections
+4. The chain: a second subscription sends `urgent` and `review` results to
+   `/notify?route=evacuation`. The bridge asks Pointsman again (profile
+   `evacuation-access-check`: does the closure cut people off from their
+   evacuation site?) and writes `evacuation`, plus a `Decision` entity that
+   links the first one (`wasInformedBy`). An `alert` creates an `Alert`
+   entity (Smart Data Models) for the site's staff.
+5. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
    in Pointsman, updates the broker, and closes the issue.
-5. Every hour, data older than a day is deleted and its issues are closed.
+6. Every hour, data older than a day is deleted (with its Decision and Alert
+   entities) and its issues are closed.
 
 ## The page
 
@@ -68,8 +75,9 @@ Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.
 - Prepared reports by default; free text only with Cloudflare Turnstile
   (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET`), at most 300 characters, inside
   the demo area.
-- 10 reports per visitor and minute; `DAILY_LIMIT` reports a day (each is one
-  Pointsman call).
+- 10 reports per visitor and minute; `DAILY_LIMIT` reports a day. A report
+  is one Pointsman call, or two when step 1 decides `urgent` or `review` and
+  the chain runs.
 - Everything is deleted after a day. Do not write personal data.
 
 ## Setup
@@ -78,15 +86,15 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 
 | Secret | Source |
 |---|---|
-| `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check` |
+| `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check` and `evacuation-access-check` |
 | `BROKER_API_KEY` | 1Password `geonic-apps` / `geonicdb-production-geolonia-demo-pointsman_demo-apikey` |
-| `NOTIFY_SECRET` | Random; the subscription sends it (`scripts/setup.mjs`) |
+| `NOTIFY_SECRET` | Random; both subscriptions send it (`scripts/setup.mjs`) |
 | `GITHUB_WEBHOOK_SECRET` | 1Password `geolonia-ops` / "Pointsman demo GitHub App" (password) |
 | `GITHUB_APP_PRIVATE_KEY` | Same item, the private key converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt` |
 | `TURNSTILE_SECRET` | Optional |
 
-Then, once: `node scripts/setup.mjs` creates the subscription in the broker and
-the issue labels.
+Then, once: `node scripts/setup.mjs` creates both subscriptions in the broker
+(new reports, and the chain's step 2) and the issue labels.
 
 ## Deployment
 
