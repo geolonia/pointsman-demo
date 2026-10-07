@@ -3,6 +3,7 @@
 // repository only, and webhooks for issue comments.
 
 import type { Env } from './env';
+import { fetchWithAgent } from './http';
 
 const API = 'https://api.github.com';
 const enc = new TextEncoder();
@@ -44,7 +45,7 @@ export class GitHub {
   private token: { value: string; expires: number } | undefined;
 
   // A wrapper, not `fetch` itself: see Broker.
-  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = (input, init) => fetch(input, init)) {}
+  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = fetchWithAgent) {}
 
   private async installationToken(): Promise<string> {
     if (this.token && this.token.expires > Date.now() + 60_000) return this.token.value;

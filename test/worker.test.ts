@@ -52,6 +52,7 @@ describe('reports from the page', () => {
     const { id } = await res.json<{ id: string }>();
     const create = calls.find((c) => c.url === `${BROKER}/entities`)!;
     expect(create.headers.get('x-api-key')).toBe(env.BROKER_API_KEY);
+    expect(create.headers.get('user-agent')).toMatch(/^pointsman-demo/);
     expect(create.headers.get('ngsild-tenant')).toBe('pointsman_demo');
     expect(create.headers.get('link')).toContain('https://datamodels.jp/context/transportation/v1.jsonld');
     expect(create.body).toMatchObject({ id, type: 'RoadRestriction', roadName: P('紀尾井町通り') });
@@ -110,10 +111,13 @@ describe('notifications (the bridge)', () => {
     await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))).toBe(true));
     const decide = calls.find((c) => c.url.includes('/v1/decide/'))!;
     expect(decide.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
+    expect(decide.headers.get('user-agent')).toMatch(/^pointsman-demo/);
     const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision')!;
     expect(decisionEntity.body.humanInvolvement).toEqual({ type: 'VocabProperty', vocab: 'dpv:HumanInvolvementForVerification' });
-    // Every broker request carries the demo's API key and tenant.
+    // Every broker request carries the demo's API key, tenant and a User-Agent
+    // (GeonicDB's firewall refuses requests without one).
     for (const c of calls.filter((x) => x.url.startsWith(BROKER))) {
+      expect(c.headers.get('user-agent')).toMatch(/^pointsman-demo/);
       expect(c.headers.get('x-api-key')).toBe(env.BROKER_API_KEY);
       expect(c.headers.get('ngsild-tenant')).toBe('pointsman_demo');
     }
