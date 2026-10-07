@@ -289,7 +289,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     ]);
     const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
     // Only prepared reports go to the GitHub queue; the page says so.
-    return json({ ...summary, prepared: Boolean(report?.prepared), issue, ngsi: { entity, decision: decisionEntity } }, 200, cors);
+    return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), ngsi: { entity, decision: decisionEntity } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
@@ -398,6 +398,36 @@ export function pendingOf(e: Entity): PendingDecision {
 }
 
 // --- Shapes for the page ---------------------------------------------------------
+
+/** One spatial fact as the page shows it (pointsman docs/profile-format.md#facts). */
+export type PageFact =
+  | { name: string; missing: false; values: Record<string, string | number | boolean | null>; source: string }
+  | { name: string; missing: true; reason: string };
+
+const FACTS_IRI = 'https://datamodels.jp/ns/decision/facts';
+
+/**
+ * The facts of a Decision entity (read without a context, so the attribute
+ * has its full IRI). Items that do not have the expected shape are left out:
+ * the entity comes from the broker, and the page shows the values as text.
+ */
+export function factsOf(decision: Entity | null): PageFact[] {
+  const attr = decision?.[FACTS_IRI] as { json?: unknown } | undefined;
+  if (!Array.isArray(attr?.json)) return [];
+  const out: PageFact[] = [];
+  for (const f of attr.json as Record<string, unknown>[]) {
+    if (!f || typeof f !== 'object' || typeof f.name !== 'string') continue;
+    if (f.missing === true && typeof f.reason === 'string') out.push({ name: f.name, missing: true, reason: f.reason });
+    else if (f.missing === false && typeof f.source === 'string' && f.values && typeof f.values === 'object' && !Array.isArray(f.values)) {
+      const values: Record<string, string | number | boolean | null> = {};
+      for (const [k, v] of Object.entries(f.values as Record<string, unknown>)) {
+        if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) values[k] = v as string | number | boolean | null;
+      }
+      out.push({ name: f.name, missing: false, values, source: f.source });
+    }
+  }
+  return out;
+}
 
 type Attr = { type?: string; value?: unknown; object?: unknown; [sub: string]: unknown };
 const val = (a: unknown) => (a && typeof a === 'object' ? (a as Attr).value : undefined);
