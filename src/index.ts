@@ -110,18 +110,29 @@ async function notify(request: Request, env: Env, ctx: ExecutionContext): Promis
  * the road is closed, which site, how much longer the way on foot is, and
  * the decision that raised it.
  */
-async function createAlert(env: Env, entityId: string, decision: string): Promise<void> {
+async function createAlert(env: Env, entityId: string, decision: string, attempts = 3, pauseMs = 1000): Promise<void> {
   const broker = new Broker(env);
-  const [entity, decided] = await Promise.all([broker.getRoadRestriction(entityId, { sysAttrs: false }), broker.getDecision(decisionEntityId(decision))]);
+  // The Alert is written once (a later retry gets 409), so it waits for the
+  // complete facts: the Decision entity may not be readable at once.
+  let entity: Entity | null = null;
+  let site: Record<string, unknown> | undefined;
+  let walk: Record<string, unknown> | undefined;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, pauseMs));
+    const [e, decided] = await Promise.all([broker.getRoadRestriction(entityId, { sysAttrs: false }), broker.getDecision(decisionEntityId(decision))]);
+    const facts = factsOf(decided);
+    const fact = (name: string) => (facts.find((f) => f.name === name && !f.missing) as { values: Record<string, unknown> } | undefined)?.values;
+    entity = e;
+    site = fact('shelter');
+    walk = fact('walk');
+    if (entity && typeof site?.name === 'string' && typeof walk?.extra_m === 'number') break;
+  }
   if (!entity) throw new Error('report not found in the broker');
-  const facts = factsOf(decided);
-  const fact = (name: string) => facts.find((f) => f.name === name && !f.missing) as { values: Record<string, unknown> } | undefined;
-  const site = fact('shelter')?.values;
-  const walk = fact('walk')?.values;
+  if (typeof site?.name !== 'string' || typeof walk?.extra_m !== 'number') throw new Error('decision facts not readable: no alert written');
   const P = (value: unknown) => ({ type: 'Property', value });
   const description = [
-    `Road closed near the evacuation site ${String(site?.name ?? '')} (${String(site?.distance_m ?? '?')} m).`,
-    `On foot, the way around is ${String(walk?.extra_m ?? '?')} m longer.`,
+    `Road closed near the evacuation site ${site.name} (${String(site.distance_m)} m).`,
+    `On foot, the closed section cannot be passed; the way around is ${walk.extra_m} m longer.`,
     String((entity.description as { value?: unknown } | undefined)?.value ?? ''),
   ].join(' ');
   await broker.createAlert({
@@ -133,7 +144,8 @@ async function createAlert(env: Env, entityId: string, decision: string): Promis
     description: P(description),
     location: entity.location,
     dateIssued: P({ '@type': 'DateTime', '@value': new Date().toISOString() }),
-    alertSource: P(decisionEntityId(decision)),
+    // A Relationship in the Smart Data Models Alert: the decision that raised it.
+    alertSource: { type: 'Relationship', object: decisionEntityId(decision) },
   });
 }
 

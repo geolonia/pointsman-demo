@@ -337,12 +337,25 @@ describe('the chain (step 2)', () => {
     expect(alert.body).toMatchObject({
       id: 'urn:ngsi-ld:Alert:demo-33333333-3333-4333-8333-333333333333',
       category: P('traffic'), subCategory: P('roadClosed'), severity: P('high'),
-      alertSource: P('urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333'), location,
+      alertSource: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333' }, location,
     });
     expect(alert.body.description.value).toContain('日本大学法学部①');
     expect(alert.body.description.value).toContain('316 m');
     // Step 2 never opens GitHub issues.
     expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
+  });
+
+  it('writes no Alert while the decision facts cannot be read', async () => {
+    pointsmanSays('alert');
+    const base = answer;
+    // The Decision entity stays unreadable (404).
+    answer = (c) => (c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:33333333')) ? new Response(null, { status: 404 }) : base(c));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await notify()).status).toBe(200);
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('no alert written')), { timeout: 5000 });
+    expect(calls.some((c) => c.body?.type === 'Alert')).toBe(false);
+    // It tried three times.
+    expect(calls.filter((c) => c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:33333333'))).length).toBe(3);
   });
 
   it('raises no Alert when step 2 says none', async () => {
