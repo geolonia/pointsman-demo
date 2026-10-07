@@ -2,6 +2,7 @@
 
 import { env as cfEnv, exports } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DECISION_TERMS } from '../engine/bridge/src/bridge';
 import type { Env } from '../src/env';
 import { cleanup } from '../src/index';
 
@@ -93,6 +94,43 @@ describe('reports from the page', () => {
     expect(r).toMatchObject({ id, prepared: false, check: { action: 'review', decision: 'urn:ngsi-ld:Decision:d-9' }, issue: 'https://github.com/geolonia/pointsman-demo/issues/12' });
     expect(r.ngsi.entity.id).toBe(id);
     expect(r.ngsi.decision.type).toBe('https://datamodels.jp/ns/decision/Decision');
+  });
+
+  it('lists the decisions waiting for a person, with one NGSI-LD query', async () => {
+    const D = (n: string, action: string, decidedAt: unknown) => ({
+      id: `urn:ngsi-ld:Decision:${n}`, type: 'Decision', action: P(action), decidedAt: P(decidedAt),
+      refersTo: { type: 'Relationship', object: `urn:ngsi-ld:RoadRestriction:demo-${n}` },
+    });
+    // First a broker failure: an error, and nothing cached.
+    answer = (c) => (c.url.startsWith(`${BROKER}/entities?type=Decision`) ? new Response(null, { status: 400 }) : undefined);
+    expect((await worker('/api/decisions', { headers: { origin: PAGE } })).status).toBe(502);
+
+    await env.DEMO.put('decision-issue:d-2', '21');
+    answer = (c) => (c.url.startsWith(`${BROKER}/entities?type=Decision`)
+      ? Response.json([D('d-1', 'review', '2026-10-07T01:00:00Z'), D('d-2', 'urgent', { '@type': 'DateTime', '@value': '2026-10-07T02:00:00Z' })])
+      : undefined);
+    const res = await worker('/api/decisions', { headers: { origin: PAGE } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBe(PAGE);
+    const list = calls.filter((c) => c.url.startsWith(`${BROKER}/entities?type=Decision`)).pop()!;
+    expect(new URL(list.url).searchParams.get('q')).toBe('reviewStatus=="pending"');
+    // The short names come from the context this Worker serves.
+    expect(list.headers.get('link')).toContain('<https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld>');
+    const body = await res.json<any>();
+    expect(body.total).toBe(2);
+    expect(body.request).toMatchObject({ method: 'GET', tenant: 'pointsman_demo', pages: 1, link: 'https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld' });
+    expect(body.request.url).toBe(list.url);
+    expect(body.decisions).toEqual([
+      { id: 'urn:ngsi-ld:Decision:d-2', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-2', action: 'urgent', decidedAt: '2026-10-07T02:00:00Z', issue: 'https://github.com/geolonia/pointsman-demo/issues/21' },
+      { id: 'urn:ngsi-ld:Decision:d-1', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-1', action: 'review', decidedAt: '2026-10-07T01:00:00Z', issue: null },
+    ]);
+  });
+
+  it('serves the Decision context for the broker, as JSON-LD', async () => {
+    const res = await worker('/context/decision.jsonld');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/ld+json');
+    expect(await res.json()).toEqual({ '@context': DECISION_TERMS });
   });
 
   it('serves the configuration for the page', async () => {

@@ -170,3 +170,24 @@ describe('listing reports', () => {
     expect(list[0]!.id).toBe('r1004');
   });
 });
+
+describe('listing pending decisions', () => {
+  it('pages through all of them', async () => {
+    const { Broker } = await import('../src/broker');
+    const offsets: number[] = [];
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      const u = new URL(String(input));
+      const offset = Number(u.searchParams.get('offset') ?? 0);
+      offsets.push(offset);
+      expect(u.searchParams.get('q')).toBe('reviewStatus=="pending"');
+      const n = offset === 0 ? 1000 : 3; // a full page, then the rest
+      return Response.json(Array.from({ length: n }, (_, i) => ({ id: `urn:ngsi-ld:Decision:d${offset + i}`, type: 'Decision' })));
+    }) as typeof fetch;
+    const env = { BROKER_URL: 'https://broker.test', BROKER_API_KEY: 'k', BROKER_TENANT: 't' } as never;
+    const { pages, decisions, query } = await new Broker(env, fakeFetch).listPendingDecisions('https://demo.test/context/decision.jsonld');
+    expect(offsets).toEqual([0, 1000]);
+    expect(pages).toBe(2);
+    expect(decisions).toHaveLength(1003);
+    expect(query).not.toContain('offset');
+  });
+});

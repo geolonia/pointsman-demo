@@ -1,7 +1,7 @@
 // The demo Worker: the page's API, the FIWARE bridge on /notify, the GitHub
 // review queue, and the daily cleanup. See README.md.
 
-import { type BridgeConfig, type Route, decisionEntityId, handleRequest } from '../engine/bridge/src/bridge';
+import { type BridgeConfig, DECISION_TERMS, type Route, decisionEntityId, handleRequest } from '../engine/bridge/src/bridge';
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
@@ -41,6 +41,7 @@ export default {
       if (url.pathname === '/notify') return await notify(request, env, ctx);
       if (url.pathname === '/github/webhook' && request.method === 'POST') return await webhook(request, env);
       if (url.pathname.startsWith('/api/')) return await api(request, url, env, ctx);
+      if (url.pathname === CONTEXT_PATH && request.method === 'GET') return decisionContext();
       // The page and its files (wrangler.jsonc "assets").
       return env.ASSETS.fetch(request);
     } catch (err) {
@@ -261,6 +262,15 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
+  if (url.pathname === '/api/decisions' && request.method === 'GET') {
+    const key = new Request(new URL('/api/decisions', url).toString());
+    const hit = await caches.default.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
+    const res = json(await pendingDecisions(env), 200, { 'cache-control': 'max-age=3' });
+    ctx.waitUntil(caches.default.put(key, res.clone()));
+    return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
+  }
+
   // Browsers send the id percent-encoded (urn%3Angsi-ld%3A…).
   let path = url.pathname;
   try { path = decodeURIComponent(path); } catch { /* malformed: no match below */ }
@@ -323,6 +333,68 @@ async function turnstileOk(secret: string, token: unknown, ip: string): Promise<
     body: new URLSearchParams({ secret, response: token, remoteip: ip }),
   });
   return res.ok && ((await res.json()) as { success?: boolean }).success === true;
+}
+
+// --- Decisions across entities ----------------------------------------------------
+
+/**
+ * The Decision terms (the bridge's DECISION_TERMS), served so the broker can
+ * read short names in queries. GeonicDB fetches a context only from a URL
+ * served as application/ld+json.
+ */
+const CONTEXT_PATH = '/context/decision.jsonld';
+
+function decisionContext(): Response {
+  return new Response(JSON.stringify({ '@context': DECISION_TERMS }, null, 2), {
+    headers: { 'content-type': 'application/ld+json', 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' },
+  });
+}
+
+export interface PendingDecision {
+  id: string;
+  /** The entity the decision is about. */
+  refersTo?: string;
+  action?: string;
+  decidedAt?: string;
+  issue: string | null;
+}
+
+/** At most this many are listed (newest first); each needs a KV read for its issue. */
+const PENDING_SHOWN = 50;
+
+/**
+ * Decisions waiting for a person, with the NGSI-LD request that found them
+ * (the first page; `pages` says how many pages it took).
+ */
+async function pendingDecisions(env: Env): Promise<{ request: { method: 'GET'; url: string; tenant: string; link: string; pages: number }; total: number; decisions: PendingDecision[] }> {
+  const contextUrl = `${trimUrl(env.PUBLIC_URL)}${CONTEXT_PATH}`;
+  const { query, pages, decisions } = await new Broker(env).listPendingDecisions(contextUrl);
+  const shown = decisions.map(pendingOf).sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? '')).slice(0, PENDING_SHOWN);
+  await Promise.all(shown.map(async (d) => {
+    const n = await env.DEMO.get(`decision-issue:${d.id.split(':').pop()}`);
+    d.issue = n && /^\d+$/.test(n) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${n}` : null;
+  }));
+  return {
+    request: { method: 'GET', url: `${trimUrl(env.BROKER_URL)}/ngsi-ld/v1${query}`, tenant: env.BROKER_TENANT, link: contextUrl, pages },
+    total: decisions.length,
+    decisions: shown,
+  };
+}
+
+/** Accepts a DateTime value as a string or as {"@type": "DateTime", "@value": …}. */
+const dateOf = (v: unknown) => (typeof v === 'string' ? v : typeof (v as { '@value'?: unknown })?.['@value'] === 'string' ? (v as { '@value': string })['@value'] : undefined);
+
+export function pendingOf(e: Entity): PendingDecision {
+  const refersTo = (e.refersTo as Attr | undefined)?.object;
+  const action = val(e.action);
+  const decidedAt = dateOf(val(e.decidedAt));
+  return {
+    id: e.id,
+    ...(typeof refersTo === 'string' && { refersTo }),
+    ...(typeof action === 'string' && { action }),
+    ...(decidedAt && { decidedAt }),
+    issue: null,
+  };
 }
 
 // --- Shapes for the page ---------------------------------------------------------
