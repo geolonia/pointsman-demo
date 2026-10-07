@@ -2,7 +2,6 @@
 
 import { env as cfEnv, exports } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DECISION_TERMS } from '../engine/bridge/src/bridge';
 import type { Env } from '../src/env';
 import { cleanup } from '../src/index';
 
@@ -114,11 +113,11 @@ describe('reports from the page', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe(PAGE);
     const list = calls.filter((c) => c.url.startsWith(`${BROKER}/entities?type=Decision`)).pop()!;
     expect(new URL(list.url).searchParams.get('q')).toBe('reviewStatus=="pending"');
-    // The short names come from the context this Worker serves.
-    expect(list.headers.get('link')).toContain('<https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld>');
+    // The short names come from the published Decision context (datamodels.jp).
+    expect(list.headers.get('link')).toContain('<https://datamodels.jp/context/decision/v1.jsonld>');
     const body = await res.json<any>();
     expect(body.total).toBe(2);
-    expect(body.request).toMatchObject({ method: 'GET', tenant: 'pointsman_demo', pages: 1, link: 'https://pointsman-demo.geolonia.workers.dev/context/decision.jsonld' });
+    expect(body.request).toMatchObject({ method: 'GET', tenant: 'pointsman_demo', pages: 1, link: 'https://datamodels.jp/context/decision/v1.jsonld' });
     expect(body.request.url).toBe(list.url);
     expect(body.decisions).toEqual([
       { id: 'urn:ngsi-ld:Decision:d-2', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-2', action: 'urgent', decidedAt: '2026-10-07T02:00:00Z', issue: 'https://github.com/geolonia/pointsman-demo/issues/21' },
@@ -126,12 +125,6 @@ describe('reports from the page', () => {
     ]);
   });
 
-  it('serves the Decision context for the broker, as JSON-LD', async () => {
-    const res = await worker('/context/decision.jsonld');
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toBe('application/ld+json');
-    expect(await res.json()).toEqual({ '@context': DECISION_TERMS });
-  });
 
   it('serves the configuration for the page', async () => {
     const res = await worker('/api/config', { headers: { origin: PAGE } });

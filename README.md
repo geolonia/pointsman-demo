@@ -59,7 +59,6 @@ No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
 | `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`) |
 | `GET /api/decisions` | `Decision` entities waiting for a person (`reviewStatus` "pending"), newest first, with the NGSI-LD request that found them |
-| `GET /context/decision.jsonld` | The `Decision` terms as a JSON-LD context, for the broker to read short names in that query |
 | `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}` |
 
 Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.

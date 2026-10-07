@@ -1,7 +1,7 @@
 // The context broker (GeonicDB): road restrictions and Decision entities of
 // the demo tenant.
 
-import { DECISION_TERMS } from '../engine/bridge/src/bridge';
+import { DECISION_CONTEXT } from '../engine/bridge/src/bridge';
 import { type Env, trimUrl } from './env';
 import { fetchWithAgent } from './http';
 
@@ -78,10 +78,10 @@ export class Broker {
     if (!res.ok) throw new BrokerError('update', res.status);
   }
 
-  /** Adds or replaces attributes of a Decision entity (its terms inline). */
+  /** Adds or replaces attributes of a Decision entity (the published Decision context). */
   async updateDecision(id: string, attributes: Record<string, unknown>): Promise<void> {
     const res = await this.call('POST', `/entities/${encodeURIComponent(id)}/attrs`, {
-      body: { '@context': [DECISION_TERMS, CORE_CONTEXT], ...attributes },
+      body: { '@context': [DECISION_CONTEXT, CORE_CONTEXT], ...attributes },
       headers: { 'content-type': 'application/ld+json' },
     });
     if (!res.ok) throw new BrokerError('update decision', res.status);
