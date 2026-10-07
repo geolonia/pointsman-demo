@@ -43,7 +43,8 @@ export interface Issue {
 export class GitHub {
   private token: { value: string; expires: number } | undefined;
 
-  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = fetch) {}
+  // A wrapper, not `fetch` itself: see Broker.
+  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = (input, init) => fetch(input, init)) {}
 
   private async installationToken(): Promise<string> {
     if (this.token && this.token.expires > Date.now() + 60_000) return this.token.value;

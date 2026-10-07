@@ -137,3 +137,17 @@ describe('summary for the page', () => {
     expect(summarize({ ...entity, check: undefined }).published).toBe(false);
   });
 });
+
+describe('the default fetch', () => {
+  // The Worker tests replace the global fetch with a mock, which hides the
+  // "Illegal invocation" error of an unbound fetch. This calls the real one.
+  it('works when called through the classes', async () => {
+    const { Broker } = await import('../src/broker');
+    const { GitHub } = await import('../src/github');
+    const env = { BROKER_URL: 'http://127.0.0.1:9', BROKER_API_KEY: 'k', BROKER_TENANT: 't', GITHUB_REPOSITORY: 'o/r' } as never;
+    // Connection refused is fine; "Illegal invocation" is not.
+    await expect(new Broker(env).listRoadRestrictions()).rejects.not.toThrow(/Illegal invocation/);
+    const gh = new GitHub(env) as unknown as { fetchFn: typeof fetch };
+    await expect(gh.fetchFn('http://127.0.0.1:9')).rejects.not.toThrow(/Illegal invocation/);
+  });
+});
