@@ -125,13 +125,13 @@ async function createAlert(env: Env, entityId: string, decision: string, attempt
     entity = e;
     site = fact('shelter');
     walk = fact('walk');
-    if (entity && typeof site?.name === 'string' && typeof walk?.extra_m === 'number') break;
+    if (entity && typeof site?.name === 'string' && typeof site.distance_m === 'number' && typeof walk?.extra_m === 'number') break;
   }
   if (!entity) throw new Error('report not found in the broker');
-  if (typeof site?.name !== 'string' || typeof walk?.extra_m !== 'number') throw new Error('decision facts not readable: no alert written');
+  if (typeof site?.name !== 'string' || typeof site.distance_m !== 'number' || typeof walk?.extra_m !== 'number') throw new Error('decision facts not readable: no alert written');
   const P = (value: unknown) => ({ type: 'Property', value });
   const description = [
-    `Road closed near the evacuation site ${site.name} (${String(site.distance_m)} m).`,
+    `Road closed near the evacuation site ${site.name} (${site.distance_m} m).`,
     `On foot, the closed section cannot be passed; the way around is ${walk.extra_m} m longer.`,
     String((entity.description as { value?: unknown } | undefined)?.value ?? ''),
   ].join(' ');
