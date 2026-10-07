@@ -5,6 +5,7 @@ import { type BridgeConfig, type Route, decisionEntityId, handleRequest } from '
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
+import { fetchWithAgent } from './http';
 import { AREA, PREPARED, parseReport, toEntity } from './reports';
 import { mayReview, parseCommand } from './review';
 
@@ -66,6 +67,7 @@ function bridgeConfig(env: Env): BridgeConfig {
     notifySecret: env.NOTIFY_SECRET,
     pointsman: { url: trimUrl(env.POINTSMAN_URL), token: env.POINTSMAN_TOKEN },
     broker: { url: trimUrl(env.BROKER_URL), apiKey: env.BROKER_API_KEY, tenant: env.BROKER_TENANT, context: TRANSPORTATION_CONTEXT },
+    fetch: fetchWithAgent,
   };
 }
 
@@ -167,7 +169,7 @@ async function webhook(request: Request, env: Env): Promise<Response> {
 
   const by = `github:${p.comment.user.login}`;
   const now = new Date().toISOString();
-  const pointsman = (path: string, payload: unknown) => fetch(`${trimUrl(env.POINTSMAN_URL)}${path}`, {
+  const pointsman = (path: string, payload: unknown) => fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}${path}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}`, 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -301,7 +303,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
 
 async function turnstileOk(secret: string, token: unknown, ip: string): Promise<boolean> {
   if (typeof token !== 'string' || token.length === 0 || token.length > 2048) return false;
-  const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+  const res = await fetchWithAgent('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
     body: new URLSearchParams({ secret, response: token, remoteip: ip }),
   });

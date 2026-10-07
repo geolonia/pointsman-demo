@@ -3,6 +3,7 @@
 
 import { DECISION_TERMS } from '../engine/bridge/src/bridge';
 import { type Env, trimUrl } from './env';
+import { fetchWithAgent } from './http';
 
 /** The datamodels.jp transportation context: RoadRestriction and its attributes. */
 export const TRANSPORTATION_CONTEXT = 'https://datamodels.jp/context/transportation/v1.jsonld';
@@ -15,7 +16,7 @@ export class Broker {
   private readonly base: string;
   // A wrapper, not `fetch` itself: Workers refuse `this.fetchFn()` with the
   // global fetch as a property ("Illegal invocation").
-  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = (input, init) => fetch(input, init)) {
+  constructor(private readonly env: Env, private readonly fetchFn: typeof fetch = fetchWithAgent) {
     this.base = `${trimUrl(env.BROKER_URL)}/ngsi-ld/v1`;
   }
 
