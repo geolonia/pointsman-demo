@@ -24,7 +24,7 @@ const KEEP_MS = 24 * 3600_000;
 const KV_TTL = 2 * 24 * 3600;
 
 interface ReportRecord { prepared?: string; createdAt: string }
-interface IssueRecord { decision: string; entity: string; action: string; corrections: Correction[] }
+interface IssueRecord { decision: string; entity: string; action: string; corrections: Correction[]; createdAt: string }
 interface Correction { name: string; value: string | boolean; by: string; at: string }
 
 export default {
@@ -87,8 +87,18 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // A retried notification must not open a second issue.
   if (await env.DEMO.get(`decision-issue:${decision}`)) return;
   await env.DEMO.put(`decision-issue:${decision}`, 'pending', { expirationTtl: KV_TTL });
+  try {
+    await createIssueFor(env, entityId, decision, action);
+  } catch (err) {
+    // Let a retried notification try again.
+    await env.DEMO.delete(`decision-issue:${decision}`);
+    throw err;
+  }
+}
+
+async function createIssueFor(env: Env, entityId: string, decision: string, action: string): Promise<void> {
   const entity = await new Broker(env).getRoadRestriction(entityId);
-  if (!entity) return;
+  if (!entity) throw new Error('report not found in the broker');
   const r = summarize(entity);
   const answers = Object.entries(r.check?.answers ?? {})
     .map(([name, a]) => `| ${name} | \`${String(a.value)}\` | ${a.p === undefined ? '' : a.p.toFixed(2)} |`).join('\n');
@@ -111,7 +121,7 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   ].join('\n');
   const title = `[${action}] ${r.roadName || 'Report'}: ${r.description.slice(0, 60)}${r.description.length > 60 ? '…' : ''}`;
   const issue = await new GitHub(env).createIssue(title, body, ['demo', action]);
-  const record: IssueRecord = { decision, entity: entityId, action, corrections: [] };
+  const record: IssueRecord = { decision, entity: entityId, action, corrections: [], createdAt: new Date().toISOString() };
   await env.DEMO.put(`issue:${issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
   await env.DEMO.put(`decision-issue:${decision}`, String(issue.number), { expirationTtl: KV_TTL });
 }
@@ -365,9 +375,9 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
   let closed = 0;
   const github = new GitHub(env);
   for (const key of (await env.DEMO.list({ prefix: 'issue:' })).keys) {
-    const record = await env.DEMO.get<IssueRecord & { closedAt?: string }>(key.name, 'json');
-    const report = record && await env.DEMO.get<ReportRecord>(`report:${record.entity}`, 'json');
-    if (!record || !report || now - Date.parse(report.createdAt) <= KEEP_MS) continue;
+    const record = await env.DEMO.get<IssueRecord>(key.name, 'json');
+    // The issue's own time: the report's KV record may already have expired.
+    if (!record || now - Date.parse(record.createdAt) <= KEEP_MS) continue;
     await github.comment(Number(key.name.slice(6)), 'Demo data deleted after a day; closing.').catch(() => {});
     await github.close(Number(key.name.slice(6))).catch(() => {});
     await env.DEMO.delete(key.name);

@@ -119,6 +119,20 @@ describe('notifications (the bridge)', () => {
     await vi.waitFor(async () => expect(await env.DEMO.get('issue:7', 'json')).toMatchObject({ decision: '11111111-1111-4111-8111-111111111111', action: 'review' }));
   });
 
+  it('lets a retry open the issue when GitHub failed the first time', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
+    pointsmanSays('review');
+    const decide = answer;
+    let issueCalls = 0;
+    answer = (c) => (c.url.endsWith('/issues') ? (++issueCalls === 1 ? new Response(null, { status: 502 }) : undefined) : decide(c));
+    await notify();
+    await vi.waitFor(() => expect(issueCalls).toBe(1));
+    await vi.waitFor(async () => expect(await env.DEMO.get('decision-issue:11111111-1111-4111-8111-111111111111')).toBeNull());
+    await notify();
+    await vi.waitFor(async () => expect(await env.DEMO.get('issue:7')).not.toBeNull());
+    expect(issueCalls).toBe(2);
+  });
+
   it('never opens an issue for free text, or for publish', async () => {
     await env.DEMO.put(`report:${report.id}`, JSON.stringify({ createdAt: new Date().toISOString() }));
     pointsmanSays('urgent');
@@ -199,9 +213,12 @@ describe('cleanup', () => {
       return undefined;
     };
     await env.DEMO.put('report:urn:ngsi-ld:RoadRestriction:demo-old', JSON.stringify({ prepared: 'vague', createdAt: old }));
-    await env.DEMO.put('issue:9', JSON.stringify({ decision: 'd-old', entity: 'urn:ngsi-ld:RoadRestriction:demo-old', action: 'review', corrections: [] }));
+    // The report's KV record may expire first: the issue keeps its own time.
+    await env.DEMO.put('issue:9', JSON.stringify({ decision: 'd-old', entity: 'urn:ngsi-ld:RoadRestriction:demo-old', action: 'review', corrections: [], createdAt: old }));
+    await env.DEMO.put('issue:10', JSON.stringify({ decision: 'd-new', entity: 'urn:ngsi-ld:RoadRestriction:demo-new', action: 'review', corrections: [], createdAt: new Date().toISOString() }));
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
+    expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });
 });

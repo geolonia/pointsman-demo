@@ -18,5 +18,13 @@ the change or have the right to submit it, and it may be published under this
 repository's license (MIT). The [DCO app](https://github.com/apps/dco) checks
 every commit of a pull request (except bots and merge commits).
 
-Forgot it: `git rebase --signoff origin/main`, then `git push --force-with-lease`,
-or add one follow-up commit that signs off the earlier ones.
+Forgot it: `git rebase --signoff origin/main`, then `git push --force-with-lease`.
+If you would rather not rewrite history, add one follow-up commit whose message
+signs off each earlier commit, in the form the DCO app expects (its check
+details show the exact text):
+
+```
+I, Your Name <you@example.com>, hereby add my Signed-off-by to this commit: <sha of the commit>
+
+Signed-off-by: Your Name <you@example.com>
+```
