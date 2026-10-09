@@ -47,7 +47,11 @@ flowchart LR
    bridge writes the final action to the report (the page shows it as
    published) and completes the Task. This also works without GitHub: any
    app that writes the result to the Decision entity resolves the review
-   (pointsman#83), for example `scripts/resolve.mjs`.
+   (pointsman#83), for example `scripts/resolve.mjs`. Apps that keep their
+   own work orders, such as Redmine with GTT, resolve it by completing a
+   `Task` that refers to the report (pointsman#85): its status name gives
+   the final action ([src/work-orders.json](src/work-orders.json):
+   `Published` or `公開` → publish, `Rejected` or `却下` → reject).
 7. Every hour, data older than a day is deleted (with its Decision, Task and
    Alert entities) and its issues are closed.
 
@@ -101,15 +105,23 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 | `GITHUB_APP_PRIVATE_KEY` | Same item, the private key converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt` |
 | `TURNSTILE_SECRET` | Optional |
 
-Then, once: `node scripts/setup.mjs` creates the three subscriptions in the
-broker (new reports, the chain's step 2, resolved decisions) and the issue
-labels.
+Then, once: `node scripts/setup.mjs` creates the four subscriptions in the
+broker (new reports, the chain's step 2, resolved decisions, completed work
+orders) and the issue labels.
 
 To resolve a review in the broker, as another app would (a member of the
 team, with the broker key):
 
 ```sh
 BROKER_API_KEY=… node scripts/resolve.mjs <decision id> publish --by demo:script --correct danger=false
+```
+
+Or as Redmine with GTT would, with a completed work order for the report
+(one issue number per report; delete it afterwards with `--delete`, the
+hourly cleanup does not know it):
+
+```sh
+BROKER_API_KEY=… node scripts/work-order.mjs urn:ngsi-ld:RoadRestriction:demo-… Published --issue 1
 ```
 
 The GitHub issue of that report stays open (a later `/publish` there gets

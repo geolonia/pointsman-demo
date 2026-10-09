@@ -8,6 +8,7 @@ import { GitHub, type Issue, verifyWebhook } from './github';
 import { fetchWithAgent } from './http';
 import { AREA, PREPARED, parseReport, toEntity } from './reports';
 import { mayReview, parseCommand } from './review';
+import WORK_ORDERS from './work-orders.json';
 
 const PROFILE = 'road-restriction-check';
 /** Actions a person looks at; they become issues (prepared reports only). */
@@ -37,6 +38,10 @@ const EVACUATION_ROUTE: Route = {
   name: 'evacuation',
   informedBy: 'check',
 };
+// Work orders from other apps (pointsman#85): a completed Task that refers to
+// a report, for example a Redmine GTT issue, resolves the report's review; its
+// status name gives the final action (src/work-orders.json, also read by
+// scripts/work-order.mjs).
 const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 /** Demo data lives this long. */
 const KEEP_MS = 24 * 3600_000;
@@ -85,6 +90,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
 function bridgeConfig(env: Env): BridgeConfig {
   return {
     routes: [ROUTE, EVACUATION_ROUTE],
+    workOrders: WORK_ORDERS,
     notifySecret: env.NOTIFY_SECRET,
     pointsman: { url: trimUrl(env.POINTSMAN_URL), token: env.POINTSMAN_TOKEN },
     broker: { url: trimUrl(env.BROKER_URL), apiKey: env.BROKER_API_KEY, tenant: env.BROKER_TENANT, context: TRANSPORTATION_CONTEXT },

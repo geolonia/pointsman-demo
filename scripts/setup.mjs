@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // One-time setup outside Cloudflare: the subscriptions in the context broker
 // (RoadRestriction -> the Worker's /notify, the chain's step 2 ->
-// /notify?route=evacuation, and resolved Decisions -> /reviews) and the issue
-// labels on GitHub.
+// /notify?route=evacuation, resolved Decisions and completed work orders ->
+// /reviews) and the issue labels on GitHub.
 // Idempotent: an existing subscription with the same id is updated in place.
 //
 // Secrets come from the environment, for example from 1Password:
@@ -45,6 +45,15 @@ const subscriptions = {
     q: 'reviewStatus=="resolved"',
     notification: { format: 'normalized', endpoint: endpoint('/reviews') },
     context: 'https://datamodels.jp/context/decision/v1.jsonld',
+  },
+  // Work orders other apps completed, for example Redmine GTT issues (pointsman#85).
+  'urn:ngsi-ld:Subscription:pointsman-demo-work-orders': {
+    description: 'Pointsman demo: completed work orders, to the bridge',
+    entities: [{ type: 'Task' }],
+    watchedAttributes: ['progress'],
+    q: 'progress=="completed"',
+    notification: { format: 'normalized', endpoint: endpoint('/reviews') },
+    context: 'https://datamodels.jp/context/task/v1.jsonld',
   },
 };
 const linkTo = (context) => ({ ...headers, link: `<${context}>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"` });
