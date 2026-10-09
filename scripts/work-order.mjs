@@ -2,13 +2,15 @@
 // Plays the part of Redmine with GTT (pointsman#85): writes a completed work
 // order for a report, shaped like a GTT issue published in the Task
 // vocabulary. The broker notifies the Worker (/reviews); the bridge resolves
-// the report's review from the status name (WORK_ORDERS in src/index.ts).
+// the report's review from the status name (src/work-orders.json).
 //
 // Usage:
-//   BROKER_API_KEY=$(op read …) node scripts/work-order.mjs <report> <status> [--issue <n>] [--open]
-// <report>: urn:ngsi-ld:RoadRestriction:demo-… ; <status>: a Redmine status
-// name, for example Published or Rejected. --open writes it as not done yet.
-// The work order is demo data: delete it with --delete.
+//   BROKER_API_KEY=$(op read …) node scripts/work-order.mjs <report> <status> --issue <n> [--open]
+// <report>: urn:ngsi-ld:RoadRestriction:demo-… ; <status>: a status name from
+// src/work-orders.json, for example Published or Rejected (any name with
+// --open, which writes it as not done yet). --issue: the issue number, one
+// per report, as in Redmine. The work order is demo data: delete it with
+// --delete.
 
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -16,11 +18,17 @@ import { parse } from 'jsonc-parser';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { issue: { type: 'string', default: '1' }, open: { type: 'boolean', default: false }, delete: { type: 'boolean', default: false } },
+  options: { issue: { type: 'string' }, open: { type: 'boolean', default: false }, delete: { type: 'boolean', default: false } },
 });
 const [report, status] = positionals;
-if (!report?.startsWith('urn:ngsi-ld:RoadRestriction:') || (!status && !values.delete) || !/^\d+$/.test(values.issue)) {
-  console.error('usage: node scripts/work-order.mjs <report urn> <status> [--issue <n>] [--open] | <report urn> --delete [--issue <n>]');
+if (!report?.startsWith('urn:ngsi-ld:RoadRestriction:') || (!status && !values.delete) || !/^\d+$/.test(values.issue ?? '')) {
+  console.error('usage: node scripts/work-order.mjs <report urn> <status> --issue <n> [--open] | <report urn> --delete --issue <n>');
+  process.exit(2);
+}
+// A completed work order needs a status the Worker maps to a final action.
+const mapping = JSON.parse(readFileSync(new URL('../src/work-orders.json', import.meta.url), 'utf8'));
+if (!values.delete && !values.open && !Object.hasOwn(mapping, status)) {
+  console.error(`status ${status}: not in src/work-orders.json (${Object.keys(mapping).join(', ')}); use --open for an open work order`);
   process.exit(2);
 }
 const { BROKER_API_KEY } = process.env;

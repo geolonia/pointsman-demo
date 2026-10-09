@@ -50,8 +50,8 @@ flowchart LR
    (pointsman#83), for example `scripts/resolve.mjs`. Apps that keep their
    own work orders, such as Redmine with GTT, resolve it by completing a
    `Task` that refers to the report (pointsman#85): its status name gives
-   the final action (`Published` or `公開` → publish, `Rejected` or `却下` →
-   reject).
+   the final action ([src/work-orders.json](src/work-orders.json):
+   `Published` or `公開` → publish, `Rejected` or `却下` → reject).
 7. Every hour, data older than a day is deleted (with its Decision, Task and
    Alert entities) and its issues are closed.
 
@@ -117,7 +117,8 @@ BROKER_API_KEY=… node scripts/resolve.mjs <decision id> publish --by demo:scri
 ```
 
 Or as Redmine with GTT would, with a completed work order for the report
-(delete it afterwards with `--delete`; the hourly cleanup does not know it):
+(one issue number per report; delete it afterwards with `--delete`, the
+hourly cleanup does not know it):
 
 ```sh
 BROKER_API_KEY=… node scripts/work-order.mjs urn:ngsi-ld:RoadRestriction:demo-… Published --issue 1

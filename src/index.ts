@@ -8,6 +8,7 @@ import { GitHub, type Issue, verifyWebhook } from './github';
 import { fetchWithAgent } from './http';
 import { AREA, PREPARED, parseReport, toEntity } from './reports';
 import { mayReview, parseCommand } from './review';
+import WORK_ORDERS from './work-orders.json';
 
 const PROFILE = 'road-restriction-check';
 /** Actions a person looks at; they become issues (prepared reports only). */
@@ -37,12 +38,10 @@ const EVACUATION_ROUTE: Route = {
   name: 'evacuation',
   informedBy: 'check',
 };
-/**
- * Work orders from other apps (pointsman#85): a completed Task that refers to
- * a report, for example a Redmine GTT issue, resolves the report's review.
- * Its status name gives the final action.
- */
-const WORK_ORDERS = { Published: 'publish', Rejected: 'reject', 公開: 'publish', 却下: 'reject' };
+// Work orders from other apps (pointsman#85): a completed Task that refers to
+// a report, for example a Redmine GTT issue, resolves the report's review; its
+// status name gives the final action (src/work-orders.json, also read by
+// scripts/work-order.mjs).
 const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 /** Demo data lives this long. */
 const KEEP_MS = 24 * 3600_000;
