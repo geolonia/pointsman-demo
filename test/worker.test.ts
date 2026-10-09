@@ -296,6 +296,7 @@ describe('reviews from GitHub', () => {
       body: JSON.stringify({ type: 'Notification', data: [{
         id: D, type: 'Decision', refersTo: { type: 'Relationship', object: entityId }, profile: P('road-restriction-check'),
         reviewStatus: P('resolved'), finalAction: P('publish'), reviewedBy: P('demo:script'),
+        reviewedAt: P({ '@type': 'DateTime', '@value': '2026-10-09T03:00:00.000Z' }),
       }] }),
     });
     expect(res.status).toBe(200);
