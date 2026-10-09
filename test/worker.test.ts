@@ -166,6 +166,8 @@ describe('notifications (the bridge)', () => {
   function pointsmanSays(action: string) {
     answer = (c) => {
       if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/road-restriction-check') return Response.json(decided(action));
+      // No Task yet for these inputs (the bridge looks before it cancels one).
+      if (c.url.includes('urn%3Angsi-ld%3ATask%3A')) return new Response(null, { status: 404 });
       if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/`)) {
         return Response.json({ ...report, check: { type: 'Property', value: action, policyRule: P('default'), category: P('alternatingOneWay'), categoryProbability: P(0.85) } });
       }
@@ -234,6 +236,8 @@ describe('notifications (the bridge)', () => {
     expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
     // Tasks are about the decision, not the issue: urgent free text gets one, publish none.
     expect(calls.filter((c) => c.body?.type === 'Task').map((c) => c.body.statusLabel.value)).toEqual(['urgent']);
+    // For publish the bridge only looked for an open Task (none here).
+    expect(calls.filter((c) => c.url.includes('urn%3Angsi-ld%3ATask%3A')).map((c) => c.method)).toEqual(['GET']);
   });
 });
 
