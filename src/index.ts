@@ -57,6 +57,9 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === '/notify') return await notify(request, env, ctx);
+      // Decisions a person resolved (pointsman#83): the bridge resolves them in
+      // Pointsman, writes the final action to the report and completes its Task.
+      if (url.pathname === '/reviews') return await handleRequest(request, bridgeConfig(env));
       if (url.pathname === '/github/webhook' && request.method === 'POST') return await webhook(request, env);
       if (url.pathname.startsWith('/api/')) return await api(request, url, env, ctx);
       // The page and its files (wrangler.jsonc "assets").
@@ -264,28 +267,9 @@ async function webhook(request: Request, env: Env): Promise<Response> {
       reviewedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
     }),
   });
-  if (command.final) {
-    const entity = await broker.getRoadRestriction(record.entity, { sysAttrs: false });
-    // The person's work is done, whichever way they decided. Best effort: the
-    // review itself is resolved, and reports from before Tasks have none.
-    const taskId = entity && await taskIdOf(entity);
-    if (taskId) {
-      await broker.updateTask(taskId, {
-        progress: { type: 'Property', value: 'completed' },
-        statusLabel: { type: 'Property', value: command.final },
-        completedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
-      }).catch((err) => console.error(`task for ${record.decision}: ${(err as Error).message}`));
-    }
-    // The page reads the outcome from the report's check property.
-    const check = entity?.check as Record<string, unknown> | undefined;
-    if (check) {
-      await broker.writeAttribute(record.entity, 'check', {
-        ...check,
-        finalAction: { type: 'Property', value: command.final },
-        reviewedAt: { type: 'Property', value: now },
-      });
-    }
-  }
+  // With reviewStatus "resolved" the broker notifies the bridge (/reviews):
+  // it writes the final action to the report's check (the page reads it
+  // there) and completes the Task. Pointsman has the review already.
   await env.DEMO.put(`issue:${p.issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
 
   const corrected = Object.entries(command.correct).map(([k, v]) => `\`${k}\` → \`${String(v)}\``).join(', ');

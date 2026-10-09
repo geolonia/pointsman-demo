@@ -274,29 +274,39 @@ describe('reviews from GitHub', () => {
       reviewStatus: P('resolved'), finalAction: P('publish'), reviewedBy: P('github:reviewer'),
       corrections: { type: 'JsonProperty', json: [{ name: 'category', value: 'alternatingOneWay', by: 'github:reviewer' }] },
     });
-    const check = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/check'))!;
-    expect(check.body).toMatchObject({ value: 'review', finalAction: P('publish') });
+    // The report's check and its Task: the bridge writes them, notified by the broker (/reviews).
+    expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/check'))).toBe(false);
     expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))!.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'publish'] });
-    const taskUrl = `${BROKER}/entities/${encodeURIComponent(await taskEntityId(entityId, 'check', 'h-7'))}/attrs`;
-    const task = calls.find((c) => c.url === taskUrl)!;
-    expect(task.headers.get('content-type')).toBe('application/ld+json');
-    expect(task.body).toMatchObject({
-      '@context': ['https://datamodels.jp/context/task/v1.jsonld', 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.8.jsonld'],
-      progress: P('completed'), statusLabel: P('publish'),
-    });
-    expect(task.body.completedAt.value['@value']).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 
-  it('resolves the review even when the Task is missing or cannot be updated', async () => {
-    for (const status of [404, 503]) {
-      calls = [];
-      await env.DEMO.put('issue:7', JSON.stringify({ decision, entity: entityId, action: 'review', corrections: [] }));
-      const base = answer;
-      answer = (c) => (c.url.includes('urn%3Angsi-ld%3ATask%3A') ? new Response(null, { status }) : base(c));
-      expect((await signed(comment('/reject'))).status).toBe(200);
-      expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))!.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'reject'] });
-      answer = base;
-    }
+  it('passes resolved Decisions from the broker to the bridge (/reviews)', async () => {
+    const D = `urn:ngsi-ld:Decision:${decision}`;
+    answer = (c) => {
+      if (c.url === `https://pointsman.geolonia.workers.dev/v1/decisions/${decision}`) return Response.json({ review: { status: 'pending' }, feedback: [] });
+      if (c.url.endsWith('/resolve')) return Response.json({});
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(entityId)}`)) {
+        return Response.json({ id: entityId, type: 'RoadRestriction', check: { type: 'Property', value: 'review', inputHash: P('h-7'), decision: { type: 'Relationship', object: D } } });
+      }
+      if (c.url.includes('urn%3Angsi-ld%3ATask%3A')) return new Response(null, { status: 204 });
+      return undefined;
+    };
+    const res = await worker('/reviews', {
+      method: 'POST',
+      headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'Notification', data: [{
+        id: D, type: 'Decision', refersTo: { type: 'Relationship', object: entityId }, profile: P('road-restriction-check'),
+        reviewStatus: P('resolved'), finalAction: P('publish'), reviewedBy: P('demo:script'),
+        reviewedAt: P({ '@type': 'DateTime', '@value': '2026-10-09T03:00:00.000Z' }),
+      }] }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ handled: [{ id: D, review: 'resolved', written: true }] });
+    expect(calls.find((c) => c.url.endsWith('/resolve'))!.body).toEqual({ action: 'publish', correct: {}, by: 'demo:script' });
+    expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/check'))!.body).toMatchObject({ value: 'review', finalAction: P('publish') });
+    const taskUrl = `${BROKER}/entities/${encodeURIComponent(await taskEntityId(entityId, 'check', 'h-7'))}/attrs`;
+    expect(calls.find((c) => c.url === taskUrl)!.body).toMatchObject({ progress: P('completed'), statusLabel: P('publish') });
+    // The shared secret, as on /notify.
+    expect((await worker('/reviews', { method: 'POST', headers: { 'x-bridge-secret': 'wrong' }, body: '{}' })).status).toBe(403);
   });
 
   it('sends corrections alone as feedback and keeps the issue open', async () => {
