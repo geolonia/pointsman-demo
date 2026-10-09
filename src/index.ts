@@ -265,15 +265,18 @@ async function webhook(request: Request, env: Env): Promise<Response> {
     }),
   });
   if (command.final) {
+    const entity = await broker.getRoadRestriction(record.entity, { sysAttrs: false });
     // The person's work is done, whichever way they decided. Best effort: the
     // review itself is resolved, and reports from before Tasks have none.
-    await broker.updateTask(taskEntityId(record.decision), {
-      progress: { type: 'Property', value: 'completed' },
-      statusLabel: { type: 'Property', value: command.final },
-      completedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
-    }).catch((err) => console.error(`task for ${record.decision}: ${(err as Error).message}`));
+    const taskId = entity && await taskIdOf(entity);
+    if (taskId) {
+      await broker.updateTask(taskId, {
+        progress: { type: 'Property', value: 'completed' },
+        statusLabel: { type: 'Property', value: command.final },
+        completedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
+      }).catch((err) => console.error(`task for ${record.decision}: ${(err as Error).message}`));
+    }
     // The page reads the outcome from the report's check property.
-    const entity = await broker.getRoadRestriction(record.entity, { sysAttrs: false });
     const check = entity?.check as Record<string, unknown> | undefined;
     if (check) {
       await broker.writeAttribute(record.entity, 'check', {
@@ -365,7 +368,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     const [evacuation, task] = await Promise.all([
       evacuationOf(broker, entity),
       // Extra data for developers: the page still works without it.
-      decisionId && PERSON_ACTIONS.includes(summary.check!.action) ? broker.getEntity(taskEntityId(decisionId.split(':').pop()!)).catch(() => null) : null,
+      PERSON_ACTIONS.includes(summary.check?.action ?? '') ? taskIdOf(entity).then((id) => (id ? broker.getEntity(id) : null)).catch(() => null) : null,
     ]);
     // Only prepared reports go to the GitHub queue; the page says so.
     return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
@@ -466,6 +469,16 @@ export function pendingOf(e: Entity): PendingDecision {
 }
 
 // --- Shapes for the page ---------------------------------------------------------
+
+/**
+ * The report's Task (pointsman#81). The bridge makes its id from the report,
+ * the result attribute and the input hash, so a retried notification finds
+ * the same Task; the hash is in the check property.
+ */
+async function taskIdOf(e: Entity): Promise<string | null> {
+  const hash = val((e.check as Attr | undefined)?.inputHash);
+  return typeof hash === 'string' ? taskEntityId(e.id, ROUTE.attribute, hash) : null;
+}
 
 /** Step 2 of the chain for the page: its action, facts, Alert and NGSI-LD data; null before it ran. */
 async function evacuationOf(broker: Broker, entity: Entity) {
@@ -583,10 +596,9 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     const created = Date.parse(String(e.createdAt ?? ''));
     if (!(now - created > KEEP_MS)) continue;
     const decision = ((e.check as Attr | undefined)?.decision as Attr | undefined)?.object;
-    if (typeof decision === 'string') {
-      await broker.delete(decision);
-      await broker.delete(taskEntityId(decision.split(':').pop()!));
-    }
+    if (typeof decision === 'string') await broker.delete(decision);
+    const taskId = await taskIdOf(e);
+    if (taskId) await broker.delete(taskId);
     // Step 2: its Decision entity and the Alert it raised.
     const second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
     if (typeof second === 'string') {

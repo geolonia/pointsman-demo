@@ -3,6 +3,7 @@
 import { env as cfEnv, exports } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
+import { taskEntityId } from '../engine/bridge/src/bridge';
 import { cleanup } from '../src/index';
 
 // Secrets come from vitest.config.ts; the generated types know only the vars.
@@ -77,16 +78,17 @@ describe('reports from the page', () => {
 
   it('shows one report with its NGSI-LD data and issue', async () => {
     const id = 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-0000000000aa';
+    const taskId = await taskEntityId(id, 'check', 'h-9');
     await env.DEMO.put('decision-issue:d-9', '12');
     answer = (c) => {
       if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
-        return Response.json({ id, type: 'RoadRestriction', description: P('blocked'), check: { type: 'Property', value: 'review', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-9' } } });
+        return Response.json({ id, type: 'RoadRestriction', description: P('blocked'), check: { type: 'Property', value: 'review', inputHash: P('h-9'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-9' } } });
       }
       if (c.url === `${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Decision:d-9')}`) {
         expect(c.headers.get('link')).toBeNull(); // full IRIs for the page
         return Response.json({ id: 'urn:ngsi-ld:Decision:d-9', type: 'https://datamodels.jp/ns/decision/Decision' });
       }
-      if (c.url === `${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Task:d-9')}`) return Response.json({ id: 'urn:ngsi-ld:Task:d-9', type: 'https://datamodels.jp/ns/task/Task' });
+      if (c.url === `${BROKER}/entities/${encodeURIComponent(taskId)}`) return Response.json({ id: taskId, type: 'https://datamodels.jp/ns/task/Task' });
       return undefined;
     };
     // As the page asks: percent-encoded.
@@ -94,17 +96,17 @@ describe('reports from the page', () => {
     expect(r).toMatchObject({ id, prepared: false, check: { action: 'review', decision: 'urn:ngsi-ld:Decision:d-9' }, issue: 'https://github.com/geolonia/pointsman-demo/issues/12' });
     expect(r.ngsi.entity.id).toBe(id);
     expect(r.ngsi.decision.type).toBe('https://datamodels.jp/ns/decision/Decision');
-    expect(r.ngsi.task.id).toBe('urn:ngsi-ld:Task:d-9');
+    expect(r.ngsi.task.id).toBe(taskId);
   });
 
   it('shows the report when its Task cannot be read', async () => {
     const id = 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-0000000000ab';
     answer = (c) => {
       if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
-        return Response.json({ id, type: 'RoadRestriction', check: { type: 'Property', value: 'urgent', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-8' } } });
+        return Response.json({ id, type: 'RoadRestriction', check: { type: 'Property', value: 'urgent', inputHash: P('h-8'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-8' } } });
       }
       if (c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:d-8'))) return Response.json({ id: 'urn:ngsi-ld:Decision:d-8', type: 'Decision' });
-      if (c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Task:d-8'))) return new Response(null, { status: 503 });
+      if (c.url.includes('urn%3Angsi-ld%3ATask%3A')) return new Response(null, { status: 503 });
       return undefined;
     };
     const res = await worker(`/api/reports/${encodeURIComponent(id)}`);
@@ -183,13 +185,14 @@ describe('notifications (the bridge)', () => {
     expect(decide.headers.get('user-agent')).toMatch(/^pointsman-(demo|bridge)/);
     const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision')!;
     expect(decisionEntity.body.humanInvolvement).toEqual({ type: 'VocabProperty', vocab: 'dpv:HumanInvolvementForVerification' });
-    // A Task for a person (pointsman#81), with the decision's id.
+    // A Task for a person (pointsman#81), found again by the check's input hash.
     const task = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Task')!;
     expect(task.body).toMatchObject({
-      id: 'urn:ngsi-ld:Task:11111111-1111-4111-8111-111111111111',
       name: P('[review] 内堀通り'), progress: P('needs-action'), priority: P(5),
       refersTo: { type: 'Relationship', object: report.id },
     });
+    const check = calls.find((c) => c.url.endsWith('/attrs') && c.body?.check)?.body.check ?? calls.find((c) => c.url.endsWith('/attrs/check'))!.body;
+    expect(task.body.id).toBe(await taskEntityId(report.id, 'check', check.inputHash.value));
     // Every broker request carries the demo's API key, tenant and a User-Agent
     // (GeonicDB's firewall refuses requests without one): the demo's, or the
     // bridge's for the requests the bridge makes.
@@ -252,7 +255,7 @@ describe('reviews from GitHub', () => {
     await env.DEMO.put('issue:7', JSON.stringify({ decision, entity: entityId, action: 'review', corrections: [] }));
     answer = (c) => {
       if (c.url.startsWith('https://pointsman.geolonia.workers.dev/')) return new Response(null, { status: c.url.endsWith('/resolve') ? 200 : 204 });
-      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/`)) return Response.json({ id: entityId, type: 'RoadRestriction', check: { type: 'Property', value: 'review', decisionId: P(decision) } });
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/`)) return Response.json({ id: entityId, type: 'RoadRestriction', check: { type: 'Property', value: 'review', decisionId: P(decision), inputHash: P('h-7') } });
       return undefined;
     };
   });
@@ -270,7 +273,8 @@ describe('reviews from GitHub', () => {
     const check = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/check'))!;
     expect(check.body).toMatchObject({ value: 'review', finalAction: P('publish') });
     expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))!.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'publish'] });
-    const task = calls.find((c) => c.url === `${BROKER}/entities/${encodeURIComponent(`urn:ngsi-ld:Task:${decision}`)}/attrs`)!;
+    const taskUrl = `${BROKER}/entities/${encodeURIComponent(await taskEntityId(entityId, 'check', 'h-7'))}/attrs`;
+    const task = calls.find((c) => c.url === taskUrl)!;
     expect(task.headers.get('content-type')).toBe('application/ld+json');
     expect(task.body).toMatchObject({
       '@context': ['https://datamodels.jp/context/task/v1.jsonld', 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.8.jsonld'],
@@ -313,7 +317,7 @@ describe('cleanup', () => {
     answer = (c) => {
       if (c.method === 'GET' && c.url.includes('/entities?type=RoadRestriction')) {
         return Response.json([
-          { id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old, check: { type: 'Property', value: 'review', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-old' } },
+          { id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old, check: { type: 'Property', value: 'review', inputHash: P('h-old'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-old' } },
             evacuation: { type: 'Property', value: 'alert', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-old' } } },
           { id: 'urn:ngsi-ld:RoadRestriction:demo-new', type: 'RoadRestriction', createdAt: new Date().toISOString() },
         ]);
@@ -327,7 +331,7 @@ describe('cleanup', () => {
     await env.DEMO.put('issue:10', JSON.stringify({ decision: 'd-new', entity: 'urn:ngsi-ld:RoadRestriction:demo-new', action: 'review', corrections: [], createdAt: new Date().toISOString() }));
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
     // Step 1's Decision and Task, step 2's Decision and Alert, then the report.
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', 'urn:ngsi-ld:Task:d-old', 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });
