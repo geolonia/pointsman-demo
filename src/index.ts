@@ -37,6 +37,12 @@ const EVACUATION_ROUTE: Route = {
   name: 'evacuation',
   informedBy: 'check',
 };
+/**
+ * Work orders from other apps (pointsman#85): a completed Task that refers to
+ * a report, for example a Redmine GTT issue, resolves the report's review.
+ * Its status name gives the final action.
+ */
+const WORK_ORDERS = { Published: 'publish', Rejected: 'reject', 公開: 'publish', 却下: 'reject' };
 const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 /** Demo data lives this long. */
 const KEEP_MS = 24 * 3600_000;
@@ -85,6 +91,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
 function bridgeConfig(env: Env): BridgeConfig {
   return {
     routes: [ROUTE, EVACUATION_ROUTE],
+    workOrders: WORK_ORDERS,
     notifySecret: env.NOTIFY_SECRET,
     pointsman: { url: trimUrl(env.POINTSMAN_URL), token: env.POINTSMAN_TOKEN },
     broker: { url: trimUrl(env.BROKER_URL), apiKey: env.BROKER_API_KEY, tenant: env.BROKER_TENANT, context: TRANSPORTATION_CONTEXT },

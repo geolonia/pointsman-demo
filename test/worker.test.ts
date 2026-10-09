@@ -279,6 +279,29 @@ describe('reviews from GitHub', () => {
     expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))!.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'publish'] });
   });
 
+  it('resolves the review of a report from a completed work order (pointsman#85)', async () => {
+    const D = `urn:ngsi-ld:Decision:${decision}`;
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(entityId)}`)) {
+        return Response.json({ id: entityId, type: 'RoadRestriction', check: { type: 'Property', value: 'review', inputHash: P('h-7'), decision: { type: 'Relationship', object: D } } });
+      }
+      if (c.method === 'POST' && c.url === `${BROKER}/entities/${encodeURIComponent(D)}/attrs`) return new Response(null, { status: 204 });
+      return undefined;
+    };
+    const res = await worker('/reviews', {
+      method: 'POST',
+      headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'Notification', data: [{
+        id: 'urn:ngsi-ld:Issue:redmine:demo:12', type: 'Task', progress: P('completed'), statusLabel: P('却下'),
+        refersTo: { type: 'Relationship', object: entityId }, dateModified: P({ '@type': 'DateTime', '@value': '2026-10-09T05:00:00Z' }),
+      }] }),
+    });
+    expect(await res.json()).toEqual({ handled: [{ id: 'urn:ngsi-ld:Issue:redmine:demo:12', resolves: D, finalAction: 'reject' }] });
+    expect(calls.find((c) => c.method === 'POST' && c.url.includes(encodeURIComponent(D)))!.body).toMatchObject({
+      reviewStatus: P('resolved'), finalAction: P('reject'), reviewedBy: P('redmine:demo#12'),
+    });
+  });
+
   it('passes resolved Decisions from the broker to the bridge (/reviews)', async () => {
     const D = `urn:ngsi-ld:Decision:${decision}`;
     answer = (c) => {
