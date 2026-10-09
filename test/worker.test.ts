@@ -286,6 +286,8 @@ describe('reviews from GitHub', () => {
         return Response.json({ id: entityId, type: 'RoadRestriction', check: { type: 'Property', value: 'review', inputHash: P('h-7'), decision: { type: 'Relationship', object: D } } });
       }
       if (c.method === 'POST' && c.url === `${BROKER}/entities/${encodeURIComponent(D)}/attrs`) return new Response(null, { status: 204 });
+      // The bridge reads the Decision first: the first work order wins.
+      if (c.method === 'GET' && c.url === `${BROKER}/entities/${encodeURIComponent(D)}`) return Response.json({ id: D, type: 'Decision', reviewStatus: P('pending') });
       return undefined;
     };
     const res = await worker('/reviews', {
