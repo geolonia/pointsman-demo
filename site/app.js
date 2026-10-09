@@ -25,7 +25,7 @@
       footer: 'Invented events at real places. Do not enter personal data. Map: <a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>.',
       s1: 'Stored in the context broker', s2: 'Broker notified the bridge (subscription)', s3: 'Pointsman answered the four questions and looked up facts about the place',
       s4: 'Result written back to the entity and as a Decision entity', waiting: 'waiting…',
-      showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showRequest: 'request',
+      showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp Task)', showRequest: 'request',
       rule: 'rule', ruleDefault: 'no rule matched: default action',
       nPublish: 'Clear and consistent: published to the residents’ map without waiting for a person.',
       nReview: 'Not clear enough to publish on its own: a person checks it.',
@@ -75,7 +75,7 @@
       footer: '場所は実在、出来事は架空です。個人情報は入れないでください。地図：<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>。',
       s1: 'コンテキストブローカーに保存', s2: 'ブローカーがブリッジに通知（サブスクリプション）', s3: 'Pointsman が 4 つの問いに回答し、場所の事実を調査',
       s4: '結果をエンティティと Decision エンティティに書き戻し', waiting: '待機中…',
-      showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showRequest: 'リクエスト',
+      showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp Task）', showRequest: 'リクエスト',
       rule: '規則', ruleDefault: 'どの規則にも当たらず既定の行動',
       nPublish: 'はっきりしていて矛盾もないので、人を待たずに住民向けの地図に公開しました。',
       nReview: 'そのまま公開するには不明な点があるので、人が確認します。',
@@ -296,7 +296,7 @@
     tl.appendChild(step(t('s2'), decided ? 'done' : stored ? 'wait' : 'wait', ''));
     tl.appendChild(step(t('s3'), decided ? 'done' : 'wait', decided ? seconds(r.createdAt, r.check.decidedAt) : ''));
     tl.appendChild(step(t('s4'), written ? 'done' : 'wait', '',
-      written ? el('div', null, [json(t('showEntity'), r.ngsi.entity), json(t('showDecision'), r.ngsi.decision)]) : null));
+      written ? el('div', null, [json(t('showEntity'), r.ngsi.entity), json(t('showDecision'), r.ngsi.decision), r.ngsi.task ? json(t('showTask'), r.ngsi.task) : null]) : null));
     // Step 2 of the chain runs only for urgent and review (pointsman#66).
     var chained = decided && (r.check.action === 'urgent' || r.check.action === 'review');
     if (chained) {

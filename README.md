@@ -18,7 +18,7 @@ flowchart LR
   W -->|create entity| B["GeonicDB<br/>(tenant pointsman_demo)"]
   B -->|notification| W
   W -->|decide| P["Pointsman"]
-  W -->|write check, Decision entity| B
+  W -->|write check, Decision, Task| B
   W -->|urgent / review| G["GitHub issues<br/>(this repository)"]
   G -->|"/publish comment"| W
 ```
@@ -30,7 +30,9 @@ flowchart LR
    Pointsman (profile `road-restriction-check`) and writes the result back to
    the entity as `check`, plus a `Decision` entity.
 3. `review` and `urgent` reports become issues here, for prepared reports only
-   (free text from visitors never goes to GitHub).
+   (free text from visitors never goes to GitHub). Each one also gets a
+   `Task` entity ([datamodels.jp](https://datamodels.jp/models/task/Task/)),
+   so any app that lists tasks from the broker shows the work.
 4. The chain: a second subscription sends `urgent` and `review` results to
    `/notify?route=evacuation`. The bridge asks Pointsman again (profile
    `evacuation-access-check`: does the closure cut people off from their
@@ -39,9 +41,10 @@ flowchart LR
    entity (Smart Data Models) for the site's staff.
 5. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
-   in Pointsman, updates the broker, and closes the issue.
-6. Every hour, data older than a day is deleted (with its Decision and Alert
-   entities) and its issues are closed.
+   in Pointsman, updates the broker (the Task becomes `completed`), and closes
+   the issue.
+6. Every hour, data older than a day is deleted (with its Decision, Task and
+   Alert entities) and its issues are closed.
 
 ## The page
 
@@ -52,7 +55,7 @@ https://pointsman-demo.geolonia.workers.dev — `site/`, served by the Worker
   on GSI tiles (地理院タイル);
 - the six prepared reports; a click sends one and shows each step with its
   time, the answers with their probabilities, the outcome, and the review issue;
-- the real NGSI-LD data of the report and its `Decision` entity;
+- the real NGSI-LD data of the report, its `Decision` entity and its `Task`;
 - recent reports, shared by all visitors.
 
 No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
@@ -64,7 +67,7 @@ No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 |---|---|
 | `GET /api/config` | Prepared reports, the demo area, whether free text is on, today's usage |
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
-| `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`) |
+| `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`, `ngsi.task`) |
 | `GET /api/decisions` | `Decision` entities waiting for a person (`reviewStatus` "pending"), newest first, with the NGSI-LD request that found them |
 | `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}` |
 
