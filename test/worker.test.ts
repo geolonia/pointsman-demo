@@ -86,6 +86,7 @@ describe('reports from the page', () => {
         expect(c.headers.get('link')).toBeNull(); // full IRIs for the page
         return Response.json({ id: 'urn:ngsi-ld:Decision:d-9', type: 'https://datamodels.jp/ns/decision/Decision' });
       }
+      if (c.url === `${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Task:d-9')}`) return Response.json({ id: 'urn:ngsi-ld:Task:d-9', type: 'https://datamodels.jp/ns/task/Task' });
       return undefined;
     };
     // As the page asks: percent-encoded.
@@ -93,6 +94,22 @@ describe('reports from the page', () => {
     expect(r).toMatchObject({ id, prepared: false, check: { action: 'review', decision: 'urn:ngsi-ld:Decision:d-9' }, issue: 'https://github.com/geolonia/pointsman-demo/issues/12' });
     expect(r.ngsi.entity.id).toBe(id);
     expect(r.ngsi.decision.type).toBe('https://datamodels.jp/ns/decision/Decision');
+    expect(r.ngsi.task.id).toBe('urn:ngsi-ld:Task:d-9');
+  });
+
+  it('shows the report when its Task cannot be read', async () => {
+    const id = 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-0000000000ab';
+    answer = (c) => {
+      if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
+        return Response.json({ id, type: 'RoadRestriction', check: { type: 'Property', value: 'urgent', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-8' } } });
+      }
+      if (c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:d-8'))) return Response.json({ id: 'urn:ngsi-ld:Decision:d-8', type: 'Decision' });
+      if (c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Task:d-8'))) return new Response(null, { status: 503 });
+      return undefined;
+    };
+    const res = await worker(`/api/reports/${encodeURIComponent(id)}`);
+    expect(res.status).toBe(200);
+    expect((await res.json<any>()).ngsi.task).toBeNull();
   });
 
   it('lists the decisions waiting for a person, with one NGSI-LD query', async () => {
@@ -166,6 +183,13 @@ describe('notifications (the bridge)', () => {
     expect(decide.headers.get('user-agent')).toMatch(/^pointsman-(demo|bridge)/);
     const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision')!;
     expect(decisionEntity.body.humanInvolvement).toEqual({ type: 'VocabProperty', vocab: 'dpv:HumanInvolvementForVerification' });
+    // A Task for a person (pointsman#81), with the decision's id.
+    const task = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Task')!;
+    expect(task.body).toMatchObject({
+      id: 'urn:ngsi-ld:Task:11111111-1111-4111-8111-111111111111',
+      name: P('[review] 内堀通り'), progress: P('needs-action'), priority: P(5),
+      refersTo: { type: 'Relationship', object: report.id },
+    });
     // Every broker request carries the demo's API key, tenant and a User-Agent
     // (GeonicDB's firewall refuses requests without one): the demo's, or the
     // bridge's for the requests the bridge makes.
@@ -205,6 +229,8 @@ describe('notifications (the bridge)', () => {
     expect((await notify()).status).toBe(200);
     await new Promise((r) => setTimeout(r, 50));
     expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
+    // Tasks are about the decision, not the issue: urgent free text gets one, publish none.
+    expect(calls.filter((c) => c.body?.type === 'Task').map((c) => c.body.statusLabel.value)).toEqual(['urgent']);
   });
 });
 
@@ -244,6 +270,25 @@ describe('reviews from GitHub', () => {
     const check = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/check'))!;
     expect(check.body).toMatchObject({ value: 'review', finalAction: P('publish') });
     expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))!.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'publish'] });
+    const task = calls.find((c) => c.url === `${BROKER}/entities/${encodeURIComponent(`urn:ngsi-ld:Task:${decision}`)}/attrs`)!;
+    expect(task.headers.get('content-type')).toBe('application/ld+json');
+    expect(task.body).toMatchObject({
+      '@context': ['https://datamodels.jp/context/task/v1.jsonld', 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.8.jsonld'],
+      progress: P('completed'), statusLabel: P('publish'),
+    });
+    expect(task.body.completedAt.value['@value']).toMatch(/^\d{4}-\d\d-\d\dT/);
+  });
+
+  it('resolves the review even when the Task is missing or cannot be updated', async () => {
+    for (const status of [404, 503]) {
+      calls = [];
+      await env.DEMO.put('issue:7', JSON.stringify({ decision, entity: entityId, action: 'review', corrections: [] }));
+      const base = answer;
+      answer = (c) => (c.url.includes('urn%3Angsi-ld%3ATask%3A') ? new Response(null, { status }) : base(c));
+      expect((await signed(comment('/reject'))).status).toBe(200);
+      expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))!.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'reject'] });
+      answer = base;
+    }
   });
 
   it('sends corrections alone as feedback and keeps the issue open', async () => {
@@ -281,8 +326,8 @@ describe('cleanup', () => {
     await env.DEMO.put('issue:9', JSON.stringify({ decision: 'd-old', entity: 'urn:ngsi-ld:RoadRestriction:demo-old', action: 'review', corrections: [], createdAt: old }));
     await env.DEMO.put('issue:10', JSON.stringify({ decision: 'd-new', entity: 'urn:ngsi-ld:RoadRestriction:demo-new', action: 'review', corrections: [], createdAt: new Date().toISOString() }));
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
-    // Step 1's and step 2's Decision entities, step 2's Alert, then the report.
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+    // Step 1's Decision and Task, step 2's Decision and Alert, then the report.
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', 'urn:ngsi-ld:Task:d-old', 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });

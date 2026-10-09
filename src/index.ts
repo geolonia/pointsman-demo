@@ -1,7 +1,7 @@
 // The demo Worker: the page's API, the FIWARE bridge on /notify, the GitHub
 // review queue, and the daily cleanup. See README.md.
 
-import { type BridgeConfig, DECISION_CONTEXT, type Route, decisionEntityId, handleRequest } from '../engine/bridge/src/bridge';
+import { type BridgeConfig, DECISION_CONTEXT, type Route, decisionEntityId, handleRequest, taskEntityId } from '../engine/bridge/src/bridge';
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
@@ -19,6 +19,8 @@ const ROUTE: Route = {
   attribute: 'check',
   decisionEntity: true,
   reviewActions: PERSON_ACTIONS,
+  // A Task (datamodels.jp) for the same reports that get an issue (pointsman#81).
+  task: { actions: PERSON_ACTIONS, name: 'roadName', priority: { urgent: 1, review: 5 } },
 };
 /**
  * Step 2 of the chain (pointsman#66): for reports that step 1 decided
@@ -263,6 +265,13 @@ async function webhook(request: Request, env: Env): Promise<Response> {
     }),
   });
   if (command.final) {
+    // The person's work is done, whichever way they decided. Best effort: the
+    // review itself is resolved, and reports from before Tasks have none.
+    await broker.updateTask(taskEntityId(record.decision), {
+      progress: { type: 'Property', value: 'completed' },
+      statusLabel: { type: 'Property', value: command.final },
+      completedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
+    }).catch((err) => console.error(`task for ${record.decision}: ${(err as Error).message}`));
     // The page reads the outcome from the report's check property.
     const entity = await broker.getRoadRestriction(record.entity, { sysAttrs: false });
     const check = entity?.check as Record<string, unknown> | undefined;
@@ -353,9 +362,13 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       env.DEMO.get<ReportRecord>(`report:${entity.id}`, 'json'),
     ]);
     const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
-    const evacuation = await evacuationOf(broker, entity);
+    const [evacuation, task] = await Promise.all([
+      evacuationOf(broker, entity),
+      // Extra data for developers: the page still works without it.
+      decisionId && PERSON_ACTIONS.includes(summary.check!.action) ? broker.getEntity(taskEntityId(decisionId.split(':').pop()!)).catch(() => null) : null,
+    ]);
     // Only prepared reports go to the GitHub queue; the page says so.
-    return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity } }, 200, cors);
+    return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
@@ -562,7 +575,7 @@ export function summarize(e: Entity): Summary {
 
 // --- Cleanup -----------------------------------------------------------------------
 
-/** Deletes reports and their Decision entities after a day, and closes their issues. */
+/** Deletes reports and their Decision, Task and Alert entities after a day, and closes their issues. */
 export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: number; closed: number }> {
   const broker = new Broker(env);
   let deleted = 0;
@@ -570,7 +583,10 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     const created = Date.parse(String(e.createdAt ?? ''));
     if (!(now - created > KEEP_MS)) continue;
     const decision = ((e.check as Attr | undefined)?.decision as Attr | undefined)?.object;
-    if (typeof decision === 'string') await broker.delete(decision);
+    if (typeof decision === 'string') {
+      await broker.delete(decision);
+      await broker.delete(taskEntityId(decision.split(':').pop()!));
+    }
     // Step 2: its Decision entity and the Alert it raised.
     const second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
     if (typeof second === 'string') {

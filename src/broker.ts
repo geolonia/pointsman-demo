@@ -1,7 +1,7 @@
 // The context broker (GeonicDB): road restrictions and Decision entities of
 // the demo tenant.
 
-import { DECISION_CONTEXT } from '../engine/bridge/src/bridge';
+import { DECISION_CONTEXT, TASK_CONTEXT } from '../engine/bridge/src/bridge';
 import { type Env, trimUrl } from './env';
 import { fetchWithAgent } from './http';
 
@@ -85,6 +85,15 @@ export class Broker {
       headers: { 'content-type': 'application/ld+json' },
     });
     if (!res.ok) throw new BrokerError('update decision', res.status);
+  }
+
+  /** Adds or replaces attributes of a Task entity (the published Task context). A missing Task is fine. */
+  async updateTask(id: string, attributes: Record<string, unknown>): Promise<void> {
+    const res = await this.call('POST', `/entities/${encodeURIComponent(id)}/attrs`, {
+      body: { '@context': [TASK_CONTEXT, CORE_CONTEXT], ...attributes },
+      headers: { 'content-type': 'application/ld+json' },
+    });
+    if (!res.ok && res.status !== 404) throw new BrokerError('update task', res.status);
   }
 
   /**
