@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // One-time setup outside Cloudflare: the subscriptions in the context broker
-// (RoadRestriction -> the Worker's /notify, and the chain's step 2 ->
-// /notify?route=evacuation) and the issue labels on GitHub.
+// (RoadRestriction -> the Worker's /notify, the chain's step 2 ->
+// /notify?route=evacuation, and resolved Decisions -> /reviews) and the issue
+// labels on GitHub.
 // Idempotent: an existing subscription with the same id is updated in place.
 //
 // Secrets come from the environment, for example from 1Password:
@@ -36,9 +37,20 @@ const subscriptions = {
     q: 'check=="urgent"|check=="review"',
     notification: { format: 'normalized', endpoint: endpoint('/notify?route=evacuation') },
   },
+  // Reviews resolved in the broker (pointsman#83): from GitHub, or from any app.
+  'urn:ngsi-ld:Subscription:pointsman-demo-reviews': {
+    description: 'Pointsman demo: decisions a person resolved, to the bridge',
+    entities: [{ type: 'Decision' }],
+    watchedAttributes: ['reviewStatus'],
+    q: 'reviewStatus=="resolved"',
+    notification: { format: 'normalized', endpoint: endpoint('/reviews') },
+    context: 'https://datamodels.jp/context/decision/v1.jsonld',
+  },
 };
-const withContext = { ...headers, link: '<https://datamodels.jp/context/transportation/v1.jsonld>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"' };
-for (const [id, subscription] of Object.entries(subscriptions)) {
+const linkTo = (context) => ({ ...headers, link: `<${context}>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"` });
+for (const [id, { context = 'https://datamodels.jp/context/transportation/v1.jsonld', ...subscription }] of Object.entries(subscriptions)) {
+  // The context gives the short names in the subscription and its notifications.
+  const withContext = linkTo(context);
   // Update in place, so notifications never stop; create it when missing.
   let res = await fetch(`${base}/subscriptions/${encodeURIComponent(id)}`, { method: 'PATCH', headers: withContext, body: JSON.stringify(subscription) });
   if (res.status === 404) {

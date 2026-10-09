@@ -41,9 +41,14 @@ flowchart LR
    entity (Smart Data Models) for the site's staff.
 5. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
-   in Pointsman, updates the broker (the Task becomes `completed`), and closes
-   the issue.
-6. Every hour, data older than a day is deleted (with its Decision, Task and
+   in Pointsman, writes the result to the `Decision` entity, and closes the
+   issue.
+6. A third subscription sends resolved `Decision` entities to `/reviews`. The
+   bridge writes the final action to the report (the page shows it as
+   published) and completes the Task. This also works without GitHub: any
+   app that writes the result to the Decision entity resolves the review
+   (pointsman#83), for example `scripts/resolve.mjs`.
+7. Every hour, data older than a day is deleted (with its Decision, Task and
    Alert entities) and its issues are closed.
 
 ## The page
@@ -96,8 +101,19 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 | `GITHUB_APP_PRIVATE_KEY` | Same item, the private key converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt` |
 | `TURNSTILE_SECRET` | Optional |
 
-Then, once: `node scripts/setup.mjs` creates both subscriptions in the broker
-(new reports, and the chain's step 2) and the issue labels.
+Then, once: `node scripts/setup.mjs` creates the three subscriptions in the
+broker (new reports, the chain's step 2, resolved decisions) and the issue
+labels.
+
+To resolve a review in the broker, as another app would (a member of the
+team, with the broker key):
+
+```sh
+BROKER_API_KEY=… node scripts/resolve.mjs <decision id> publish --by demo:script --correct danger=false
+```
+
+The GitHub issue of that report stays open (a later `/publish` there gets
+"Pointsman refused this (409)"); the hourly cleanup closes it.
 
 ## Deployment
 
