@@ -339,6 +339,19 @@ describe('cleanup', () => {
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });
+
+  it('deletes the report even when its Task cannot be deleted', async () => {
+    const old = new Date(Date.now() - 25 * 3600_000).toISOString();
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.includes('/entities?type=RoadRestriction')) {
+        return Response.json([{ id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old, check: { type: 'Property', value: 'review', inputHash: P('h-old') } }]);
+      }
+      if (c.method === 'DELETE') return new Response(null, { status: c.url.includes('Task') ? 503 : 204 });
+      return undefined;
+    };
+    expect(await cleanup(env)).toEqual({ deleted: 1, closed: 0 });
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith(encodeURIComponent('urn:ngsi-ld:RoadRestriction:demo-old')))).toBe(true);
+  });
 });
 
 describe('the chain (step 2)', () => {

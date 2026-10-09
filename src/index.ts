@@ -597,8 +597,9 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     if (!(now - created > KEEP_MS)) continue;
     const decision = ((e.check as Attr | undefined)?.decision as Attr | undefined)?.object;
     if (typeof decision === 'string') await broker.delete(decision);
+    // Extra data: a Task that cannot be deleted must not keep the report.
     const taskId = await taskIdOf(e);
-    if (taskId) await broker.delete(taskId);
+    if (taskId) await broker.delete(taskId).catch((err) => console.error(`task cleanup: ${(err as Error).message}`));
     // Step 2: its Decision entity and the Alert it raised.
     const second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
     if (typeof second === 'string') {
