@@ -1,11 +1,19 @@
 # Pointsman FIWARE demo
 
-A demo of [Pointsman](https://github.com/geolonia/pointsman) with an NGSI-LD
-context broker. During heavy rain, reports of closed or restricted roads come
-in as `RoadRestriction` entities
-([datamodels.jp](https://datamodels.jp/models/transportation/RoadRestriction/)).
-Pointsman checks each one within about a second: clear reports go straight to
-the residents' map, the others to a person, urgent ones first.
+A demo of [Pointsman](https://github.com/geolonia/pointsman) on a smart-city
+data platform (FIWARE). During heavy rain, residents report closed roads.
+Pointsman checks each report within seconds. Clear reports go straight to
+the residents' map. Unclear reports go to a person, and urgent reports go to
+a person first.
+
+Try it: https://pointsman-demo.geolonia.workers.dev
+
+In FIWARE terms: the reports are `RoadRestriction` entities
+([datamodels.jp](https://datamodels.jp/models/transportation/RoadRestriction/))
+in GeonicDB, an NGSI-LD context broker. The
+[bridge](https://github.com/geolonia/pointsman/tree/main/bridge) connects the
+broker to Pointsman. [Why a bridge](https://github.com/geolonia/pointsman/blob/main/bridge/README.md#why-a-bridge)
+explains these words.
 
 The storyboard and the reasons are in Pointsman's
 [docs/fiware-demo.md](https://github.com/geolonia/pointsman/blob/main/docs/fiware-demo.md).

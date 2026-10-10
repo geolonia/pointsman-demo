@@ -34,7 +34,7 @@
 <main>
   <section class="intro">
     <h1 data-i18n="title">Heavy rain. Reports of closed roads are coming in.</h1>
-    <p data-i18n="lead">Each report becomes a <code>RoadRestriction</code> entity in an NGSI-LD context broker. Pointsman checks it within seconds: clear reports go straight to the residents' map, unclear ones to a person, urgent ones first.</p>
+    <p data-i18n="lead">During heavy rain, residents report closed roads. Pointsman checks each report within seconds. Clear reports go straight to the residents’ map. Unclear reports go to a person, and urgent reports go to a person first. The reports are stored in a smart-city data platform (FIWARE).</p>
   </section>
 
   <section class="maps">
@@ -59,7 +59,7 @@
   <section class="work">
     <div class="panel">
       <h2 data-i18n="send">1. Send a report</h2>
-      <p class="muted" data-i18n="sendNote">Pick one. Each is a real request to the broker; Pointsman answers it live.</p>
+      <p class="muted" data-i18n="sendNote">Pick one. The page really sends it, and Pointsman checks it live.</p>
       <ul id="prepared" class="prepared"></ul>
       <p id="free-note" class="muted small" data-i18n="freeOff">Free text is switched off in this demo: only prepared reports.</p>
       <p id="send-error" class="error" hidden></p>
@@ -81,7 +81,7 @@
 
   <section class="panel">
     <h2 data-i18n="waitingTitle">Waiting for a person</h2>
-    <p class="muted small" data-i18n="waitingNote">One NGSI-LD query across all reports: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can ask the broker the same.</p>
+    <p class="muted small" data-i18n="waitingNote">One search in the data platform finds them: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can do the same search.</p>
     <ul id="pending" class="reports pending"></ul>
     <div id="pending-info"></div>
   </section>
@@ -89,10 +89,10 @@
   <section class="panel explain">
     <h2 data-i18n="what">What just happened</h2>
     <ol>
-      <li data-i18n="w1">The page created a <code>RoadRestriction</code> entity (<a href="https://datamodels.jp/models/transportation/RoadRestriction/">datamodels.jp</a>) in GeonicDB, an NGSI-LD context broker.</li>
-      <li data-i18n="w2">A subscription notified the bridge. It sent the entity, as it is, to Pointsman: the profile reads the attributes it needs, no mapping code.</li>
-      <li data-i18n="w3">Pointsman asked the model four typed questions and turned the answers into an action with the city's rules. The bridge wrote the result back to the entity (<code>check</code>) and as a <code>Decision</code> entity, so other FIWARE apps can subscribe to it.</li>
-      <li data-i18n="w4">Reports that need a person became GitHub issues. A member resolves one with <code>/publish</code> or <code>/reject</code>; the answer goes back to Pointsman as feedback.</li>
+      <li data-i18n="w1">The page saved the report in the city’s data platform: GeonicDB, a FIWARE context broker. The report is stored as a <code>RoadRestriction</code> entity (a data model from <a href="https://datamodels.jp/models/transportation/RoadRestriction/">datamodels.jp</a>).</li>
+      <li data-i18n="w2">The data platform told the bridge about the new report (a subscription). The bridge sent the report to Pointsman as it is. The profile picks the fields it needs, so no conversion code is needed.</li>
+      <li data-i18n="w3">Pointsman asked an AI four questions about the report. It also looked up facts about the place in public data: the flood zone and the nearest evacuation site. Then the city’s rules turned the answers and the facts into an action. The AI does not see the facts; only the rules use them. The bridge saved the result in the data platform: on the report (<code>check</code>) and as a separate <code>Decision</code> entity, so other FIWARE apps can use it too.</li>
+      <li data-i18n="w4">Reports that need a person became GitHub issues. A team member decides with <code>/publish</code> or <code>/reject</code>. The answer goes back to Pointsman, so we can see how often the AI was right.</li>
     </ol>
     <p class="links">
       <a href="https://github.com/geolonia/pointsman/blob/main/examples/profiles/road-restriction-check.yaml" data-i18n="lProfile">The profile</a>
