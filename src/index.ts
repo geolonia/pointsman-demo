@@ -430,7 +430,11 @@ async function pendingDecisions(env: Env): Promise<{ request: { method: 'GET'; u
   // short names in the query (Decision, reviewStatus) from it.
   const contextUrl = DECISION_CONTEXT;
   const { query, pages, decisions } = await new Broker(env).listPendingDecisions(contextUrl);
-  const shown = decisions.map(pendingOf).sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? '')).slice(0, PENDING_SHOWN);
+  // Urgent first (someone may be in danger), then the newest.
+  const rank = (action?: string) => (action === 'urgent' ? 0 : 1);
+  const shown = decisions.map(pendingOf)
+    .sort((a, b) => rank(a.action) - rank(b.action) || (b.decidedAt ?? '').localeCompare(a.decidedAt ?? ''))
+    .slice(0, PENDING_SHOWN);
   await Promise.all(shown.map(async (d) => {
     const n = await env.DEMO.get(`decision-issue:${d.id.split(':').pop()}`);
     d.issue = n && /^\d+$/.test(n) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${n}` : null;

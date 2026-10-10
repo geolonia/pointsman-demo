@@ -144,6 +144,17 @@ describe('reports from the page', () => {
     ]);
   });
 
+  it('lists urgent decisions first, then the newest', async () => {
+    // The list is cached for a few seconds: start without the previous test's answer.
+    await caches.default.delete(new Request('https://pointsman-demo.test/api/decisions'));
+    const D = (n: string, action: string, decidedAt: string) => ({ id: `urn:ngsi-ld:Decision:${n}`, type: 'Decision', action: P(action), decidedAt: P(decidedAt) });
+    answer = (c) => (c.url.startsWith(`${BROKER}/entities?type=Decision`)
+      ? Response.json([D('old-urgent', 'urgent', '2026-10-07T01:00:00Z'), D('new-review', 'review', '2026-10-07T03:00:00Z'), D('newer-urgent', 'urgent', '2026-10-07T02:00:00Z')])
+      : undefined);
+    const body = await (await worker('/api/decisions', { headers: { origin: PAGE } })).json<any>();
+    expect(body.decisions.map((d: { id: string }) => d.id.split(':').pop())).toEqual(['newer-urgent', 'old-urgent', 'new-review']);
+  });
+
 
   it('serves the configuration for the page', async () => {
     const res = await worker('/api/config', { headers: { origin: PAGE } });
