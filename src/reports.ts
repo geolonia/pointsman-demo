@@ -20,6 +20,10 @@ export interface Prepared {
   featured?: { en: string; ja: string };
 }
 
+// The texts are tuned so that Clef-flash gives the expected action in both
+// languages, with some margin to the profile's thresholds (checked on
+// 2026-10-15 with Pointsman dev:live). A model update can move the answers:
+// check again then.
 export const PREPARED: Prepared[] = [
   {
     id: 'flooded-underpass',
@@ -28,8 +32,8 @@ export const PREPARED: Prepared[] = [
     status: 'closed',
     statusLabel: '通行止め中',
     description: {
-      ja: '大雨でアンダーパスが冠水したため、10時45分から全面通行止め。迂回は内堀通りへ。',
-      en: 'The underpass is flooded by heavy rain; fully closed since 10:45. Detour via Uchibori-dori.',
+      ja: '大雨でアンダーパスが冠水したため、10時45分から全面通行止め。けが人や取り残された車はない。迂回は内堀通りへ。',
+      en: 'The underpass is flooded by heavy rain; fully closed since 10:45. No one is hurt and no cars are stuck. Detour via Uchibori-dori.',
     },
     location: { type: 'LineString', coordinates: [[139.7505, 35.695], [139.752, 35.6956]] },
     expected: 'publish',
@@ -63,8 +67,8 @@ export const PREPARED: Prepared[] = [
     status: 'limited',
     statusLabel: '車線規制',
     description: {
-      ja: '水道管工事のため、9時から17時まで左車線を規制。',
-      en: 'Water pipe works: the left lane is closed from 9:00 to 17:00.',
+      ja: '水道管工事のため、9時から17時まで左車線を規制。右車線は通行できる。',
+      en: 'Water pipe works: the left lane is closed from 9:00 to 17:00. Traffic passes in the right lane.',
     },
     location: { type: 'LineString', coordinates: [[139.7552, 35.6985], [139.7556, 35.7002]] },
     expected: 'publish',
@@ -93,7 +97,7 @@ export const PREPARED: Prepared[] = [
   },
   {
     // The chain (pointsman#66), same text at two places. Step 1: urgent
-    // (Clef-flash danger about 0.77). Step 2: no way through on foot. On the
+    // (Clef-flash danger about 0.92 in both languages, 2026-10-15). Step 2: no way through on foot. On the
     // bridge the way around on foot is about 316 m longer, with an evacuation
     // site 443 m away: an Alert for its staff. In the street grid it is about
     // 143 m: no alert.
@@ -102,8 +106,8 @@ export const PREPARED: Prepared[] = [
     roadName: '飯田橋三丁目の橋',
     status: 'closed',
     description: {
-      ja: '倒木で道路がふさがれ、車も歩行者も通れない。',
-      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass.',
+      ja: '倒木で道路がふさがれ、車も歩行者も通れない。救急車も通れない。',
+      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass. Ambulances cannot get through.',
     },
     location: { type: 'LineString', coordinates: [[139.750481, 35.702539], [139.750472, 35.702397], [139.750458, 35.701952], [139.750476, 35.701524], [139.750613, 35.701197], [139.750727, 35.700972]] },
     expected: 'urgent',
@@ -113,8 +117,8 @@ export const PREPARED: Prepared[] = [
     roadName: '飯田橋四丁目の通り',
     status: 'closed',
     description: {
-      ja: '倒木で道路がふさがれ、車も歩行者も通れない。',
-      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass.',
+      ja: '倒木で道路がふさがれ、車も歩行者も通れない。救急車も通れない。',
+      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass. Ambulances cannot get through.',
     },
     location: { type: 'LineString', coordinates: [[139.746432, 35.701305], [139.7461, 35.700931], [139.745926, 35.700653]] },
     expected: 'urgent',
@@ -124,8 +128,8 @@ export const PREPARED: Prepared[] = [
     roadName: '日比谷通り',
     status: 'closed',
     description: {
-      ja: '倒木が両車線をふさいでいる（川の橋の近く、7時から）。作業班が向かっている。',
-      en: 'A fallen tree blocks both lanes near the river bridge since 7 am. Crews are on the way.',
+      ja: '大雨と強風で倒木があり、両車線が通れない（川の橋の近く、7時から）。作業班が向かっている。',
+      en: 'Heavy rain and strong wind brought down a tree; both lanes are blocked near the river bridge since 7 am. Crews are on the way.',
     },
     location: { type: 'Point', coordinates: [139.759, 35.676] },
     expected: 'publish',
