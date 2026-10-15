@@ -53,7 +53,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          title='Demo examples check: some examples miss their expected action'
+          # No report: the check itself failed (token missing or not a test
+          # token, Node error), not an example. A separate issue for that.
+          if [ -f "$RUNNER_TEMP/examples-report.md" ]; then
+            title='Demo examples check: some examples miss their expected action'
+          else
+            title='Demo examples check failed before it could write a report'
+          fi
           body_file="$RUNNER_TEMP/issue.md"
           { cat "$RUNNER_TEMP/examples-report.md" 2>/dev/null || echo 'The check failed before it could write a report.'; echo; echo "Run: $RUN_URL"; } > "$body_file"
           number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
