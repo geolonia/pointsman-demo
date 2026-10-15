@@ -143,11 +143,12 @@ async function notify(request: Request, env: Env, ctx: ExecutionContext): Promis
   const response = await handleRequest(request, bridgeConfig(env));
   // With the queue the answer is 202 and the queue handler does the rest;
   // an entity too large to queue is handled here (200 or 502).
+  // A 502 without `handled` means the queue refused the notification.
   if (response.status === 200 || response.status === 502) {
-    const { handled } = (await response.clone().json()) as { handled: EntityResult[] };
+    const { handled } = (await response.clone().json()) as { handled?: EntityResult[] };
     // After the answer, so the broker is not kept waiting.
     const route = new URL(request.url).searchParams.get('route') ?? undefined;
-    for (const step of afterDecisions(env, route, handled)) ctx.waitUntil(step);
+    if (Array.isArray(handled)) for (const step of afterDecisions(env, route, handled)) ctx.waitUntil(step);
   }
   return response;
 }

@@ -65,11 +65,20 @@ flowchart LR
 
 No notification gets lost (pointsman#88). The Worker puts each notified
 entity on a queue (`pointsman-demo-bridge`) and answers the broker at once.
-The Worker's queue handler then runs steps 2 to 4 and 6. If Pointsman or the
-broker fails, it tries again after 30 seconds, then waits twice as long each
-time, up to an hour, for about 14 hours in all. After that the message goes
-to the queue `pointsman-demo-bridge-dlq`, where it can be checked and sent
-again.
+The Worker's queue handler then runs steps 2 to 4 and 6.
+
+- If Pointsman or the broker fails, the handler tries again after 30
+  seconds, then waits twice as long each time, up to an hour: about 14 hours
+  in all (20 tries). With a configuration error it waits 5 minutes each time,
+  so about 100 minutes.
+- After the last try the message goes to the queue
+  `pointsman-demo-bridge-dlq`. Nothing reads that queue: check its messages
+  in the Cloudflare dashboard (Queues), within its retention time (4 days by
+  default), and send the report again if needed.
+- The decision is safe, but the issue (step 3) and the Alert (step 4) are
+  not tried again: if GitHub or the broker refuses them, the error is logged
+  and the message is done. A second try would find the decision already
+  written and do nothing.
 
 ## The page
 

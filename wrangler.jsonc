@@ -35,8 +35,8 @@
   "triggers": { "crons": ["17 * * * *"] },
   // The bridge's queue (pointsman#88): notifications are answered at once and
   // handled here, with retries for up to about 14 hours, then the
-  // dead-letter queue. One batch at a time, so two messages for the same
-  // report never run together.
+  // dead-letter queue. One batch at a time, so the queue handler never runs
+  // two messages for the same report together.
   "queues": {
     "producers": [{ "binding": "BRIDGE_QUEUE", "queue": "pointsman-demo-bridge" }],
     "consumers": [{ "queue": "pointsman-demo-bridge", "max_batch_timeout": 1, "max_retries": 20, "max_concurrency": 1, "dead_letter_queue": "pointsman-demo-bridge-dlq" }]
