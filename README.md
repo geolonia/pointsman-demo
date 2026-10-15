@@ -184,6 +184,29 @@ credential lives in GitHub, and CI only runs a dry-run deploy. Settings of the
 
 Secrets are not part of the build; they stay on the Worker (`wrangler secret put`).
 
+## Examples check
+
+The model's answers can move a little over time, so a prepared report can
+stop giving its expected action (it happened on 2026-10-15, #33). Every
+Monday at 09:00 JST a workflow ([examples-check.yml](.github/workflows/examples-check.yml))
+sends all prepared reports in both languages to Pointsman and compares the
+action with `expected` in [src/reports.ts](src/reports.ts). The job summary
+shows every answer; a miss opens an issue (or comments on the open one). Run
+it by hand from the Actions tab, or locally:
+
+```sh
+POINTSMAN_CHECK_TOKEN=… node scripts/check-examples.mjs
+```
+
+The repository secret `POINTSMAN_CHECK_TOKEN` is a Pointsman **test token**
+for `road-restriction-check` (`scripts/tokens.mjs create --client
+demo-examples-check --profiles road-restriction-check --test --remote` in
+the config repository): its decisions are made like any other but not
+logged, so the check never reaches the review queue or the accuracy numbers.
+The script stops if the token is not a test token. GitHub switches off
+scheduled workflows in a public repository after 60 days without activity:
+if the weekly runs stop, enable the workflow again in the Actions tab.
+
 ## Development
 
 Node.js 24, pnpm 12.
