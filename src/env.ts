@@ -1,5 +1,7 @@
 // Settings of the demo Worker (wrangler.jsonc vars and secrets).
 
+import type { BridgeMessage } from '../engine/bridge/src/bridge';
+
 export interface Env {
   // Vars
   POINTSMAN_URL: string;
@@ -29,6 +31,8 @@ export interface Env {
   ASSETS: Fetcher;
   DEMO: KVNamespace;
   REPORT_LIMIT: RateLimit;
+  /** Optional: the bridge's queue (pointsman#88), producer and consumer. */
+  BRIDGE_QUEUE?: Queue<BridgeMessage>;
 }
 
 const REQUIRED = [

@@ -1,10 +1,10 @@
 // The Worker end to end, with a fake broker, Pointsman and GitHub (global fetch stubbed).
 
-import { env as cfEnv, exports } from 'cloudflare:workers';
+import { env as cfEnv } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
-import { taskEntityId } from '../engine/bridge/src/bridge';
-import { cleanup } from '../src/index';
+import { type BridgeMessage, taskEntityId } from '../engine/bridge/src/bridge';
+import demo, { cleanup } from '../src/index';
 
 // Secrets come from vitest.config.ts; the generated types know only the vars.
 const env = cfEnv as unknown as Env;
@@ -41,7 +41,11 @@ beforeEach(async () => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-const worker = (path: string, init: RequestInit = {}) => exports.default.fetch(`https://pointsman-demo.test${path}`, init);
+// wrangler.jsonc binds the bridge's queue. Most tests run without it, so the
+// bridge handles each notification at once; 'the bridge's queue' below uses it.
+const { BRIDGE_QUEUE: _queue, ...direct } = env;
+const ctx = { waitUntil: (p: Promise<unknown>) => void p.catch(() => {}), passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+const worker = (path: string, init: RequestInit = {}, e: Env = direct as Env) => demo.fetch(new Request(`https://pointsman-demo.test${path}`, init), e, ctx);
 const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
   worker(path, { method: 'POST', headers: { 'content-type': 'application/json', origin: PAGE, ...headers }, body: JSON.stringify(body) });
 
@@ -488,3 +492,76 @@ describe('the chain (step 2)', () => {
   });
 });
 
+
+describe("the bridge's queue (pointsman#88)", () => {
+  const report = { id: 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-000000000003', type: 'RoadRestriction', roadName: P('内堀通り'), restrictionStatus: P('closed'), description: P('倒木で通れない') };
+  const decided = (action: string) => ({
+    decision_id: '44444444-4444-4444-8444-444444444444', action, profile: 'road-restriction-check', profile_version: 1, model: 'clef-flash',
+    created_at: '2026-10-15T01:00:01.000Z', rule: null,
+    answers: { category: { type: 'choice', value: 'closedWeather', p: 0.9, probabilities: { closedWeather: 0.9, other: 0.1 } } },
+  });
+  const sent: { body: BridgeMessage }[] = [];
+  const queued = { ...env, BRIDGE_QUEUE: { sendBatch: async (m: { body: BridgeMessage }[]) => { sent.push(...m); } } } as unknown as Env;
+  type Message = { body: unknown; attempts: number; ack: ReturnType<typeof vi.fn>; retry: ReturnType<typeof vi.fn> };
+  const message = (body: unknown, attempts = 1): Message => ({ body, attempts, ack: vi.fn(), retry: vi.fn() });
+  const consume = (...messages: Message[]) =>
+    demo.queue!({ queue: 'pointsman-demo-bridge', messages, retryAll: vi.fn(), ackAll: vi.fn() } as unknown as MessageBatch<BridgeMessage>, env);
+
+  function pointsmanSays(action: string | Response) {
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/road-restriction-check') return typeof action === 'string' ? Response.json(decided(action)) : action;
+      if (c.url.includes('urn%3Angsi-ld%3ATask%3A')) return new Response(null, { status: 404 });
+      // The consumer reads the report as it is now.
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(report.id)}`)) return Response.json(report);
+      return undefined;
+    };
+  }
+
+  beforeEach(() => { sent.length = 0; });
+
+  it('is bound in wrangler.jsonc', () => {
+    expect(env.BRIDGE_QUEUE).toBeDefined();
+  });
+
+  it('queues a notification and answers at once, without deciding', async () => {
+    const res = await worker('/notify?route=evacuation', { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) }, queued);
+    expect(res.status).toBe(202);
+    expect(sent).toEqual([{ body: { path: '/notify', route: 'evacuation', entity: report } }]);
+    expect(calls.some((c) => c.url.includes('/v1/decide/'))).toBe(false);
+  });
+
+  it('decides from the queue and opens the issue for a prepared report', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'fallen-tree', createdAt: new Date().toISOString() }));
+    pointsmanSays('urgent');
+    const m = message({ path: '/notify', entity: report });
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    expect(m.retry).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.url.endsWith('/v1/decide/road-restriction-check'))).toBe(true);
+    // Awaited in the consumer, not after it.
+    expect(calls.find((c) => c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))?.body.labels).toEqual(['demo', 'urgent']);
+    expect(await env.DEMO.get('issue:7', 'json')).toMatchObject({ decision: '44444444-4444-4444-8444-444444444444', action: 'urgent' });
+  });
+
+  it('retries when Pointsman is down, with a growing delay', async () => {
+    pointsmanSays(new Response('down', { status: 503 }));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const first = message({ path: '/notify', entity: report }, 1);
+    const third = message({ path: '/notify', entity: report }, 3);
+    await consume(first, third);
+    expect(first.retry).toHaveBeenCalledWith({ delaySeconds: 30 });
+    expect(third.retry).toHaveBeenCalledWith({ delaySeconds: 120 });
+    expect(first.ack).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.url.endsWith('/issues'))).toBe(false);
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('bridge queue:'));
+  });
+
+  it('drops a message without an entity', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = message({ path: '/elsewhere' });
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    expect(calls).toEqual([]);
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('dropped'));
+  });
+});

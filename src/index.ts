@@ -1,7 +1,10 @@
-// The demo Worker: the page's API, the FIWARE bridge on /notify, the GitHub
-// review queue, and the daily cleanup. See README.md.
+// The demo Worker: the page's API, the FIWARE bridge on /notify (with its
+// queue), the GitHub review queue, and the daily cleanup. See README.md.
 
-import { type BridgeConfig, DECISION_CONTEXT, type Route, decisionEntityId, handleRequest, taskEntityId } from '../engine/bridge/src/bridge';
+import {
+  type BridgeConfig, type BridgeMessage, DECISION_CONTEXT, type EntityResult, type Route,
+  decisionEntityId, handleMessage, handleRequest, retryDelay, taskEntityId,
+} from '../engine/bridge/src/bridge';
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
@@ -79,7 +82,42 @@ export default {
     checkEnv(env);
     await cleanup(env);
   },
-} satisfies ExportedHandler<Env>;
+
+  // The bridge's queue (pointsman#88): what /notify and /reviews put on
+  // BRIDGE_QUEUE. Like the engine's handleQueueBatch, and then the demo's own
+  // steps (issues, Alerts) for each decision.
+  async queue(batch: MessageBatch<BridgeMessage>, env: Env): Promise<void> {
+    try {
+      checkEnv(env);
+    } catch (err) {
+      console.error(`configuration: ${(err as Error).message}`);
+      batch.retryAll({ delaySeconds: 300 });
+      return;
+    }
+    // The consumer handles messages itself: never queue them again.
+    const config = bridgeConfig(env);
+    delete config.queue;
+    for (const message of batch.messages) {
+      const body = message.body;
+      if (!body || (body.path !== '/notify' && body.path !== '/reviews') || typeof body.entity?.id !== 'string') {
+        console.error('bridge queue: a message without a notified entity; dropped');
+        message.ack();
+        continue;
+      }
+      const result = await handleMessage(body, config, { fresh: true });
+      if ('retry' in result && result.retry) {
+        console.error(`bridge queue: ${result.id} (attempt ${message.attempts}): ${result.error}`);
+        message.retry({ delaySeconds: retryDelay(message.attempts) });
+        continue;
+      }
+      if ('error' in result) console.error(`bridge queue: ${result.id}: ${result.error}`);
+      // A failure here is logged, not retried: a second try would find the
+      // decision written (inputs unchanged) and do nothing.
+      if (body.path === '/notify') await Promise.all(afterDecisions(env, body.route, [result]));
+      message.ack();
+    }
+  },
+} satisfies ExportedHandler<Env, BridgeMessage>;
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
@@ -90,6 +128,9 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
 function bridgeConfig(env: Env): BridgeConfig {
   return {
     routes: [ROUTE, EVACUATION_ROUTE],
+    // Optional (wrangler.jsonc "queues"): notifications are queued and
+    // answered at once; the queue handler above runs the bridge.
+    ...(env.BRIDGE_QUEUE && { queue: env.BRIDGE_QUEUE }),
     workOrders: WORK_ORDERS,
     notifySecret: env.NOTIFY_SECRET,
     pointsman: { url: trimUrl(env.POINTSMAN_URL), token: env.POINTSMAN_TOKEN },
@@ -100,19 +141,31 @@ function bridgeConfig(env: Env): BridgeConfig {
 
 async function notify(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const response = await handleRequest(request, bridgeConfig(env));
+  // With the queue the answer is 202 and the queue handler does the rest;
+  // an entity too large to queue is handled here (200 or 502).
   if (response.status === 200 || response.status === 502) {
-    const { handled } = (await response.clone().json()) as { handled: { id: string; action?: string; decision?: string }[] };
-    // Issues after the answer, so the broker is not kept waiting.
-    if (new URL(request.url).searchParams.get('route') === EVACUATION_ROUTE.name) {
-      // Step 2: alerts for the evacuation sites' staff, nothing for GitHub.
-      const alerts = handled.filter((h) => h.action === 'alert' && h.decision);
-      if (alerts.length) ctx.waitUntil(Promise.all(alerts.map((h) => createAlert(env, h.id, h.decision!).catch((err) => console.error(`alert for ${h.decision}: ${(err as Error).message}`)))));
-      return response;
-    }
-    const forPeople = handled.filter((h) => h.action && h.decision && PERSON_ACTIONS.includes(h.action));
-    if (forPeople.length) ctx.waitUntil(Promise.all(forPeople.map((h) => openIssue(env, h.id, h.decision!, h.action!).catch((err) => console.error(`issue for ${h.decision}: ${(err as Error).message}`)))));
+    const { handled } = (await response.clone().json()) as { handled: EntityResult[] };
+    // After the answer, so the broker is not kept waiting.
+    const route = new URL(request.url).searchParams.get('route') ?? undefined;
+    for (const step of afterDecisions(env, route, handled)) ctx.waitUntil(step);
   }
   return response;
+}
+
+/**
+ * The demo's steps after the bridge decided: Alerts for the evacuation
+ * sites' staff (step 2 of the chain), issues for the reports a person looks
+ * at (step 1). Each step logs its own failure.
+ */
+function afterDecisions(env: Env, route: string | undefined, handled: EntityResult[]): Promise<void>[] {
+  const decided = handled.filter((h): h is Extract<EntityResult, { action: string }> => 'action' in h && typeof h.decision === 'string');
+  if (route === EVACUATION_ROUTE.name) {
+    // Step 2: alerts for the evacuation sites' staff, nothing for GitHub.
+    return decided.filter((h) => h.action === 'alert')
+      .map((h) => createAlert(env, h.id, h.decision).catch((err) => console.error(`alert for ${h.decision}: ${(err as Error).message}`)));
+  }
+  return decided.filter((h) => PERSON_ACTIONS.includes(h.action))
+    .map((h) => openIssue(env, h.id, h.decision, h.action).catch((err) => console.error(`issue for ${h.decision}: ${(err as Error).message}`)));
 }
 
 /**
