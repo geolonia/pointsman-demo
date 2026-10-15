@@ -753,7 +753,9 @@
 
   // --- Map ---------------------------------------------------------------------------------
 
-  // A calm base map; the flood zones the facts come from, for headquarters only.
+  // A grayscale base map (GSI pale map, without colour), so that only the
+  // reports and the flood zones are in colour; the flood zones the facts come
+  // from are for headquarters only.
   function style() {
     return {
       version: 8,
@@ -762,8 +764,8 @@
         flood: { type: 'raster', tiles: ['https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png'], tileSize: 256, minzoom: 2, maxzoom: 17, attribution: '<a href="https://disaportal.gsi.go.jp/hazardmap/copyright/opendata.html">「ハザードマップポータルサイト」</a>洪水浸水想定区域' },
       },
       layers: [
-        { id: 'gsi', type: 'raster', source: 'gsi', paint: { 'raster-saturation': -0.4 } },
-        { id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.4 } },
+        { id: 'gsi', type: 'raster', source: 'gsi', paint: { 'raster-saturation': -1, 'raster-contrast': -0.1 } },
+        { id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.3 } },
       ],
     };
   }
