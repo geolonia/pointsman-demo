@@ -467,8 +467,9 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
   }
 
   if (url.pathname === '/api/stats' && request.method === 'GET') {
-    // The week's outcomes from Pointsman's decision log (GET /v1/stats), for
-    // the page: counts only. Cached for a minute.
+    // The last 7 days from Pointsman's decision log (GET /v1/stats/{profile}),
+    // for the page: counts only. Browsers keep it for a minute (the Cache API
+    // only helps on a custom domain, not on workers.dev).
     const key = new Request(new URL('/api/stats', url).toString());
     const hit = await caches.default.match(key);
     if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
@@ -481,7 +482,9 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       published: s.actions.publish ?? 0,
       toPerson: (s.actions.review ?? 0) + (s.actions.urgent ?? 0),
       urgent: s.actions.urgent ?? 0,
-      // Reviews in Pointsman's queue: the unclear reports (`review`).
+      // Pointsman's review queue holds the unclear reports (`review`); a
+      // person's decision on an urgent report is recorded in the broker only.
+      unclear: s.actions.review ?? 0,
       decided: { published: s.reviews.final_actions.publish ?? 0, rejected: s.reviews.final_actions.reject ?? 0, waiting: s.reviews.pending },
       corrected: s.corrected,
     }, 200, { 'cache-control': 'max-age=60' });
