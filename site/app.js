@@ -90,6 +90,12 @@
       why3: 'The city writes the rules, and can read every decision later.',
       why4: 'A person has the last word whenever it matters.',
       again: 'Try another report',
+      statsTitle: 'This week on this demo',
+      stats1: function (n, pub, person, urgent) { return n + ' reports. ' + pub + ' were published at once; ' + person + ' went to a person first (' + urgent + ' of them urgent).'; },
+      stats2: function (p, r, w) { return 'Of the unclear reports, people published ' + p + ' and rejected ' + r + '; ' + w + ' are still waiting.'; },
+      statsCorrected: function (c) { return 'A person corrected one of the AI’s answers in ' + c + (c === 1 ? ' report.' : ' reports.'); },
+      statsNone: 'No reports yet this week. Yours will be the first.',
+      statsSource: 'From Pointsman’s decision log: every decision is recorded.',
       mapTitle: 'The city map', hq: 'Headquarters', residents: 'Residents',
       capNone: 'Every report of the last day is on this map. Yours appears as soon as you send it.',
       capHq: 'Headquarters sees every report, also the ones waiting for a person.',
@@ -180,6 +186,12 @@
       why3: '規則は市が書き、どの判断も後から読めます。',
       why4: '大事なところでは、最後に人が決めます。',
       again: 'ほかの報告を試す',
+      statsTitle: 'このデモの今週の数字',
+      stats1: function (n, pub, person, urgent) { return '報告 ' + n + ' 件。' + pub + ' 件はすぐに公開され、' + person + ' 件は先に人が確認しました（うち緊急 ' + urgent + ' 件）。'; },
+      stats2: function (p, r, w) { return 'はっきりしない報告のうち、人が公開したのは ' + p + ' 件、公開しなかったのは ' + r + ' 件です。' + w + ' 件はまだ確認待ちです。'; },
+      statsCorrected: function (c) { return '人が AI の答えを直した報告は ' + c + ' 件です。'; },
+      statsNone: '今週の報告はまだありません。あなたの報告が最初になります。',
+      statsSource: 'Pointsman の判断記録から集計しています。判断はすべて記録されます。',
       mapTitle: '市の地図', hq: '災害対策本部', residents: '住民向け',
       capNone: 'この 1 日の報告がすべて地図に載っています。あなたの報告も、送るとすぐに載ります。',
       capHq: '災害対策本部では、人の確認待ちも含めてすべての報告が見えます。',
@@ -245,6 +257,7 @@
     renderReports();
     renderPending();
     renderCaption();
+    renderStats();
     if (current) renderCurrent();
   }
 
@@ -544,6 +557,7 @@
         el('button', { class: 'btn', type: 'button', text: t('next'), onclick: function () {
           setStep('result', true);
           renderResult(current.last);
+          loadStats();
           // A published report: show it where residents see it.
           if (outcomeOf(current.last) === 'publish') setView('res');
         } }),
@@ -632,6 +646,32 @@
     }
   }
 
+  // --- The week's numbers (step 3) -------------------------------------------------------
+
+  var stats = null;
+  function loadStats() {
+    return api('/api/stats').then(function (r) {
+      if (!r.ok || !r.body || typeof r.body.reports !== 'number') return;
+      stats = r.body;
+      renderStats();
+    }).catch(function () {});
+  }
+
+  // Numbers only; no box when they cannot be loaded.
+  function renderStats() {
+    var box = $('stats');
+    box.textContent = '';
+    if (!stats) return;
+    var lines = stats.reports === 0 ? [t('statsNone')] : [
+      t('stats1')(stats.reports, stats.published, stats.toPerson, stats.urgent),
+      t('stats2')(stats.decided.published, stats.decided.rejected, stats.decided.waiting),
+    ];
+    if (stats.corrected > 0) lines.push(t('statsCorrected')(stats.corrected));
+    box.appendChild(el('div', { class: 'box' }, [
+      el('strong', { class: 'box-title', text: t('statsTitle') }),
+    ].concat(lines.map(function (l) { return el('span', { text: l }); }), [el('span', { class: 'muted small', text: t('statsSource') })])));
+  }
+
   function decide(choice) {
     var me = current;
     if (me.sending || me.decision) return;
@@ -659,6 +699,8 @@
       renderResult(me.last);
       setView(me.decision === 'publish' ? 'res' : 'hq');
       me.poll = setTimeout(poll, 4000);
+      // The numbers include this answer once Pointsman has it (cached for a minute).
+      setTimeout(loadStats, 65000);
     }).catch(function (e) {
       if (current !== me) return;
       me.sending = null;

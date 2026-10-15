@@ -466,6 +466,29 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
+  if (url.pathname === '/api/stats' && request.method === 'GET') {
+    // The week's outcomes from Pointsman's decision log (GET /v1/stats), for
+    // the page: counts only. Cached for a minute.
+    const key = new Request(new URL('/api/stats', url).toString());
+    const hit = await caches.default.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
+    const pm = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/stats/${PROFILE}?days=7`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+    if (!pm.ok) return json({ error: `Pointsman ${pm.status}` }, 502, cors);
+    const s = (await pm.json()) as { days: number; decisions: number; actions: Record<string, number>; reviews: { pending: number; final_actions: Record<string, number> }; corrected: number };
+    const res = json({
+      days: s.days,
+      reports: s.decisions,
+      published: s.actions.publish ?? 0,
+      toPerson: (s.actions.review ?? 0) + (s.actions.urgent ?? 0),
+      urgent: s.actions.urgent ?? 0,
+      // Reviews in Pointsman's queue: the unclear reports (`review`).
+      decided: { published: s.reviews.final_actions.publish ?? 0, rejected: s.reviews.final_actions.reject ?? 0, waiting: s.reviews.pending },
+      corrected: s.corrected,
+    }, 200, { 'cache-control': 'max-age=60' });
+    ctx.waitUntil(caches.default.put(key, res.clone()));
+    return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
+  }
+
   if (url.pathname === '/api/decisions' && request.method === 'GET') {
     const key = new Request(new URL('/api/decisions', url).toString());
     const hit = await caches.default.match(key);

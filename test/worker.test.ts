@@ -744,3 +744,27 @@ describe('a visitor decides their own report', () => {
     expect(calls.some((c) => c.url.includes('/v1/reviews/'))).toBe(false);
   });
 });
+
+describe('the week in numbers (/api/stats)', () => {
+  it('passes on the counts from Pointsman, without anything else', async () => {
+    answer = (c) => (c.url === 'https://pointsman.geolonia.workers.dev/v1/stats/road-restriction-check?days=7'
+      ? Response.json({
+        profile: 'road-restriction-check', days: 7, since: '2026-10-08T00:00:00.000Z', decisions: 12,
+        actions: { publish: 5, review: 4, urgent: 3 }, reviews: { pending: 1, resolved: 3, final_actions: { publish: 2, reject: 1 } }, corrected: 1,
+      })
+      : undefined);
+    const res = await worker('/api/stats', { headers: { origin: PAGE } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ days: 7, reports: 12, published: 5, toPerson: 7, urgent: 3, decided: { published: 2, rejected: 1, waiting: 1 }, corrected: 1 });
+    const call = calls.find((c) => c.url.includes('/v1/stats/'))!;
+    expect(call.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
+  });
+
+  it('answers 502 when Pointsman cannot give them', async () => {
+    answer = (c) => (c.url.includes('/v1/stats/') ? new Response(null, { status: 503 }) : undefined);
+    // The answer above is cached for a minute: start without it.
+    await caches.default.delete(new Request('https://pointsman-demo.test/api/stats'));
+    const res = await worker('/api/stats', { headers: { origin: PAGE } });
+    expect(res.status).toBe(502);
+  });
+});

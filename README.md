@@ -96,7 +96,8 @@ a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
    city's rule in one sentence. The real NGSI-LD data is behind "Show the data".
 3. **What happens next.** The outcome, the second check (evacuation site),
    and, for a report that waits for a person, Publish and Reject buttons: the
-   visitor who sent it decides it, as the person on duty would.
+   visitor who sent it decides it, as the person on duty would. Below, the
+   week's numbers from Pointsman's decision log.
 
 One map, switched between headquarters (every report) and residents (only
 what is published), on GSI tiles (地理院タイル). "How it works" opens the
@@ -113,6 +114,7 @@ No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 | `GET /api/config` | Prepared reports, the demo area, whether free text is on, today's usage |
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
 | `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`, `ngsi.task`) |
+| `GET /api/stats` | The week's outcomes from Pointsman's decision log (`GET /v1/stats`): reports, published at once, to a person (urgent), what people decided on unclear reports, corrections. Counts only; cached for a minute |
 | `GET /api/decisions` | `Decision` entities waiting for a person (`reviewStatus` "pending"), newest first, with the NGSI-LD request that found them |
 | `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}`. Answers `{"id", "key"}` |
 | `POST /api/reports/{id}/resolve` | `{"action": "publish" or "reject", "key"}`: the visitor who sent the report decides it, once, while it waits for a person. Like a review on GitHub (`reviewedBy` is `demo:visitor`); the report's issue is closed. Only a hash of the key is kept |
