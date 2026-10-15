@@ -1,10 +1,10 @@
 // The Worker end to end, with a fake broker, Pointsman and GitHub (global fetch stubbed).
 
-import { env as cfEnv, exports } from 'cloudflare:workers';
+import { env as cfEnv } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
-import { taskEntityId } from '../engine/bridge/src/bridge';
-import { cleanup } from '../src/index';
+import { type BridgeMessage, taskEntityId } from '../engine/bridge/src/bridge';
+import demo, { cleanup } from '../src/index';
 
 // Secrets come from vitest.config.ts; the generated types know only the vars.
 const env = cfEnv as unknown as Env;
@@ -41,7 +41,11 @@ beforeEach(async () => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-const worker = (path: string, init: RequestInit = {}) => exports.default.fetch(`https://pointsman-demo.test${path}`, init);
+// wrangler.jsonc binds the bridge's queue. Most tests run without it, so the
+// bridge handles each notification at once; 'the bridge's queue' below uses it.
+const { BRIDGE_QUEUE: _queue, ...direct } = env;
+const ctx = { waitUntil: (p: Promise<unknown>) => void p.catch(() => {}), passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+const worker = (path: string, init: RequestInit = {}, e: Env = direct as Env) => demo.fetch(new Request(`https://pointsman-demo.test${path}`, init), e, ctx);
 const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
   worker(path, { method: 'POST', headers: { 'content-type': 'application/json', origin: PAGE, ...headers }, body: JSON.stringify(body) });
 
@@ -488,3 +492,133 @@ describe('the chain (step 2)', () => {
   });
 });
 
+
+describe("the bridge's queue (pointsman#88)", () => {
+  const report = { id: 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-000000000003', type: 'RoadRestriction', roadName: P('内堀通り'), restrictionStatus: P('closed'), description: P('倒木で通れない') };
+  const decided = (action: string) => ({
+    decision_id: '44444444-4444-4444-8444-444444444444', action, profile: 'road-restriction-check', profile_version: 1, model: 'clef-flash',
+    created_at: '2026-10-15T01:00:01.000Z', rule: null,
+    answers: { category: { type: 'choice', value: 'closedWeather', p: 0.9, probabilities: { closedWeather: 0.9, other: 0.1 } } },
+  });
+  const sent: { body: BridgeMessage }[] = [];
+  const queued = { ...env, BRIDGE_QUEUE: { sendBatch: async (m: { body: BridgeMessage }[]) => { sent.push(...m); } } } as unknown as Env;
+  type Message = { body: unknown; attempts: number; ack: ReturnType<typeof vi.fn>; retry: ReturnType<typeof vi.fn> };
+  const message = (body: unknown, attempts = 1): Message => ({ body, attempts, ack: vi.fn(), retry: vi.fn() });
+  const consume = (...messages: Message[]) =>
+    demo.queue!({ queue: 'pointsman-demo-bridge', messages, retryAll: vi.fn(), ackAll: vi.fn() } as unknown as MessageBatch<BridgeMessage>, env);
+
+  function pointsmanSays(action: string | Response) {
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/road-restriction-check') return typeof action === 'string' ? Response.json(decided(action)) : action;
+      if (c.url.includes('urn%3Angsi-ld%3ATask%3A')) return new Response(null, { status: 404 });
+      // The consumer reads the report as it is now.
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(report.id)}`)) return Response.json(report);
+      return undefined;
+    };
+  }
+
+  beforeEach(() => { sent.length = 0; });
+
+  it('is bound in wrangler.jsonc', () => {
+    expect(env.BRIDGE_QUEUE).toBeDefined();
+  });
+
+  it('queues a notification and answers at once, without deciding', async () => {
+    const res = await worker('/notify?route=evacuation', { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) }, queued);
+    expect(res.status).toBe(202);
+    expect(sent).toEqual([{ body: { path: '/notify', route: 'evacuation', entity: report } }]);
+    expect(calls.some((c) => c.url.includes('/v1/decide/'))).toBe(false);
+  });
+
+  it('decides from the queue and opens the issue for a prepared report', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'fallen-tree', createdAt: new Date().toISOString() }));
+    pointsmanSays('urgent');
+    const m = message({ path: '/notify', entity: report });
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    expect(m.retry).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.url.endsWith('/v1/decide/road-restriction-check'))).toBe(true);
+    // Awaited in the consumer, not after it.
+    expect(calls.find((c) => c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))?.body.labels).toEqual(['demo', 'urgent']);
+    expect(await env.DEMO.get('issue:7', 'json')).toMatchObject({ decision: '44444444-4444-4444-8444-444444444444', action: 'urgent' });
+  });
+
+  it('retries when Pointsman is down, with a growing delay', async () => {
+    pointsmanSays(new Response('down', { status: 503 }));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const first = message({ path: '/notify', entity: report }, 1);
+    const third = message({ path: '/notify', entity: report }, 3);
+    await consume(first, third);
+    expect(first.retry).toHaveBeenCalledWith({ delaySeconds: 30 });
+    expect(third.retry).toHaveBeenCalledWith({ delaySeconds: 120 });
+    expect(first.ack).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.url.endsWith('/issues'))).toBe(false);
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('bridge queue:'));
+  });
+
+  it('answers 502 when the queue refuses the notification, without deciding', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const refusing = { ...env, BRIDGE_QUEUE: { sendBatch: async () => { throw new Error('queue down'); } } } as unknown as Env;
+    const res = await worker('/notify', { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) }, refusing);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'could not queue the notification' });
+    expect(calls).toEqual([]);
+    // The bridge's own message, not a failure of the demo's steps.
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('bridge queue: queue down'));
+    expect(errors).not.toHaveBeenCalledWith(expect.stringContaining('POST /notify'));
+  });
+
+  it('acknowledges a message Pointsman refused, without a retry or an issue', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'fallen-tree', createdAt: new Date().toISOString() }));
+    pointsmanSays(Response.json({ error: 'bad input' }, { status: 400 }));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = message({ path: '/notify', entity: report });
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    expect(m.retry).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.url.endsWith('/issues'))).toBe(false);
+  });
+
+  it('raises the Alert for step 2 from the queue', async () => {
+    const step2 = {
+      decision_id: '55555555-5555-4555-8555-555555555555', action: 'alert', profile: 'evacuation-access-check', profile_version: 1, model: 'clef-flash',
+      created_at: '2026-10-15T01:00:05.000Z', rule: 0, answers: { foot_passable: { type: 'noul', value: false, p: 0.98, yes: 0.02 } },
+      facts: { shelter: { missing: false, values: { found: true, distance_m: 443, name: '日本大学法学部①' }, source: 'GSI' }, walk: { missing: false, values: { possible: true, extra_m: 316 }, source: 'OSM' } },
+    };
+    const linked = { ...report, location: { type: 'GeoProperty', value: { type: 'LineString', coordinates: [[139.7505, 35.7025], [139.7507, 35.7010]] } }, check: { type: 'Property', value: 'urgent', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' } } };
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/evacuation-access-check') return Response.json(step2);
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(linked.id)}`)) return Response.json(linked);
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent('urn:ngsi-ld:Decision:55555555')}`)) {
+        return Response.json({ id: 'urn:ngsi-ld:Decision:55555555-5555-4555-8555-555555555555', type: 'Decision', 'https://datamodels.jp/ns/decision/facts': { type: 'JsonProperty', json: Object.entries(step2.facts).map(([name, f]) => ({ name, ...f })) } });
+      }
+      return undefined;
+    };
+    const m = message({ path: '/notify', route: 'evacuation', entity: linked });
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    const alert = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Alert');
+    expect(alert?.body.id).toBe('urn:ngsi-ld:Alert:demo-55555555-5555-4555-8555-555555555555');
+    expect(alert?.body.description.value).toContain('316 m');
+    expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
+  });
+
+  it('retries the whole batch later when the Worker is not configured', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const retryAll = vi.fn();
+    const m = message({ path: '/notify', entity: report });
+    await demo.queue!({ queue: 'pointsman-demo-bridge', messages: [m], retryAll, ackAll: vi.fn() } as unknown as MessageBatch<BridgeMessage>, { ...env, POINTSMAN_TOKEN: '' } as Env);
+    expect(retryAll).toHaveBeenCalledWith({ delaySeconds: 300 });
+    expect(m.ack).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('drops a message without an entity', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = message({ path: '/elsewhere' });
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    expect(calls).toEqual([]);
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('dropped'));
+  });
+});

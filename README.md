@@ -63,6 +63,23 @@ flowchart LR
 7. Every hour, data older than a day is deleted (with its Decision, Task and
    Alert entities) and its issues are closed.
 
+No notification gets lost (pointsman#88). The Worker puts each notified
+entity on a queue (`pointsman-demo-bridge`) and answers the broker at once.
+The Worker's queue handler then runs steps 2 to 4 and 6.
+
+- If Pointsman or the broker fails, the handler tries again after 30
+  seconds, then waits twice as long each time, up to an hour: about 14 hours
+  in all (20 tries). With a configuration error it waits 5 minutes each time,
+  so about 100 minutes.
+- After the last try the message goes to the queue
+  `pointsman-demo-bridge-dlq`. Nothing reads that queue: check its messages
+  in the Cloudflare dashboard (Queues), within its retention time (4 days by
+  default), and send the report again if needed.
+- The decision is safe, but the issue (step 3) and the Alert (step 4) are
+  not tried again: if GitHub or the broker refuses them, the error is logged
+  and the message is done. A second try would find the decision already
+  written and do nothing.
+
 ## The page
 
 https://pointsman-demo.geolonia.workers.dev — `site/`, served by the Worker
@@ -112,6 +129,10 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 | `GITHUB_WEBHOOK_SECRET` | 1Password `geolonia-ops` / "Pointsman demo GitHub App" (password) |
 | `GITHUB_APP_PRIVATE_KEY` | Same item, the private key converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt` |
 | `TURNSTILE_SECRET` | Optional |
+
+The two queues are created once in the Cloudflare account:
+`wrangler queues create pointsman-demo-bridge` and
+`wrangler queues create pointsman-demo-bridge-dlq` (done on 2026-10-15).
 
 Then, once: `node scripts/setup.mjs` creates the four subscriptions in the
 broker (new reports, the chain's step 2, resolved decisions, completed work
