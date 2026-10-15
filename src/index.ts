@@ -395,9 +395,18 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
   // is recorded in the broker only.
   if (check.action === 'review') {
     const res = await pointsmanPost(env, `/v1/reviews/${decision}/resolve`, { action: final, correct: {}, by });
-    // 409: no longer pending, for example after an earlier try whose broker
-    // update failed; the broker update below then finishes it.
-    if (!res.ok && res.status !== 409) return json({ error: `Pointsman refused this (${res.status})` }, 502, cors);
+    if (res.status === 409) {
+      // No longer pending. Only this visitor's own earlier try with the same
+      // answer (whose broker update failed) is finished below; anything else
+      // (a team member, or this visitor's other answer) stays as it is.
+      const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${decision}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+      const review = got.ok ? ((await got.json()) as { review?: { resolved_by?: string; final_action?: string } }).review : undefined;
+      if (review?.resolved_by !== by || review.final_action !== final) {
+        return json({ error: 'already decided', ...(review?.resolved_by === by && { finalAction: review.final_action }) }, 409, cors);
+      }
+    } else if (!res.ok) {
+      return json({ error: `Pointsman refused this (${res.status})` }, 502, cors);
+    }
   }
   const now = new Date().toISOString();
   await broker.updateDecision(decisionEntityId(decision), resolvedAttrs(final, by, now));

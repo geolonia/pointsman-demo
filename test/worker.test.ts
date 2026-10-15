@@ -688,10 +688,36 @@ describe('a visitor decides their own report', () => {
     expect((await decide(id, { action: 'publish', key })).status).toBe(502);
     expect(calls.some((c) => c.url.endsWith('/attrs') && c.body?.finalAction)).toBe(false);
     expect(await env.DEMO.get(`report:${id}`, 'json')).not.toHaveProperty('resolved');
-    // An earlier try reached Pointsman but not the broker: Pointsman says 409.
-    answer = (c) => (c.url.includes('/v1/reviews/') ? Response.json({ error: 'not_pending' }, { status: 409 }) : base(c));
+    // An earlier try reached Pointsman but not the broker: Pointsman says 409,
+    // and has this visitor's answer.
+    const review = { status: 'resolved', resolved_by: 'demo:visitor', final_action: 'publish' };
+    answer = (c) => {
+      if (c.url.includes('/v1/reviews/')) return Response.json({ error: 'not_pending' }, { status: 409 });
+      if (c.url.endsWith(`/v1/decisions/${DECISION}`)) return Response.json({ id: DECISION, review });
+      return base(c);
+    };
     expect((await decide(id, { action: 'publish', key })).status).toBe(200);
     expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('publish'));
+  });
+
+  it('does not overwrite a decision someone else made, or a different earlier answer', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'review');
+    const base = answer;
+    let review = { status: 'resolved', resolved_by: 'github:someone', final_action: 'reject' };
+    answer = (c) => {
+      if (c.url.includes('/v1/reviews/')) return Response.json({ error: 'not_pending' }, { status: 409 });
+      if (c.url.endsWith(`/v1/decisions/${DECISION}`)) return Response.json({ id: DECISION, review });
+      return base(c);
+    };
+    let res = await decide(id, { action: 'publish', key });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'already decided' });
+    review = { status: 'resolved', resolved_by: 'demo:visitor', final_action: 'reject' };
+    res = await decide(id, { action: 'publish', key });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'already decided', finalAction: 'reject' });
+    expect(calls.some((c) => c.url.endsWith('/attrs') && c.body?.finalAction)).toBe(false);
   });
 
   it('never lets a visitor publish free text', async () => {

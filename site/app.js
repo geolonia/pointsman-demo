@@ -747,6 +747,7 @@
   function setHow(open) {
     $('how').hidden = !open;
     $('how-toggle').setAttribute('aria-expanded', String(open));
+    $('how-open').setAttribute('aria-expanded', String(open));
     if (open) $('how').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
