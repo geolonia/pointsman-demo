@@ -622,3 +622,70 @@ describe("the bridge's queue (pointsman#88)", () => {
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('dropped'));
   });
 });
+
+describe('a visitor decides their own report', () => {
+  const DECISION = '66666666-6666-4666-8666-666666666666';
+  const sendOne = async () => {
+    const res = await post('/api/reports', { prepared: 'vague', lang: 'en' });
+    expect(res.status).toBe(201);
+    return res.json<{ id: string; key: string }>();
+  };
+  const decide = (id: string, body: unknown) => post(`/api/reports/${encodeURIComponent(id)}/resolve`, body);
+  function brokerHas(id: string, action: string, extra: Record<string, unknown> = {}) {
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
+        return Response.json({
+          id, type: 'RoadRestriction', roadName: P(''), description: P('The road seems to be blocked'),
+          check: { type: 'Property', value: action, decision: { type: 'Relationship', object: `urn:ngsi-ld:Decision:${DECISION}` }, ...extra },
+        });
+      }
+      if (c.url === `https://pointsman.geolonia.workers.dev/v1/reviews/${DECISION}/resolve`) return Response.json({ ok: true });
+      return undefined;
+    };
+  }
+
+  it('gets a key with the report; only its hash is kept', async () => {
+    const { id, key } = await sendOne();
+    expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    const record = await env.DEMO.get<Record<string, unknown>>(`report:${id}`, 'json');
+    expect(record?.keyHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(record)).not.toContain(key);
+  });
+
+  it('resolves a review in Pointsman and the broker, closes the issue, and only once', async () => {
+    const { id, key } = await sendOne();
+    await env.DEMO.put(`decision-issue:${DECISION}`, '9');
+    brokerHas(id, 'review');
+    const res = await decide(id, { action: 'publish', key });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ finalAction: 'publish' });
+    const resolve = calls.find((c) => c.url.endsWith(`/v1/reviews/${DECISION}/resolve`))!;
+    expect(resolve.body).toEqual({ action: 'publish', correct: {}, by: 'demo:visitor' });
+    const update = calls.find((c) => c.url.includes(encodeURIComponent(`urn:ngsi-ld:Decision:${DECISION}`)) && c.url.endsWith('/attrs'))!;
+    expect(update.body).toMatchObject({ reviewStatus: P('resolved'), finalAction: P('publish'), reviewedBy: P('demo:visitor') });
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/issues/9'))).toBe(true));
+    expect(await env.DEMO.get(`report:${id}`, 'json')).toMatchObject({ resolved: 'publish' });
+    expect((await decide(id, { action: 'reject', key })).status).toBe(409);
+  });
+
+  it('records an urgent decision in the broker only (Pointsman queues reviews only)', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'urgent');
+    expect((await decide(id, { action: 'reject', key })).status).toBe(200);
+    expect(calls.some((c) => c.url.includes('/v1/reviews/'))).toBe(false);
+    expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('reject'));
+  });
+
+  it('refuses a wrong or missing key, a bad action, and a report that does not wait for a person', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'review');
+    expect((await decide(id, { action: 'publish', key: crypto.randomUUID() })).status).toBe(403);
+    expect((await decide(id, { action: 'publish' })).status).toBe(403);
+    expect((await decide(id, { action: 'maybe', key })).status).toBe(400);
+    brokerHas(id, 'publish');
+    expect((await decide(id, { action: 'reject', key })).status).toBe(409);
+    brokerHas(id, 'review', { finalAction: P('publish') });
+    expect((await decide(id, { action: 'reject', key })).status).toBe(409);
+    expect(calls.some((c) => c.url.includes('/v1/reviews/'))).toBe(false);
+  });
+});

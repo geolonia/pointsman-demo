@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pointsman FIWARE demo</title>
-<meta name="description" content="Road restriction reports in an NGSI-LD context broker, checked by Pointsman before they are published.">
+<meta name="description" content="Send a report of a closed road and watch Pointsman decide in seconds what happens to it: published, checked by a person, or urgent.">
 <meta name="theme-color" content="#141414">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" integrity="sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK" crossorigin="anonymous">
 <link rel="stylesheet" href="style.css">
 <script>
@@ -24,84 +24,128 @@
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="https://github.com/geolonia/pointsman"><img class="mark light" src="favicon.svg" alt="" width="22" height="22"><img class="mark dark" src="mark-on-dark.svg" alt="" width="22" height="22"><span>Pointsman</span><span class="tag" data-i18n="demo">FIWARE demo</span></a>
+  <a class="brand" href="https://github.com/geolonia/pointsman"><img class="mark light" src="favicon.svg" alt="" width="22" height="22"><img class="mark dark" src="mark-on-dark.svg" alt="" width="22" height="22"><span>Pointsman</span><span class="tag" data-i18n="demo">demo</span></a>
   <nav>
+    <button class="chip strong" id="how-toggle" type="button" aria-expanded="false" aria-controls="how" data-i18n="howTitle">How it works</button>
     <button class="chip" id="lang" type="button">日本語</button>
     <button class="chip" id="theme" type="button" aria-label="Switch theme">◐</button>
   </nav>
 </header>
 
 <main>
-  <section class="intro">
-    <h1 data-i18n="title">Heavy rain. Reports of closed roads are coming in.</h1>
-    <p data-i18n="lead">During heavy rain, residents report closed roads. Pointsman checks each report within seconds. Clear reports go straight to the residents’ map. Unclear reports go to a person, and urgent reports go to a person first. The reports are stored in a smart-city data platform (FIWARE).</p>
-  </section>
-
-  <section class="maps">
-    <figure class="map-card">
-      <figcaption><strong data-i18n="hq">Headquarters</strong> <span class="muted" data-i18n="hqNote">every report</span></figcaption>
-      <div id="map-hq" class="map" role="img" aria-label="Map of all reports"></div>
-    </figure>
-    <figure class="map-card">
-      <figcaption><strong data-i18n="residents">Residents</strong> <span class="muted" data-i18n="residentsNote">only what is published</span></figcaption>
-      <div id="map-public" class="map" role="img" aria-label="Map of published reports"></div>
-    </figure>
-    <ul class="legend">
-      <li><span class="dot publish"></span><span data-i18n="publish">publish</span></li>
-      <li><span class="dot review"></span><span data-i18n="review">review</span></li>
-      <li><span class="dot urgent"></span><span data-i18n="urgent">urgent</span></li>
-      <li><span class="dot reject"></span><span data-i18n="reject">rejected</span></li>
-      <li><span class="dot pending"></span><span data-i18n="pending">waiting for Pointsman</span></li>
-      <li><span class="swatch flood"></span><span data-i18n="floodLayer">river flood zone (maximum assumed rainfall)</span></li>
-    </ul>
-  </section>
-
-  <section class="work">
-    <div class="panel">
-      <h2 data-i18n="send">1. Send a report</h2>
-      <p class="muted" data-i18n="sendNote">Pick one. The page really sends it, and Pointsman checks it live.</p>
-      <ul id="prepared" class="prepared"></ul>
-      <p id="free-note" class="muted small" data-i18n="freeOff">Free text is switched off in this demo: only prepared reports.</p>
-      <p id="send-error" class="error" hidden></p>
-      <p id="usage" class="muted small"></p>
+  <section id="how" class="how" hidden aria-labelledby="how-title">
+    <div class="how-head">
+      <div>
+        <h2 id="how-title" data-i18n="howTitle">How it works</h2>
+        <p data-i18n="howLead">Pointsman is a small service that takes decisions for a city’s apps. The AI only answers questions. Public data gives facts about the place. The city’s own rules decide. People have the last word.</p>
+      </div>
+      <button class="btn ghost" id="how-close" type="button" data-i18n="close">Close</button>
     </div>
-
-    <div class="panel" id="current" hidden>
-      <h2 data-i18n="watch">2. Watch</h2>
-      <ol class="timeline" id="timeline"></ol>
-      <div id="result"></div>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2 data-i18n="recent">Recent reports</h2>
-    <p class="muted small" data-i18n="recentNote">Everyone sees the same reports. Demo data is deleted after a day.</p>
-    <ul id="reports" class="reports"></ul>
-  </section>
-
-  <section class="panel">
-    <h2 data-i18n="waitingTitle">Waiting for a person</h2>
-    <p class="muted small" data-i18n="waitingNote">One search in the data platform finds them: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can do the same search.</p>
-    <ul id="pending" class="reports pending"></ul>
-    <div id="pending-info"></div>
-  </section>
-
-  <section class="panel explain">
-    <h2 data-i18n="what">What just happened</h2>
-    <ol>
-      <li data-i18n="w1">The page saved the report in the city’s data platform: GeonicDB, a FIWARE context broker. The report is stored as a <code>RoadRestriction</code> entity (a data model from <a href="https://datamodels.jp/models/transportation/RoadRestriction/">datamodels.jp</a>).</li>
-      <li data-i18n="w2">The data platform told the bridge about the new report (a subscription). The bridge sent the report to Pointsman as it is. The profile picks the fields it needs, so no conversion code is needed.</li>
-      <li data-i18n="w3">Pointsman asked an AI four questions about the report. It also looked up facts about the place in public data: the flood zone and the nearest evacuation site. Then the city’s rules turned the answers and the facts into an action. The AI does not see the facts; only the rules use them. The bridge saved the result in the data platform: on the report (<code>check</code>) and as a separate <code>Decision</code> entity, so other FIWARE apps can use it too.</li>
-      <li data-i18n="w4">Reports that need a person became GitHub issues. A team member decides with <code>/publish</code> or <code>/reject</code>. The answer goes back to Pointsman, so we can see how often the AI was right.</li>
+    <ol class="how-steps">
+      <li><span class="kicker" data-i18n="h1k">1 · The report</span><strong data-i18n="h1t">A resident’s app saves it</strong><span data-i18n="h1d"></span></li>
+      <li><span class="kicker" data-i18n="h2k">2 · Passed on</span><strong data-i18n="h2t">The data platform tells Pointsman</strong><span data-i18n="h2d"></span></li>
+      <li class="accent"><span class="kicker" data-i18n="h3k">3 · Pointsman</span><strong data-i18n="h3t">Questions, facts, rules</strong><span data-i18n="h3d"></span></li>
+      <li><span class="kicker" data-i18n="h4k">4 · The result</span><strong data-i18n="h4t">Saved back, open to every app</strong><span data-i18n="h4d"></span></li>
     </ol>
-    <p class="links">
-      <a href="https://github.com/geolonia/pointsman/blob/main/examples/profiles/road-restriction-check.yaml" data-i18n="lProfile">The profile</a>
-      <a href="https://github.com/geolonia/pointsman/tree/main/bridge" data-i18n="lBridge">The bridge</a>
+    <p class="links"><span class="kicker" data-i18n="forDevs">For developers</span>
+      <a href="https://github.com/geolonia/pointsman/blob/main/examples/profiles/road-restriction-check.yaml" data-i18n="lProfile">The questions and rules (profile)</a>
+      <a href="https://github.com/geolonia/pointsman/tree/main/bridge" data-i18n="lBridge">The FIWARE bridge</a>
       <a href="https://github.com/geolonia/pointsman/blob/main/docs/fiware-demo.md" data-i18n="lStory">Why it works this way</a>
       <a href="https://github.com/geolonia/pointsman-demo" data-i18n="lSource">Source of this demo</a>
       <a href="https://github.com/geolonia/pointsman-demo/issues?q=label%3Ademo" data-i18n="lQueue">The review queue</a>
     </p>
+    <div class="live">
+      <section>
+        <h3 data-i18n="recent">Recent reports</h3>
+        <p class="muted small" data-i18n="recentNote">Everyone sees the same reports. Demo data is deleted after a day.</p>
+        <ul id="reports" class="reports"></ul>
+      </section>
+      <section>
+        <h3 data-i18n="waitingTitle">Waiting for a person</h3>
+        <p class="muted small" data-i18n="waitingNote"></p>
+        <ul id="pending" class="reports pending"></ul>
+        <div id="pending-info"></div>
+      </section>
+    </div>
   </section>
+
+  <section class="intro">
+    <h1 data-i18n="title">Heavy rain. Reports of closed roads are coming in.</h1>
+    <p data-i18n="lead">Send one, and watch Pointsman decide in seconds what happens to it.</p>
+    <ol class="stepper" id="stepper" aria-label="Steps">
+      <li data-step="pick"><span class="num">1</span><span data-i18n="st1">Pick a report</span></li>
+      <li data-step="decide"><span class="num">2</span><span data-i18n="st2">Pointsman decides</span></li>
+      <li data-step="result"><span class="num">3</span><span data-i18n="st3">What happens next</span></li>
+    </ol>
+  </section>
+
+  <div class="flow">
+    <div class="steps">
+      <section id="step-pick" class="step">
+        <h2 data-i18n="pickTitle">Pick a report</h2>
+        <p class="sub" data-i18n="pickNote">Each one is sent live to Pointsman. They show four different outcomes.</p>
+        <ul id="featured" class="cards"></ul>
+        <details class="more">
+          <summary id="more-summary" data-i18n="moreTitle">More examples</summary>
+          <ul id="more" class="more-list"></ul>
+        </details>
+        <p id="send-error" class="error" hidden></p>
+        <p class="muted small"><span data-i18n="pickFoot">Invented events at real places in Tokyo. Everyone sees the same reports; they are deleted after a day.</span> <span id="usage"></span></p>
+      </section>
+
+      <section id="step-decide" class="step" hidden>
+        <h2 data-i18n="decideTitle">Pointsman decides</h2>
+        <div class="box quote"><span class="kicker" id="cur-kicker"></span><span id="cur-text"></span></div>
+        <ol class="timeline" id="timeline"></ol>
+        <div id="answers"></div>
+        <div id="facts"></div>
+        <div id="rule"></div>
+        <div id="data"></div>
+      </section>
+
+      <section id="step-result" class="step" hidden>
+        <h2 data-i18n="resultTitle">What happens next</h2>
+        <div id="outcome"></div>
+        <div id="chain"></div>
+        <div id="person"></div>
+        <div class="box">
+          <strong class="box-title" data-i18n="whyTitle">Why cities use it this way</strong>
+          <ul class="why">
+            <li data-i18n="why1">The AI only answers fixed questions. It never decides alone.</li>
+            <li data-i18n="why2">Facts come from public data, so anyone can check them.</li>
+            <li data-i18n="why3">The city writes the rules, and can read every decision later.</li>
+            <li data-i18n="why4">A person has the last word whenever it matters.</li>
+          </ul>
+        </div>
+        <div class="actions">
+          <button class="btn" id="again" type="button" data-i18n="again">Try another report</button>
+          <button class="btn ghost" id="how-open" type="button" data-i18n="howTitle">How it works</button>
+        </div>
+      </section>
+    </div>
+
+    <aside class="map-card">
+      <div class="map-head">
+        <span class="kicker" data-i18n="mapTitle">The city map</span>
+        <div class="toggle" role="group" aria-label="Whose map">
+          <button type="button" id="view-hq" aria-pressed="true" data-i18n="hq">Headquarters</button>
+          <button type="button" id="view-res" aria-pressed="false" data-i18n="residents">Residents</button>
+        </div>
+      </div>
+      <div id="map" class="map" role="img" aria-label="Map of the reports"></div>
+      <div class="map-foot">
+        <p id="map-caption"></p>
+        <ul class="legend">
+          <li><span class="dot publish"></span><span data-i18n="lgPublish">published</span></li>
+          <li><span class="dot review"></span><span data-i18n="lgReview">waiting for a person</span></li>
+          <li><span class="dot urgent"></span><span data-i18n="lgUrgent">urgent</span></li>
+          <li><span class="dot reject"></span><span data-i18n="lgReject">rejected</span></li>
+          <li><span class="dot pending"></span><span data-i18n="lgPending">being checked</span></li>
+          <li id="legend-flood"><span class="swatch flood"></span><span data-i18n="floodLayer">river flood zone (maximum assumed rainfall)</span></li>
+        </ul>
+      </div>
+    </aside>
+  </div>
 </main>
 
 <footer>

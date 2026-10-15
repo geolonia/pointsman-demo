@@ -16,11 +16,14 @@ export interface Prepared {
   location: Geometry;
   /** What the storyboard expects Pointsman to do (docs/fiware-demo.md in pointsman). */
   expected: 'publish' | 'review' | 'urgent';
+  /** Shown first on the page, with this label: one example for each outcome. */
+  featured?: { en: string; ja: string };
 }
 
 export const PREPARED: Prepared[] = [
   {
     id: 'flooded-underpass',
+    featured: { en: 'A clear report', ja: 'はっきりした報告' },
     roadName: '靖国通り',
     status: 'closed',
     statusLabel: '通行止め中',
@@ -33,6 +36,7 @@ export const PREPARED: Prepared[] = [
   },
   {
     id: 'car-trapped',
+    featured: { en: 'Someone in danger', ja: '人に危険がある' },
     roadName: '紀尾井町通り',
     status: 'closed',
     description: {
@@ -67,6 +71,7 @@ export const PREPARED: Prepared[] = [
   },
   {
     id: 'vague',
+    featured: { en: 'An unclear report', ja: 'はっきりしない報告' },
     roadName: '',
     status: 'closed',
     description: { ja: '道が通れないらしい', en: 'The road seems to be blocked' },
@@ -93,6 +98,7 @@ export const PREPARED: Prepared[] = [
     // site 443 m away: an Alert for its staff. In the street grid it is about
     // 143 m: no alert.
     id: 'bridge-blocked',
+    featured: { en: 'Near an evacuation site', ja: '避難場所の近く' },
     roadName: '飯田橋三丁目の橋',
     status: 'closed',
     description: {

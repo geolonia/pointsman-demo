@@ -50,7 +50,8 @@ flowchart LR
 5. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
    in Pointsman, writes the result to the `Decision` entity, and closes the
-   issue.
+   issue. On the page, the visitor who sent a report can decide it the same
+   way (Publish or Reject).
 6. A third subscription sends resolved `Decision` entities to `/reviews`. The
    bridge writes the final action to the report (the page shows it as
    published) and completes the Task. This also works without GitHub: any
@@ -85,12 +86,22 @@ The Worker's queue handler then runs steps 2 to 4 and 6.
 https://pointsman-demo.geolonia.workers.dev — `site/`, served by the Worker
 (static assets), in English and Japanese, light and dark:
 
-- two maps (headquarters: every report; residents: only what is published),
-  on GSI tiles (地理院タイル);
-- the six prepared reports; a click sends one and shows each step with its
-  time, the answers with their probabilities, the outcome, and the review issue;
-- the real NGSI-LD data of the report, its `Decision` entity and its `Task`;
-- recent reports, shared by all visitors.
+a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
+
+1. **Pick a report.** Four examples, one for each outcome (a clear report, an
+   unclear one, someone in danger, near an evacuation site); the others under
+   "More examples".
+2. **Pointsman decides.** Each step with its time, the AI's answers as plain
+   questions with a confidence word, the facts about the place, and the
+   city's rule in one sentence. The real NGSI-LD data is behind "Show the data".
+3. **What happens next.** The outcome, the second check (evacuation site),
+   and, for a report that waits for a person, Publish and Reject buttons: the
+   visitor who sent it decides it, as the person on duty would.
+
+One map, switched between headquarters (every report) and residents (only
+what is published), on GSI tiles (地理院タイル). "How it works" opens the
+technical layer: the four parts of the system, links for developers, recent
+reports and the reports waiting for a person (with the NGSI-LD query).
 
 No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 (with integrity hashes).
@@ -103,7 +114,8 @@ No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
 | `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`, `ngsi.task`) |
 | `GET /api/decisions` | `Decision` entities waiting for a person (`reviewStatus` "pending"), newest first, with the NGSI-LD request that found them |
-| `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}` |
+| `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}`. Answers `{"id", "key"}` |
+| `POST /api/reports/{id}/resolve` | `{"action": "publish" or "reject", "key"}`: the visitor who sent the report decides it, once, while it waits for a person. Like a review on GitHub (`reviewedBy` is `demo:visitor`); the report's issue is closed. Only a hash of the key is kept |
 
 Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.
 
