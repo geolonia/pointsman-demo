@@ -5,6 +5,8 @@ import { appJwt, verifyWebhook } from '../src/github';
 import { factsOf, summarize } from '../src/index';
 import { AREA, PREPARED, parseReport, toEntity } from '../src/reports';
 import { mayReview, parseCommand } from '../src/review';
+// @ts-expect-error plain JavaScript without types
+import { checkExamples, report } from '../scripts/lib/examples-check.mjs';
 
 describe('reports', () => {
   const free = { roadName: '靖国通り', status: 'closed', description: '冠水のため通行止め', location: { type: 'Point', coordinates: [139.75, 35.69] } };
@@ -218,5 +220,43 @@ describe('facts for the page', () => {
       'text',
     ] } };
     expect(factsOf(odd)).toEqual([{ name: 'a', missing: false, values: { inside: true }, source: 's' }]);
+  });
+});
+
+describe('the weekly examples check', () => {
+  const answers = { danger: { type: 'noul', value: false, p: 0.9, yes: 0.1 } };
+  const fakePointsman = (action: (description: string) => string, test = true) => (async (_url: string, init: RequestInit) => {
+    const { state } = JSON.parse(String(init.body));
+    return Response.json({ action: action(state.description.value), rule: 3, answers, ...(test && { test: true }) });
+  }) as unknown as typeof fetch;
+
+  it('sends every prepared report in both languages and passes when all match', async () => {
+    const byText = new Map(PREPARED.flatMap((p) => [[p.description.ja, p.expected], [p.description.en, p.expected]]));
+    const results = await checkExamples({ prepared: PREPARED, toEntity, url: 'https://pm.test/', token: 't', fetch: fakePointsman((d) => byText.get(d)!) });
+    expect(results).toHaveLength(PREPARED.length * 2);
+    const r = report(results);
+    expect(r.ok).toBe(true);
+    expect(r.markdown).toContain(`All ${PREPARED.length * 2} examples`);
+  });
+
+  it('fails and names the examples that miss, or where Pointsman answered an error', async () => {
+    const miss = PREPARED.find((p) => p.expected === 'publish')!;
+    const results = await checkExamples({
+      prepared: [miss], toEntity, url: 'https://pm.test', token: 't',
+      fetch: (async (u: string, init: RequestInit) => (JSON.parse(String(init.body)).state.description.value === miss.description.ja
+        ? new Response('down', { status: 503 })
+        : fakePointsman(() => 'review')(u, init))) as unknown as typeof fetch,
+    });
+    const r = report(results);
+    expect(r.ok).toBe(false);
+    expect(r.markdown).toContain('2 of 2 examples');
+    expect(r.markdown).toContain('Pointsman 503');
+    expect(r.markdown).toContain('**review**');
+    expect(r.markdown).toContain('danger: false (yes 0.10)');
+  });
+
+  it('stops when the token is not a test token', async () => {
+    await expect(checkExamples({ prepared: PREPARED.slice(0, 1), toEntity, url: 'https://pm.test', token: 't', fetch: fakePointsman(() => 'publish', false) }))
+      .rejects.toThrow(/not a test token/);
   });
 });
