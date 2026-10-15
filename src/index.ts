@@ -466,6 +466,32 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
+  if (url.pathname === '/api/stats' && request.method === 'GET') {
+    // The last 7 days from Pointsman's decision log (GET /v1/stats/{profile}),
+    // for the page: counts only. Browsers keep it for a minute (the Cache API
+    // only helps on a custom domain, not on workers.dev).
+    const key = new Request(new URL('/api/stats', url).toString());
+    const hit = await caches.default.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
+    const pm = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/stats/${PROFILE}?days=7`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+    if (!pm.ok) return json({ error: `Pointsman ${pm.status}` }, 502, cors);
+    const s = (await pm.json()) as { days: number; decisions: number; actions: Record<string, number>; reviews: { pending: number; final_actions: Record<string, number> }; corrected: number };
+    const res = json({
+      days: s.days,
+      reports: s.decisions,
+      published: s.actions.publish ?? 0,
+      toPerson: (s.actions.review ?? 0) + (s.actions.urgent ?? 0),
+      urgent: s.actions.urgent ?? 0,
+      // Pointsman's review queue holds the unclear reports (`review`); a
+      // person's decision on an urgent report is recorded in the broker only.
+      unclear: s.actions.review ?? 0,
+      decided: { published: s.reviews.final_actions.publish ?? 0, rejected: s.reviews.final_actions.reject ?? 0, waiting: s.reviews.pending },
+      corrected: s.corrected,
+    }, 200, { 'cache-control': 'max-age=60' });
+    ctx.waitUntil(caches.default.put(key, res.clone()));
+    return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
+  }
+
   if (url.pathname === '/api/decisions' && request.method === 'GET') {
     const key = new Request(new URL('/api/decisions', url).toString());
     const hit = await caches.default.match(key);
