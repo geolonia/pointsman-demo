@@ -65,8 +65,7 @@
       oFinalPublish: 'Published after a check', eFinalPublish: 'A person checked it. Residents see it now.',
       oFinalReject: 'Rejected after a check', eFinalReject: 'A person checked it. Residents never see it.',
       chainKicker: 'A second check, started by the first', chainTitle: 'Can people still walk to their evacuation site?',
-      chainWait: 'Running…',
-      cAlert: 'Alert sent to the staff of the evacuation site.', cNone: 'No alert: the way to the evacuation site is not cut.', cReview: 'The way around could not be checked: a person looks at it.',
+      cAlert: 'Alert sent to the staff of the evacuation site.', cReview: 'The way around could not be checked: a person looks at it.',
       fFlood: function (c) { return 'Inside a river flood zone: water could reach ' + c; },
       fNoFlood: 'Not inside a published river flood zone',
       fShelter: function (n, m) { return 'Nearest flood evacuation site: ' + n + ', ' + m + ' m'; },
@@ -83,6 +82,7 @@
       otherTitle: 'A person decides',
       otherText: 'A team member checks this report in the review queue.',
       otherNoIssue: 'Only reports sent from this page go to the review queue.',
+      otherOpening: 'It is being added to the review queue…',
       openIssue: 'Open it in the review queue',
       whyTitle: 'Why cities use it this way',
       why1: 'The AI only answers fixed questions. It never decides alone.',
@@ -98,6 +98,7 @@
       lgPublish: 'published', lgReview: 'waiting for a person', lgUrgent: 'urgent', lgReject: 'rejected', lgPending: 'being checked',
       floodLayer: 'river flood zone (maximum assumed rainfall)',
       ago: function (s) { return s < 60 ? s + ' s ago' : Math.round(s / 60) + ' min ago'; },
+      aSteps: 'Steps', aWhose: 'Whose map', aMap: 'Map of the reports', aTheme: 'Switch theme',
       footer: 'Invented events at real places. Do not enter personal data. Map: <a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>.',
     },
     ja: {
@@ -121,7 +122,7 @@
       usage: function (u, l) { return '（本日 ' + u + ' / ' + l + ' 件）'; },
       limit: '本日のデモの上限に達しました。また明日お試しください。', failed: '報告を送れませんでした：',
       decideTitle: 'Pointsman が決める', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
-      s1: '市のデータ基盤に保存', s1d: '市のどのアプリでも同じように保存します。',
+      s1: '市のデータ基盤に保存', s1d: '市のアプリが保存するのと同じ方法です。',
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
       s3: '場所の事実を調べた', s3d: '浸水想定区域と避難場所を、公開データから調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
@@ -138,7 +139,7 @@
       },
       clarity: ['何がどこで起きたか不明', '場所か原因が不明', '少し足りないが分かる', '何が・どこで・いつからが明確'],
       yes: 'はい', no: 'いいえ',
-      conf: { vsure: 'とても確か', sure: '確か', fair: 'ほぼ確か', unsure: '不確か' },
+      conf: { vsure: 'とても自信がある', sure: '自信がある', fair: 'やや自信がある', unsure: '自信がない' },
       rules: {
         '0': '人に危険がありそうなら、真っ先に人が確認する。',
         '1': '深い浸水想定区域（3 m 以上）で危険がありそうな報告は、真っ先に人が確認する。',
@@ -154,8 +155,7 @@
       oFinalPublish: '確認のうえ公開', eFinalPublish: '人が確認しました。住民が見られます。',
       oFinalReject: '確認のうえ非公開', eFinalReject: '人が確認しました。住民には見えません。',
       chainKicker: '1 つ目の確認から始まった 2 つ目の確認', chainTitle: '歩いて避難場所まで行けるか',
-      chainWait: '確認中…',
-      cAlert: '避難場所の担当者に警報を送りました。', cNone: '警報なし：避難場所への道は断たれていません。', cReview: '迂回路を確認できなかったので、人が確認します。',
+      cAlert: '避難場所の担当者に警報を送りました。', cReview: '迂回路を確認できなかったので、人が確認します。',
       fFlood: function (c) { return '洪水浸水想定区域の中：想定される深さ ' + c; },
       fNoFlood: '公開されている洪水浸水想定区域の外',
       fShelter: function (n, m) { return '最寄りの指定緊急避難場所（洪水）：' + n + '、' + m + ' m'; },
@@ -172,6 +172,7 @@
       otherTitle: '人が決めます',
       otherText: 'チームのメンバーが確認待ちの一覧で確認します。',
       otherNoIssue: '確認待ちの一覧に回るのは、このページから送った報告だけです。',
+      otherOpening: '確認待ちの一覧に追加しています…',
       openIssue: '確認待ちの一覧で開く',
       whyTitle: '市がこの仕組みを使う理由',
       why1: 'AI は決まった質問に答えるだけで、ひとりでは決めません。',
@@ -187,6 +188,7 @@
       lgPublish: '公開', lgReview: '人の確認待ち', lgUrgent: '緊急', lgReject: '非公開', lgPending: '判定中',
       floodLayer: '洪水浸水想定区域（想定最大規模）',
       ago: function (s) { return s < 60 ? s + ' 秒前' : Math.round(s / 60) + ' 分前'; },
+      aSteps: '手順', aWhose: '誰の地図か', aMap: '報告の地図', aTheme: '表示テーマを切り替える',
       footer: '場所は実在、出来事は架空です。個人情報は入れないでください。地図：<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>。',
     },
   };
@@ -200,6 +202,7 @@
   var step = 'pick';
   var view = 'hq';
   var map = null;
+  var sending = false; // a report is being sent: its buttons stay disabled, also after a language switch
 
   function pickLang() {
     var q = new URLSearchParams(location.search).get('lang');
@@ -232,6 +235,11 @@
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach(function (n) { var v = t(n.dataset.i18n); if (typeof v === 'string') n.innerHTML = v; });
     $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
+    $('lang').setAttribute('lang', lang === 'ja' ? 'en' : 'ja');
+    $('stepper').setAttribute('aria-label', t('aSteps'));
+    document.querySelector('.toggle').setAttribute('aria-label', t('aWhose'));
+    $('map').setAttribute('aria-label', t('aMap'));
+    $('theme').setAttribute('aria-label', t('aTheme'));
     renderPrepared();
     renderUsage();
     renderReports();
@@ -350,13 +358,15 @@
       }
     });
     $('more-summary').textContent = t('moreTitle') + ' (' + others + ')';
+    document.querySelectorAll('#step-pick button').forEach(function (b) { b.disabled = sending; });
   }
 
   function send(p) {
     var err = $('send-error');
     err.hidden = true;
-    var buttons = document.querySelectorAll('#step-pick button');
-    buttons.forEach(function (b) { b.disabled = true; });
+    if (sending) return;
+    sending = true;
+    document.querySelectorAll('#step-pick button').forEach(function (b) { b.disabled = true; });
     var request = { prepared: p.id, lang: lang };
     var sentAt = Date.now();
     api('/api/reports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) })
@@ -368,7 +378,10 @@
         watch(r.body.id, { sentAt: sentAt, request: request, location: p.location });
       })
       .catch(function (e) { err.textContent = t('failed') + e.message; err.hidden = false; })
-      .finally(function () { buttons.forEach(function (b) { b.disabled = false; }); });
+      .finally(function () {
+        sending = false;
+        document.querySelectorAll('#step-pick button').forEach(function (b) { b.disabled = false; });
+      });
   }
 
   // --- Step 2 and 3: one report ------------------------------------------------------
@@ -383,19 +396,34 @@
     poll();
   }
 
+  // A poll whose answer comes after a newer poll or a decision is dropped.
   function poll() {
     var me = current;
+    var seq = me.seq = (me.seq || 0) + 1;
     api('/api/reports/' + encodeURIComponent(me.id)).then(function (r) {
-      if (current !== me) return;
+      if (current !== me || seq !== me.seq) return;
       if (r.ok) {
         var first = !me.last;
+        // The bridge writes the visitor's decision to the report a few seconds later.
+        if (me.decision && r.body.check && !r.body.check.finalAction) {
+          r.body.check.finalAction = me.decision;
+          r.body.visitorDecision = me.decision;
+          r.body.published = me.decision === 'publish';
+        }
         me.last = r.body;
         if (first && r.body.location) focus(r.body.location);
         // The steps of a decision that was already there are shown at once.
         if (first && r.body.check && !me.sentAt) me.shown = 4;
         startReveal();
-        renderCurrent();
-        renderCaption();
+        // Redraw only when something changed: open details and focus stay.
+        var b0 = r.body;
+        var sig = JSON.stringify([b0.createdAt, b0.check && [b0.check.action, b0.check.finalAction, b0.check.policyRule], !!(b0.ngsi && b0.ngsi.decision), b0.evacuation && b0.evacuation.action, b0.visitorDecision, b0.issue]);
+        if (sig !== me.sig) {
+          me.sig = sig;
+          renderCurrent();
+          renderCaption();
+          updateMap();
+        }
       }
       var b = r.ok ? r.body : null;
       var chained = b && b.check && (b.check.action === 'urgent' || b.check.action === 'review');
@@ -407,7 +435,7 @@
       var resolved = done && (b.check.finalAction || b.check.action === 'publish');
       me.poll = setTimeout(poll, !done ? 1200 : resolved ? 30000 : 4000);
       if (decidedNow && !me.mapped) { me.mapped = true; loadReports(); }
-    }).catch(function () { if (current === me) me.poll = setTimeout(poll, 3000); });
+    }).catch(function () { if (current === me && seq === me.seq) me.poll = setTimeout(poll, 3000); });
   }
 
   // Once the decision is there, its parts appear one after the other.
@@ -556,23 +584,21 @@
       el('span', { text: t('e' + o) }),
     ]));
 
-    if (a === 'urgent' || a === 'review') {
-      var ev = r.evacuation;
+    // The second check runs for urgent and review reports, a few seconds
+    // later; shown only when it found something.
+    var ev = r.evacuation;
+    if (ev && ev.action !== 'none') {
       var items = [el('span', { class: 'kicker', text: t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })];
-      if (!ev) items.push(el('span', { class: 'muted', text: t('chainWait') }));
-      else {
-        var facts = renderFactList(ev.facts || []);
-        if (facts) items.push(facts);
-        var c = { alert: 'cAlert', none: 'cNone', review: 'cReview' }[ev.action];
-        if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
-      }
-      // The chain runs only near an evacuation site; elsewhere step 2 finds none and stays quiet.
-      if (!ev || ev.action !== 'none') chain.appendChild(el('div', { class: 'box' }, items));
+      var facts = renderFactList(ev.facts || []);
+      if (facts) items.push(facts);
+      var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
+      if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
+      chain.appendChild(el('div', { class: 'box' }, items));
     }
 
     if (a === 'publish') return;
     if (final) {
-      if (r.visitorDecision || current.decided) {
+      if (r.visitorDecision || current.decision) {
         person.appendChild(el('div', { class: 'box duty' }, [
           el('strong', { class: 'box-title', text: t(final === 'publish' ? 'didPublish' : 'didReject') }),
           el('span', { text: t('learn') }),
@@ -582,52 +608,63 @@
     }
     if (current.key) {
       var buttons = el('div', { class: 'actions' });
-      var msg = el('p', { class: 'error', hidden: '' });
       ['publish', 'reject'].forEach(function (choice) {
-        buttons.appendChild(el('button', {
+        var b = el('button', {
           class: 'btn' + (choice === 'publish' ? ' go' : ' ghost'), type: 'button',
-          text: t(choice === 'publish' ? 'doPublish' : 'doReject'),
-          onclick: function () { decide(choice, buttons, msg); },
-        }));
+          text: current.sending === choice ? t('deciding') : t(choice === 'publish' ? 'doPublish' : 'doReject'),
+          onclick: function () { decide(choice); },
+        });
+        b.disabled = !!current.sending;
+        buttons.appendChild(b);
       });
       person.appendChild(el('div', { class: 'box duty' }, [
         el('strong', { class: 'box-title', text: t('dutyTitle') }),
         el('span', { text: t('dutyText') }),
-        buttons, msg,
+        buttons,
+        current.decideError ? el('p', { class: 'error', role: 'alert', text: t('decideFailed') + current.decideError }) : null,
       ]));
     } else {
       person.appendChild(el('div', { class: 'box' }, [
         el('strong', { class: 'box-title', text: t('otherTitle') }),
-        el('span', { text: r.issue ? t('otherText') : t('otherNoIssue') }),
+        el('span', { text: r.issue ? t('otherText') : r.prepared ? t('otherOpening') : t('otherNoIssue') }),
         r.issue ? el('a', { href: r.issue, target: '_blank', rel: 'noopener', text: t('openIssue') + ' (#' + r.issue.split('/').pop() + ')' }) : null,
       ]));
     }
   }
 
-  function decide(choice, buttons, msg) {
+  function decide(choice) {
     var me = current;
-    buttons.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
-    msg.hidden = true;
+    if (me.sending || me.decision) return;
+    me.sending = choice;
+    me.decideError = null;
+    // Answers of polls already on their way are dropped from now on.
+    me.seq = (me.seq || 0) + 1;
+    clearTimeout(me.poll);
+    renderResult(me.last);
     api('/api/reports/' + encodeURIComponent(me.id) + '/resolve', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: choice, key: me.key }),
     }).then(function (r) {
       if (current !== me) return;
-      if (!r.ok && r.status !== 409) throw new Error(r.body && r.body.error || String(r.status));
-      me.decided = true;
-      me.last.visitorDecision = (r.body && r.body.finalAction) || choice;
-      // The bridge writes the final action to the report a few seconds later.
-      me.last.check.finalAction = me.last.visitorDecision;
-      me.last.published = me.last.visitorDecision === 'publish';
+      me.sending = null;
+      // 409 with finalAction: this visitor decided it already (another tab).
+      // Without it, someone else did: show the report as it is now.
+      if (r.status === 409 && !(r.body && r.body.finalAction)) { me.sig = null; poll(); return; }
+      if (!r.ok && r.status !== 409) throw new Error(String(r.status));
+      me.decision = r.body.finalAction || choice;
+      me.last.visitorDecision = me.decision;
+      me.last.check.finalAction = me.decision;
+      me.last.published = me.decision === 'publish';
       var mine = reports.filter(function (x) { return x.id === me.id; })[0];
-      if (mine && mine.check) { mine.check.finalAction = me.last.visitorDecision; mine.published = me.last.published; }
+      if (mine && mine.check) { mine.check.finalAction = me.decision; mine.published = me.last.published; }
       renderResult(me.last);
-      setView(me.last.visitorDecision === 'publish' ? 'res' : 'hq');
-      clearTimeout(me.poll);
+      setView(me.decision === 'publish' ? 'res' : 'hq');
       me.poll = setTimeout(poll, 4000);
     }).catch(function (e) {
-      msg.textContent = t('decideFailed') + e.message;
-      msg.hidden = false;
-      buttons.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+      if (current !== me) return;
+      me.sending = null;
+      me.decideError = e.message;
+      renderResult(me.last);
+      me.poll = setTimeout(poll, 4000);
     });
   }
 

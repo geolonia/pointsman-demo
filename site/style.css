@@ -60,7 +60,7 @@ h2 { font-size: 1.35rem; line-height: 1.3; margin: 0; }
 h3 { font: 600 0.95rem var(--mono); margin: 0 0 4px; }
 .muted { color: var(--muted); }
 .small { font-size: 0.85rem; }
-.error { color: var(--red); margin: 0; }
+.error { color: var(--i-urgent); margin: 0; }
 .kicker { font: 500 0.8rem var(--mono); color: var(--muted); letter-spacing: 0.01em; }
 
 .top { position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -94,7 +94,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .stepper li.done { color: var(--fg); }
 .stepper li.done .num { background: var(--t-publish); color: var(--i-publish); }
 .stepper li.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.stepper li.active .num { background: var(--green); color: #fff; }
+.stepper li.active .num { background: #1E6B48; color: #fff; }
 
 .flow { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
 .steps { flex: 999 1 560px; min-width: 0; }
@@ -130,7 +130,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .rule-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
 .box.duty { border: 2px solid var(--fg); }
 .why { margin: 0; padding-left: 1.2rem; display: grid; gap: 4px; color: var(--fg-2); }
-.chain-result.alert { color: var(--red); }
+.chain-result.alert { color: var(--i-urgent); }
 
 /* Step 2 */
 .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

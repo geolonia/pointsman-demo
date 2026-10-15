@@ -27,7 +27,7 @@
   <a class="brand" href="https://github.com/geolonia/pointsman"><img class="mark light" src="favicon.svg" alt="" width="22" height="22"><img class="mark dark" src="mark-on-dark.svg" alt="" width="22" height="22"><span>Pointsman</span><span class="tag" data-i18n="demo">demo</span></a>
   <nav>
     <button class="chip strong" id="how-toggle" type="button" aria-expanded="false" aria-controls="how" data-i18n="howTitle">How it works</button>
-    <button class="chip" id="lang" type="button">日本語</button>
+    <button class="chip" id="lang" type="button" lang="ja">日本語</button>
     <button class="chip" id="theme" type="button" aria-label="Switch theme">◐</button>
   </nav>
 </header>
@@ -96,7 +96,7 @@
       <section id="step-decide" class="step" hidden>
         <h2 data-i18n="decideTitle">Pointsman decides</h2>
         <div class="box quote"><span class="kicker" id="cur-kicker"></span><span id="cur-text"></span></div>
-        <ol class="timeline" id="timeline"></ol>
+        <ol class="timeline" id="timeline" aria-live="polite"></ol>
         <div id="answers"></div>
         <div id="facts"></div>
         <div id="rule"></div>
@@ -105,9 +105,9 @@
 
       <section id="step-result" class="step" hidden>
         <h2 data-i18n="resultTitle">What happens next</h2>
-        <div id="outcome"></div>
+        <div id="outcome" aria-live="polite"></div>
         <div id="chain"></div>
-        <div id="person"></div>
+        <div id="person" aria-live="polite"></div>
         <div class="box">
           <strong class="box-title" data-i18n="whyTitle">Why cities use it this way</strong>
           <ul class="why">
@@ -132,7 +132,7 @@
           <button type="button" id="view-res" aria-pressed="false" data-i18n="residents">Residents</button>
         </div>
       </div>
-      <div id="map" class="map" role="img" aria-label="Map of the reports"></div>
+      <div id="map" class="map" role="region" aria-label="Map of the reports"></div>
       <div class="map-foot">
         <p id="map-caption"></p>
         <ul class="legend">

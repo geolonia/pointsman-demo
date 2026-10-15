@@ -625,12 +625,16 @@ describe("the bridge's queue (pointsman#88)", () => {
 
 describe('a visitor decides their own report', () => {
   const DECISION = '66666666-6666-4666-8666-666666666666';
+  // Each test is its own visitor, so the per-visitor rate limit stays out of the way.
+  let ip = '';
+  let visitor = 0;
+  beforeEach(() => { visitor += 1; ip = `198.51.100.${visitor}`; });
   const sendOne = async () => {
-    const res = await post('/api/reports', { prepared: 'vague', lang: 'en' });
+    const res = await post('/api/reports', { prepared: 'vague', lang: 'en' }, { 'cf-connecting-ip': ip });
     expect(res.status).toBe(201);
     return res.json<{ id: string; key: string }>();
   };
-  const decide = (id: string, body: unknown) => post(`/api/reports/${encodeURIComponent(id)}/resolve`, body);
+  const decide = (id: string, body: unknown) => post(`/api/reports/${encodeURIComponent(id)}/resolve`, body, { 'cf-connecting-ip': ip });
   function brokerHas(id: string, action: string, extra: Record<string, unknown> = {}) {
     answer = (c) => {
       if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
@@ -676,11 +680,36 @@ describe('a visitor decides their own report', () => {
     expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('reject'));
   });
 
+  it('leaves the report waiting when Pointsman refuses, and finishes it when Pointsman has it already', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'review');
+    const base = answer;
+    answer = (c) => (c.url.includes('/v1/reviews/') ? new Response('down', { status: 503 }) : base(c));
+    expect((await decide(id, { action: 'publish', key })).status).toBe(502);
+    expect(calls.some((c) => c.url.endsWith('/attrs') && c.body?.finalAction)).toBe(false);
+    expect(await env.DEMO.get(`report:${id}`, 'json')).not.toHaveProperty('resolved');
+    // An earlier try reached Pointsman but not the broker: Pointsman says 409.
+    answer = (c) => (c.url.includes('/v1/reviews/') ? Response.json({ error: 'not_pending' }, { status: 409 }) : base(c));
+    expect((await decide(id, { action: 'publish', key })).status).toBe(200);
+    expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('publish'));
+  });
+
+  it('never lets a visitor publish free text', async () => {
+    const id = 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-000000000009';
+    const key = crypto.randomUUID();
+    const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    await env.DEMO.put(`report:${id}`, JSON.stringify({ createdAt: new Date().toISOString(), keyHash: digest }));
+    brokerHas(id, 'review');
+    expect((await decide(id, { action: 'publish', key })).status).toBe(403);
+    expect(calls.some((c) => c.url.includes('/v1/reviews/'))).toBe(false);
+  });
+
   it('refuses a wrong or missing key, a bad action, and a report that does not wait for a person', async () => {
     const { id, key } = await sendOne();
     brokerHas(id, 'review');
     expect((await decide(id, { action: 'publish', key: crypto.randomUUID() })).status).toBe(403);
-    expect((await decide(id, { action: 'publish' })).status).toBe(403);
+    expect((await decide(id, { action: 'publish' })).status).toBe(400);
+    expect((await decide(id, { action: 'publish', key: 'short' })).status).toBe(400);
     expect((await decide(id, { action: 'maybe', key })).status).toBe(400);
     brokerHas(id, 'publish');
     expect((await decide(id, { action: 'reject', key })).status).toBe(409);

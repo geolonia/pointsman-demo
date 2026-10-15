@@ -377,9 +377,12 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
   }
   const final = body?.action;
   if (final !== 'publish' && final !== 'reject') return json({ error: 'action must be publish or reject' }, 400, cors);
-  if (typeof body.key !== 'string' || body.key.length < 32 || body.key.length > 64) return json({ error: 'key missing' }, 403, cors);
+  if (typeof body.key !== 'string' || body.key.length < 32 || body.key.length > 64) return json({ error: 'bad key' }, 400, cors);
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (!(await env.REPORT_LIMIT.limit({ key: ip })).success) return json({ error: 'too many requests, try again in a minute' }, 429, cors);
   const record = await env.DEMO.get<ReportRecord>(`report:${id}`, 'json');
-  if (!record?.keyHash || record.keyHash !== await sha256(body.key)) return json({ error: 'only the visitor who sent the report can decide it' }, 403, cors);
+  // Prepared reports only: free text from visitors is never published without the team.
+  if (!record?.prepared || !record.keyHash || record.keyHash !== await sha256(body.key)) return json({ error: 'only the visitor who sent the report can decide it' }, 403, cors);
   if (record.resolved) return json({ error: 'already decided', finalAction: record.resolved }, 409, cors);
   const broker = new Broker(env);
   const entity = await broker.getRoadRestriction(id);
@@ -392,7 +395,9 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
   // is recorded in the broker only.
   if (check.action === 'review') {
     const res = await pointsmanPost(env, `/v1/reviews/${decision}/resolve`, { action: final, correct: {}, by });
-    if (!res.ok) return json({ error: `Pointsman refused this (${res.status})` }, 502, cors);
+    // 409: no longer pending, for example after an earlier try whose broker
+    // update failed; the broker update below then finishes it.
+    if (!res.ok && res.status !== 409) return json({ error: `Pointsman refused this (${res.status})` }, 502, cors);
   }
   const now = new Date().toISOString();
   await broker.updateDecision(decisionEntityId(decision), resolvedAttrs(final, by, now));
@@ -406,7 +411,8 @@ async function closeIssueFor(env: Env, decision: string, action: string, final: 
   const n = await env.DEMO.get(`decision-issue:${decision}`);
   if (!n || !/^\d+$/.test(n)) return;
   const github = new GitHub(env);
-  await github.comment(Number(n), `Decided on the demo page by the visitor who sent it: **${final}**. Sent to Pointsman and written to the broker.`);
+  const sent = action === 'review' ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.';
+  await github.comment(Number(n), `Decided on the demo page by the visitor who sent it: **${final}**. ${sent}`);
   await github.close(Number(n), ['demo', action, final]);
 }
 
