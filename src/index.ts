@@ -50,7 +50,11 @@ const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 const KEEP_MS = 24 * 3600_000;
 const KV_TTL = 2 * 24 * 3600;
 
-interface ReportRecord { prepared?: string; createdAt: string }
+/**
+ * keyHash: SHA-256 of the key the page got when it sent the report; with the
+ * key, that visitor may decide the report themselves (resolved: their answer).
+ */
+interface ReportRecord { prepared?: string; createdAt: string; keyHash?: string; resolved?: string }
 interface IssueRecord { decision: string; entity: string; action: string; corrections: Correction[]; createdAt: string }
 interface Correction { name: string; value: string | boolean; by: string; at: string }
 
@@ -300,11 +304,7 @@ async function webhook(request: Request, env: Env): Promise<Response> {
 
   const by = `github:${p.comment.user.login}`;
   const now = new Date().toISOString();
-  const pointsman = (path: string, payload: unknown) => fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}${path}`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}`, 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const pointsman = (path: string, payload: unknown) => pointsmanPost(env, path, payload);
   const hasCorrections = Object.keys(command.correct).length > 0;
   // Pointsman queues only `review` decisions; for the others the final action
   // is recorded in the broker, and corrections go in as feedback.
@@ -320,12 +320,7 @@ async function webhook(request: Request, env: Env): Promise<Response> {
   const broker = new Broker(env);
   await broker.updateDecision(decisionEntityId(record.decision), {
     ...(record.corrections.length > 0 && { corrections: { type: 'JsonProperty', json: record.corrections } }),
-    ...(command.final && {
-      reviewStatus: { type: 'Property', value: 'resolved' },
-      finalAction: { type: 'Property', value: command.final },
-      reviewedBy: { type: 'Property', value: by },
-      reviewedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
-    }),
+    ...(command.final && resolvedAttrs(command.final, by, now)),
   });
   // With reviewStatus "resolved" the broker notifies the bridge (/reviews):
   // it writes the final action to the report's check (the page reads it
@@ -340,6 +335,94 @@ async function webhook(request: Request, env: Env): Promise<Response> {
     await github.comment(p.issue.number, `Feedback recorded: ${corrected}. Resolve with /publish or /reject.`);
   }
   return json({ ok: true });
+}
+
+function pointsmanPost(env: Env, path: string, payload: unknown): Promise<Response> {
+  return fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}${path}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}`, 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+/** The Decision entity's attributes once a person decided. */
+function resolvedAttrs(final: string, by: string, now: string): Record<string, unknown> {
+  return {
+    reviewStatus: { type: 'Property', value: 'resolved' },
+    finalAction: { type: 'Property', value: final },
+    reviewedBy: { type: 'Property', value: by },
+    reviewedAt: { type: 'Property', value: { '@type': 'DateTime', '@value': now } },
+  };
+}
+
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * A visitor decides their own report (publish or reject), as the person on
+ * duty would: only with the key the page got when it sent the report, only
+ * once, and only while the report waits for a person. Like a GitHub review:
+ * Pointsman gets the review (for `review` decisions), the Decision entity is
+ * resolved (the bridge then writes the final action to the report), and the
+ * report's issue is closed.
+ */
+async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContext, id: string, cors: Record<string, string>): Promise<Response> {
+  let body: { action?: unknown; key?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ error: 'body must be JSON' }, 400, cors);
+  }
+  const final = body?.action;
+  if (final !== 'publish' && final !== 'reject') return json({ error: 'action must be publish or reject' }, 400, cors);
+  if (typeof body.key !== 'string' || body.key.length < 32 || body.key.length > 64) return json({ error: 'bad key' }, 400, cors);
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (!(await env.REPORT_LIMIT.limit({ key: ip })).success) return json({ error: 'too many requests, try again in a minute' }, 429, cors);
+  const record = await env.DEMO.get<ReportRecord>(`report:${id}`, 'json');
+  // Prepared reports only: free text from visitors is never published without the team.
+  if (!record?.prepared || !record.keyHash || record.keyHash !== await sha256(body.key)) return json({ error: 'only the visitor who sent the report can decide it' }, 403, cors);
+  if (record.resolved) return json({ error: 'already decided', finalAction: record.resolved }, 409, cors);
+  const broker = new Broker(env);
+  const entity = await broker.getRoadRestriction(id);
+  if (!entity) return json({ error: 'not found' }, 404, cors);
+  const check = summarize(entity).check;
+  if (!check?.decision || !PERSON_ACTIONS.includes(check.action) || check.finalAction) return json({ error: 'this report does not wait for a person' }, 409, cors);
+  const decision = check.decision.split(':').pop()!;
+  const by = 'demo:visitor';
+  // Pointsman queues only `review` decisions; for `urgent` the final action
+  // is recorded in the broker only.
+  if (check.action === 'review') {
+    const res = await pointsmanPost(env, `/v1/reviews/${decision}/resolve`, { action: final, correct: {}, by });
+    if (res.status === 409) {
+      // No longer pending. Only this visitor's own earlier try with the same
+      // answer (whose broker update failed) is finished below; anything else
+      // (a team member, or this visitor's other answer) stays as it is.
+      const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${decision}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+      const review = got.ok ? ((await got.json()) as { review?: { resolved_by?: string; final_action?: string } }).review : undefined;
+      if (review?.resolved_by !== by || review.final_action !== final) {
+        return json({ error: 'already decided', ...(review?.resolved_by === by && { finalAction: review.final_action }) }, 409, cors);
+      }
+    } else if (!res.ok) {
+      return json({ error: `Pointsman refused this (${res.status})` }, 502, cors);
+    }
+  }
+  const now = new Date().toISOString();
+  await broker.updateDecision(decisionEntityId(decision), resolvedAttrs(final, by, now));
+  // One write per report key, more than a second after it was created.
+  await env.DEMO.put(`report:${id}`, JSON.stringify({ ...record, resolved: final }), { expirationTtl: KV_TTL });
+  ctx.waitUntil(closeIssueFor(env, decision, check.action, final).catch((err) => console.error(`issue for ${decision}: ${(err as Error).message}`)));
+  return json({ finalAction: final }, 200, cors);
+}
+
+async function closeIssueFor(env: Env, decision: string, action: string, final: string): Promise<void> {
+  const n = await env.DEMO.get(`decision-issue:${decision}`);
+  if (!n || !/^\d+$/.test(n)) return;
+  const github = new GitHub(env);
+  const sent = action === 'review' ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.';
+  await github.comment(Number(n), `Decided on the demo page by the visitor who sent it: **${final}**. ${sent}`);
+  await github.close(Number(n), ['demo', action, final]);
 }
 
 // --- The page's API ------------------------------------------------------------
@@ -395,6 +478,8 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
   // Browsers send the id percent-encoded (urn%3Angsi-ld%3A…).
   let path = url.pathname;
   try { path = decodeURIComponent(path); } catch { /* malformed: no match below */ }
+  const decide = path.match(/^\/api\/reports\/(urn:ngsi-ld:RoadRestriction:demo-[0-9a-f-]{36})\/resolve$/);
+  if (decide && request.method === 'POST') return resolveByVisitor(request, env, ctx, decide[1]!, cors);
   const one = path.match(/^\/api\/reports\/(urn:ngsi-ld:RoadRestriction:demo-[0-9a-f-]{36})$/);
   if (one && request.method === 'GET') {
     // The summary for the page, and the real NGSI-LD data for developers.
@@ -415,7 +500,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       PERSON_ACTIONS.includes(summary.check?.action ?? '') ? taskIdOf(entity).then((id) => (id ? broker.getEntity(id) : null)).catch(() => null) : null,
     ]);
     // Only prepared reports go to the GitHub queue; the page says so.
-    return json({ ...summary, prepared: Boolean(report?.prepared), issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
+    return json({ ...summary, prepared: Boolean(report?.prepared), visitorDecision: report?.resolved ?? null, issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
@@ -436,7 +521,9 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       if (!(await turnstileOk(env.TURNSTILE_SECRET, turnstile, ip))) return json({ error: 'please confirm you are human' }, 403, cors);
     }
     const { entity, prepared } = toEntity(input);
-    const record: ReportRecord = { ...(prepared && { prepared }), createdAt: new Date().toISOString() };
+    // Lets this visitor decide the report later, if it waits for a person.
+    const key = crypto.randomUUID();
+    const record: ReportRecord = { ...(prepared && { prepared }), createdAt: new Date().toISOString(), keyHash: await sha256(key) };
     // Before the entity: the notification may arrive before this call returns.
     await env.DEMO.put(`report:${entity.id}`, JSON.stringify(record), { expirationTtl: KV_TTL });
     await new Broker(env).createRoadRestriction(entity);
@@ -446,7 +533,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     // and an accepted report must never answer with an error.
     ctx.waitUntil(env.DEMO.put(`day:${today}`, String(used + 1), { expirationTtl: KV_TTL })
       .catch((err) => console.error(`daily count: ${(err as Error).message}`)));
-    return json({ id: entity.id }, 201, cors);
+    return json({ id: entity.id, key }, 201, cors);
   }
 
   return json({ error: 'not found' }, 404, cors);
