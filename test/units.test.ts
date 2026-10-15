@@ -260,3 +260,26 @@ describe('the weekly examples check', () => {
       .rejects.toThrow(/not a test token/);
   });
 });
+
+describe('the weekly examples check, failures', () => {
+  it('keeps the other results when one request fails', async () => {
+    const [first, second] = PREPARED;
+    let n = 0;
+    const results = await checkExamples({
+      prepared: [first, second], toEntity, url: 'https://pm.test', token: 't',
+      fetch: (async () => {
+        n += 1;
+        if (n === 1) throw new TypeError('network connection lost');
+        if (n === 2) return new Response('<html>', { status: 200 });
+        return Response.json({ action: second!.expected, answers: {}, test: true });
+      }) as unknown as typeof fetch,
+    });
+    expect(results.map((r: any) => r.error ?? r.action)).toEqual([
+      'request failed: network connection lost', expect.stringMatching(/^request failed:/), second!.expected, second!.expected,
+    ]);
+    const r = report(results);
+    expect(r.ok).toBe(false);
+    // No rule in the answer: the default rule.
+    expect(r.markdown).toContain('| default |');
+  });
+});

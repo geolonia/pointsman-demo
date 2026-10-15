@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+# A manual run during the scheduled one would otherwise open two issues.
+concurrency: examples-check
+
 jobs:
   check:
     name: Check the prepared reports
@@ -35,8 +38,11 @@ jobs:
           node-version: '24'
 
       # No install: the script uses only Node and src/reports.ts.
+      # A step timeout fails the step (a job timeout would cancel it), so the
+      # issue below still opens.
       - name: Check
         id: check
+        timeout-minutes: 8
         env:
           POINTSMAN_CHECK_TOKEN: ${{ secrets.POINTSMAN_CHECK_TOKEN }}
         run: node scripts/check-examples.mjs "$RUNNER_TEMP/examples-report.md"

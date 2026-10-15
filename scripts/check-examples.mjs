@@ -10,6 +10,9 @@
 // given file and to the GitHub job summary; exits 1 when an example misses.
 
 import { appendFileSync, writeFileSync } from 'node:fs';
+// Node reads src/reports.ts directly (type stripping): it must keep to
+// erasable TypeScript (no enum or namespace) and import values with a .ts
+// extension.
 import { PREPARED, toEntity } from '../src/reports.ts';
 import { checkExamples, report } from './lib/examples-check.mjs';
 

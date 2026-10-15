@@ -203,7 +203,9 @@ for `road-restriction-check` (`scripts/tokens.mjs create --client
 demo-examples-check --profiles road-restriction-check --test --remote` in
 the config repository): its decisions are made like any other but not
 logged, so the check never reaches the review queue or the accuracy numbers.
-The script stops if the token is not a test token.
+The script stops if the token is not a test token. GitHub switches off
+scheduled workflows in a public repository after 60 days without activity:
+if the weekly runs stop, enable the workflow again in the Actions tab.
 
 ## Development
 
