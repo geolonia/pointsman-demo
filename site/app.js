@@ -754,7 +754,8 @@
   // --- Map ---------------------------------------------------------------------------------
 
   // A grayscale base map (GSI pale map, without colour), so that only the
-  // reports are in colour; the flood zones the facts come from, for headquarters only.
+  // reports and the flood zones are in colour; the flood zones the facts come
+  // from are for headquarters only.
   function style() {
     return {
       version: 8,

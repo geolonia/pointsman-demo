@@ -97,10 +97,10 @@ export const PREPARED: Prepared[] = [
   },
   {
     // The chain (pointsman#66), same text at two places. Step 1: urgent
-    // (Clef-flash danger about 0.92 in both languages, 2026-10-15). Step 2: no way through on foot. On the
-    // bridge the way around on foot is about 316 m longer, with an evacuation
-    // site 443 m away: an Alert for its staff. In the street grid it is about
-    // 143 m: no alert.
+    // (Clef-flash danger about 0.92 in both languages, 2026-10-15).
+    // Step 2: no way through on foot. On the bridge the way around on foot
+    // is about 316 m longer, with an evacuation site 443 m away: an Alert
+    // for its staff. In the street grid it is about 143 m: no alert.
     id: 'bridge-blocked',
     featured: { en: 'Near an evacuation site', ja: '避難場所の近く' },
     roadName: '飯田橋三丁目の橋',
