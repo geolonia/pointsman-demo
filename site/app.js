@@ -37,8 +37,10 @@
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
-      working: 'Working…',
-      answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
+      working: 'Working…', together: 'At the same time, inside Pointsman', inAll: function (s) { return s + ' in all'; },
+      useTag: 'rule',
+      lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
+      answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
       ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
       checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
       secondRunning: 'The additional check is running…', cNone: 'The rules found no reason for an alert.',
@@ -143,7 +145,7 @@
       floodClass: {},
       mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
       fRouteMap: function (m) { return 'Way around on foot: +' + m + ' m'; },
-      fShelterNote: 'No rule of this check uses it: it is context for the person who checks. For reports that go to a person, the second check uses it.',
+      fShelterNote: 'Context for the person who checks; the additional check uses it.',
       fSecond: 'second check',
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
@@ -207,8 +209,10 @@
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
-      working: '処理中…',
-      answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
+      working: '処理中…', together: '同時に、Pointsman の中で', inAll: function (s) { return '合計 ' + s; },
+      useTag: '規則',
+      lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
+      answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
       ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
       checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
       secondRunning: '追加の確認をしています…', cNone: '規則では、警報を出す理由はありませんでした。',
@@ -315,7 +319,7 @@
       },
       mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
       fRouteMap: function (m) { return '歩いて迂回：+' + m + ' m'; },
-      fShelterNote: 'この確認の規則では使いません。確認する人のための参考情報です。人に回る報告では、2 つ目の確認で使います。',
+      fShelterNote: '確認する人のための参考情報です。追加の確認で使います。',
       fSecond: '2 つ目の確認',
       dutyTitle: 'あなたが担当者です',
       dutyText: '市では、チームのメンバーがこれを仕事として受け取ります。ここではあなたが決めてください。この報告を住民に見せますか。',
@@ -713,24 +717,45 @@
     if (devTag) devHighlight(devTag);
   }
 
+  /** A moving mark next to a text while something runs, so nobody mistakes it for a result. */
+  function busy(text) {
+    return el('span', { class: 'busy' }, [el('span', { class: 'spin', 'aria-hidden': 'true' }), el('span', { text: text })]);
+  }
+
+  /**
+   * The first check's parts in order, each with its result inside it: saved,
+   * then the AI and the map checks (at the same time, inside one Pointsman
+   * call), then the rule. Times: saving, Pointsman's part, and all of it.
+   */
   function renderTimeline(r) {
     var tl = $('timeline');
     tl.textContent = '';
     var shown = current.shown;
-    var times = [
-      r && r.createdAt && current.sentAt ? seconds(new Date(current.sentAt).toISOString(), r.createdAt) : '',
-      '', '',
-      r && r.check ? seconds(current.sentAt ? new Date(current.sentAt).toISOString() : r.createdAt, r.check.decidedAt) : '',
-    ];
-    ['s1', 's2', 's3', 's4'].forEach(function (k, i) {
+    var sent = current.sentAt ? new Date(current.sentAt).toISOString() : null;
+    var tSave = r && r.createdAt && sent ? seconds(sent, r.createdAt) : '';
+    var tPair = r && r.createdAt && r.check ? seconds(r.createdAt, r.check.decidedAt) : '';
+    var tAll = r && r.check && sent ? t('inAll')(seconds(sent, r.check.decidedAt)) : '';
+    var part = function (k, i, time) {
       var done = i < shown;
       var active = i === shown;
-      tl.appendChild(el('li', { class: done ? 'done' : active ? 'active' : '', 'data-dev': ['save', 'ai', 'maps', 'rule'][i] }, [
+      return el('li', { class: done ? 'done' : active ? 'active' : '', 'data-dev': ['save', 'ai', 'maps', 'rule'][i] }, [
         el('span', { class: 'mark', 'aria-hidden': 'true' }),
-        el('span', { class: 'what' }, [el('strong', { text: t(k) }), el('span', { text: done ? t(k + 'd') : active ? t('working') : '' })]),
-        el('span', { class: 'time', text: done ? times[i] : '' }),
-      ]));
-    });
+        el('div', { class: 'what' }, [
+          el('div', { class: 'head' }, [el('strong', { text: t(k) }), time && done ? el('span', { class: 'time', text: time }) : null]),
+          done ? el('span', { class: 'sub', text: t(k + 'd') }) : active ? busy(t('working')) : null,
+          // The result of this part, filled by renderAnswers, renderDecisionFacts and renderRule.
+          i > 0 ? el('div', { class: 'body', id: ['', 'answers', 'facts', 'rule'][i] }) : null,
+        ]),
+      ]);
+    };
+    tl.appendChild(part('s1', 0, tSave));
+    // The AI and the map checks run at the same time: one group, one time.
+    var pairDone = shown > 2;
+    tl.appendChild(el('li', { class: 'pair' + (pairDone ? ' done' : '') }, [
+      el('div', { class: 'pair-head' }, [el('span', { class: 'kicker', text: t('together') }), pairDone && tPair ? el('span', { class: 'time', text: tPair }) : null]),
+      el('ol', { class: 'pair-list' }, [part('s2', 1, ''), part('s3', 2, '')]),
+    ]));
+    tl.appendChild(part('s4', 3, tAll));
   }
 
   function confidence(p) {
@@ -745,35 +770,52 @@
     return String(value);
   }
 
+  /** The answer and fact names the decision's rule read (RULE_USES), or none for a rule this page does not know. */
+  function usedBy(profile, rule) {
+    var uses = RULE_USES[profile];
+    var key = rule === undefined ? 'default' : String(rule);
+    return Object.prototype.hasOwnProperty.call(uses, key) ? uses[key] : [];
+  }
+
+  function usedTag() {
+    return el('span', { class: 'use-tag', text: t('useTag') });
+  }
+
   function renderAnswers(r) {
     var box = $('answers');
+    if (!box) return;
     box.textContent = '';
     if (!r || !r.check || current.shown < 2) return;
+    var used = usedBy('check', r.check.policyRule);
     var list = el('div', { class: 'qa' });
     Object.keys(r.check.answers).forEach(function (name) {
       var a = r.check.answers[name];
       var c = confidence(a.p);
-      list.appendChild(el('div', { class: 'row' }, [
+      var on = used.indexOf(name) >= 0;
+      list.appendChild(el('div', { class: 'row' + (on ? ' used-row' : '') }, [
         el('span', { class: 'q', text: (t('q')[name] || name) }),
+        on ? usedTag() : null,
         el('strong', { text: answerText(name, a.value) }),
         c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
       ]));
     });
-    box.appendChild(el('div', { class: 'box' }, [el('span', { class: 'kicker', text: t('answersTitle') }), list]));
+    box.appendChild(list);
   }
 
   function renderDecisionFacts(r) {
     var box = $('facts');
+    if (!box) return;
     box.textContent = '';
     if (!r || !r.check || current.shown < 3) return;
     // Only this step's map checks; the way around on foot is step 3's.
-    var facts = renderFacts(r.facts || []);
+    var facts = renderFacts(r.facts || [], usedBy('check', r.check.policyRule));
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
   }
 
   function renderRule(r) {
     var box = $('rule');
+    if (!box) return;
     box.textContent = '';
     if (!r || !r.check || current.shown < 4) return;
     var a = r.check.action;
@@ -825,9 +867,9 @@
     if (a === 'publish') {
       items.push(el('span', { text: t('secondNotNeeded') }));
     } else if (!ev) {
-      items.push(el('span', { text: secondLate() ? t('ev').secondLate[1] : t('secondRunning') }));
+      items.push(secondLate() ? el('span', { text: t('ev').secondLate[1] }) : busy(t('secondRunning')));
     } else {
-      var facts = renderFactList(ev.facts || []);
+      var facts = renderFactList(ev.facts || [], false, usedBy('evacuation', ev.policyRule));
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
       showRoute(ev.facts || []);
@@ -930,7 +972,7 @@
     }
     if (!f || (!finalFresh(r) && !finalLate(r))) {
       box.appendChild(el('div', { class: 'box' }, [
-        el('strong', { class: 'box-title', text: t('finalPending') }),
+        el('strong', { class: 'box-title' }, [busy(t('finalPending'))]),
         el('span', { text: t('finalPendingText') }),
       ]));
       return;
@@ -1115,27 +1157,55 @@
     return JSON.stringify(f.values);
   }
 
-  /** One row per map check: the question, the answer, and where the data comes from. */
-  // `firstCheck`: the facts of step 1, where no rule uses the evacuation site.
-  function renderFactList(facts, firstCheck) {
-    if (!facts.length) return null;
-    var list = el('ul', { class: 'facts' });
-    facts.forEach(function (f) {
-      list.appendChild(el('li', { class: 'fact ' + f.name }, [
-        f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null,
-        el('span', { class: 'fq', text: t('fQ')[f.name] || f.name }),
-        el('strong', { class: 'fa', text: factText(f) }),
-        f.missing ? null : el('span', { class: 'fs', text: t('fSource') + f.source }),
-        firstCheck && f.name === 'shelter' && !f.missing && !f.second ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
-      ]));
-    });
-    return list;
+  var DEEP = ['3 to 5 m', '5 to 10 m', '10 to 20 m', '20 m or more'];
+
+  /** How much a map check matters, in the terms of the rules: a level word and its colour. */
+  function factLevel(f) {
+    if (f.missing) return null;
+    var v = f.values;
+    if (f.name === 'flood') return !v.inside ? ['low', t('lvl').noZone] : DEEP.indexOf(v.class) >= 0 ? ['high', t('lvl').deep] : ['mid', t('lvl').shallow];
+    if (f.name === 'shelter') return !v.found ? ['low', t('lvl').far] : v.distance_m <= 1000 ? ['mid', t('lvl').near] : ['low', t('lvl').far];
+    if (f.name === 'walk') return typeof v.extra_m !== 'number' ? ['high', t('lvl').noWay] : v.extra_m >= 200 ? ['high', t('lvl').long] : ['low', t('lvl').short];
+    return null;
   }
 
-  function renderFacts(facts) {
-    var list = renderFactList(facts, true);
+  /**
+   * One row per map check, laid out like the AI's answers: the question, the
+   * answer and its level; the rows the rule used are tagged. Where the data
+   * comes from is one numbered note under the list.
+   */
+  // `firstCheck`: the facts of the first check, where no rule uses the evacuation site.
+  function renderFactList(facts, firstCheck, used) {
+    if (!facts.length) return null;
+    used = used || [];
+    var sources = [];
+    var rows = el('div', { class: 'qa facts' });
+    facts.forEach(function (f) {
+      var level = factLevel(f);
+      var n = 0;
+      if (!f.missing && f.source) {
+        n = sources.indexOf(f.source) + 1 || sources.push(f.source);
+      }
+      var on = used.indexOf(f.name) >= 0;
+      rows.appendChild(el('div', { class: 'row fact ' + f.name + (on ? ' used-row' : '') }, [
+        el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
+        on ? usedTag() : null,
+        el('strong', { class: 'fa' }, [factText(f), n ? el('sup', { class: 'fnum', text: String(n) }) : null]),
+        level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
+        firstCheck && f.name === 'shelter' && !f.missing && !f.second && !on ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
+      ]));
+    });
+    var wrap = el('div', { class: 'fact-wrap' }, [rows]);
+    if (sources.length) {
+      wrap.appendChild(el('ol', { class: 'sources', 'aria-label': t('fSource').replace(/[：:\s]+$/, '') }, sources.map(function (src) { return el('li', { text: src }); })));
+    }
+    return wrap;
+  }
+
+  function renderFacts(facts, used) {
+    var list = renderFactList(facts, true, used);
     if (!list) return null;
-    return el('div', { class: 'box map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
+    return el('div', { class: 'map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
   }
 
   // What each rule reads, by profile and rule index (the profiles'
