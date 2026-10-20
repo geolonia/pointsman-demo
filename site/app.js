@@ -270,6 +270,9 @@
   function details(key, props, children) {
     var e = el('details', props, children);
     if (openDetails[key]) e.open = true;
+    // At the click (a redraw may come before the toggle event), and at the toggle.
+    var summary = e.querySelector('summary');
+    if (summary) summary.addEventListener('click', function () { openDetails[key] = !e.open; });
     e.addEventListener('toggle', function () { openDetails[key] = e.open; });
     return e;
   }
@@ -323,6 +326,8 @@
     $('legend-flood').hidden = v !== 'hq';
     if (map && map.demoReady) map.setLayoutProperty('flood', 'visibility', v === 'hq' ? 'visible' : 'none');
     setShelterVisible();
+    // Back at headquarters: the checks that came while residents looked.
+    if (v === 'hq') fitMapChecks();
     updateMap();
     renderCaption();
   }
@@ -1001,7 +1006,8 @@
     if (!f || !map || !map.demoReady || !current) return;
     var key = current.id + '|' + f.values.route;
     if (current.routeShown === key) return;
-    // Decoded once per value, also when it is refused; Pointsman keeps at most 6,000 characters.
+    // Decoded once per value, also when it is refused. Pointsman keeps at most
+    // 6,000 characters; anything over 20,000 is not decoded at all.
     current.routeShown = key;
     var line = f.values.route.length <= 20000 ? decodePolyline(f.values.route, 6) : null;
     // A route far from Tokyo is not this one: drawn only inside the demo area, with a margin.
