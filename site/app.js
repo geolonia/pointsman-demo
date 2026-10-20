@@ -1387,7 +1387,8 @@
   }
   var sideWanted = 440;
   function setSideWidth(w) {
-    var max = Math.max(SIDE_MIN, Math.min(900, document.documentElement.clientWidth - 480));
+    // At least 480 px left for the page, after its margins (16 px on each side, style.css).
+    var max = Math.max(SIDE_MIN, Math.min(900, document.documentElement.clientWidth - 480 - 32));
     w = Math.round(Math.min(max, Math.max(SIDE_MIN, w)));
     document.documentElement.style.setProperty('--side-w', w + 'px');
     document.querySelectorAll('.side-grip').forEach(function (g) {
