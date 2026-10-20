@@ -27,6 +27,7 @@
   <a class="brand" href="https://github.com/geolonia/pointsman"><img class="mark light" src="favicon.svg" alt="" width="22" height="22"><img class="mark dark" src="mark-on-dark.svg" alt="" width="22" height="22"><span>Pointsman</span><span class="tag" data-i18n="demo">demo</span></a>
   <nav>
     <button class="chip strong" id="how-toggle" type="button" aria-expanded="false" aria-controls="how" data-i18n="howTitle">How it works</button>
+    <button class="chip" id="dev-toggle" type="button" aria-pressed="false" aria-controls="dev"><span class="long" data-i18n="devTitle">Developer view</span><span class="short" data-i18n="devShort">Dev</span></button>
     <button class="chip" id="lang" type="button" lang="ja">日本語</button>
     <button class="chip" id="theme" type="button" aria-label="Switch theme">◐</button>
   </nav>
@@ -97,16 +98,16 @@
         <h2 data-i18n="decideTitle">Pointsman decides</h2>
         <div class="box quote"><span class="kicker" id="cur-kicker"></span><span id="cur-text"></span></div>
         <ol class="timeline" id="timeline" aria-live="polite"></ol>
-        <div id="answers"></div>
-        <div id="facts"></div>
-        <div id="rule"></div>
+        <div id="answers" data-dev="ai"></div>
+        <div id="facts" data-dev="maps"></div>
+        <div id="rule" data-dev="rule"></div>
         <div id="data"></div>
       </section>
 
       <section id="step-result" class="step" hidden>
         <h2 data-i18n="resultTitle">What happens next</h2>
         <div id="outcome" aria-live="polite"></div>
-        <div id="chain"></div>
+        <div id="chain" data-dev="second"></div>
         <div id="person" aria-live="polite"></div>
         <div class="box">
           <strong class="box-title" data-i18n="whyTitle">Why cities use it this way</strong>
@@ -148,6 +149,15 @@
     </aside>
   </div>
 </main>
+
+<aside id="dev" class="dev" hidden aria-labelledby="dev-title">
+  <div class="dev-head">
+    <h2 id="dev-title" data-i18n="devTitle">Developer view</h2>
+    <button class="chip" id="dev-close" type="button" data-i18n="close">Close</button>
+  </div>
+  <p class="muted small" data-i18n="devLead">What happens to the report, part by part, with the real data. Point at a step on the page to see its part here.</p>
+  <div id="dev-body"></div>
+</aside>
 
 <footer>
   <p class="muted small" data-i18n="footer">Invented events at real places. Do not enter personal data. Map: <a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>.</p>
