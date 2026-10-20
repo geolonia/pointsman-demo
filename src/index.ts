@@ -720,14 +720,17 @@ async function replacedBy(env: Env, broker: Broker, decisionEntity: string): Pro
     const next = (entity[REPLACES_IRI] as Attr | undefined)?.object;
     return typeof next === 'string' ? next : undefined;
   }
-  try {
-    const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${encodeURIComponent(decisionEntity.split(':').pop()!)}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
-    if (!got.ok) return undefined;
-    const replaces = ((await got.json()) as { replaces?: unknown }).replaces;
-    return typeof replaces === 'string' ? `urn:ngsi-ld:Decision:${replaces}` : undefined;
-  } catch {
-    return undefined;
-  }
+  const PREFIX = 'urn:ngsi-ld:Decision:';
+  const id = decisionEntity.startsWith(PREFIX) ? decisionEntity.slice(PREFIX.length) : '';
+  // Letters, digits and dashes only (decision ids are UUIDs): no path parts reach Pointsman.
+  if (!/^[A-Za-z0-9-]{1,64}$/.test(id)) return undefined;
+  // Not known to Pointsman either: the end of the chain. Any other failure
+  // throws, so the report stays and the next run goes on from here.
+  const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${id}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+  if (got.status === 404) return undefined;
+  if (!got.ok) throw new Error(`pointsman decision read failed: ${got.status}`);
+  const replaces = ((await got.json()) as { replaces?: unknown }).replaces;
+  return typeof replaces === 'string' ? `${PREFIX}${replaces}` : undefined;
 }
 
 type PointsmanReview = { status?: string; resolved_by?: string; final_action?: string };

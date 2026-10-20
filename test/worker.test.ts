@@ -398,6 +398,25 @@ describe('cleanup', () => {
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:Decision:e-older', 'urn:ngsi-ld:Alert:demo-e-older', 'urn:ngsi-ld:Decision:e-oldest', 'urn:ngsi-ld:Alert:demo-e-oldest', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
+    // Pointsman was asked with the token.
+    expect(calls.find((c) => c.url.endsWith('/v1/decisions/e-older'))?.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
+  });
+
+  it('keeps a report when Pointsman cannot say what a skipped decision replaced', async () => {
+    const old = new Date(Date.now() - 25 * 3600_000).toISOString();
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.includes('/entities?type=RoadRestriction')) {
+        return Response.json([{ id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old,
+          evacuation: { type: 'Property', value: 'alert', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-gone' } } }]);
+      }
+      if (c.method === 'GET' && c.url.includes('/entities/')) return new Response(null, { status: 404 });
+      if (c.url.endsWith('/v1/decisions/e-gone')) return new Response('down', { status: 503 });
+      if (c.method === 'DELETE') return new Response(null, { status: 204 });
+      return undefined;
+    };
+    await expect(cleanup(env)).rejects.toThrow('pointsman decision read failed: 503');
+    // The report itself stays for the next run.
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.includes(encodeURIComponent('urn:ngsi-ld:RoadRestriction:demo-old')))).toBe(false);
   });
 
   it('deletes the final Decision entities, also the ones a rerun replaced', async () => {
