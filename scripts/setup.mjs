@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // One-time setup outside Cloudflare: the subscriptions in the context broker
 // (RoadRestriction -> the Worker's /notify, the chain's step 2 ->
-// /notify?route=evacuation, resolved Decisions and completed work orders ->
-// /reviews) and the issue labels on GitHub.
+// /notify?route=evacuation, step 3 -> /notify?route=final, resolved Decisions
+// and completed work orders -> /reviews) and the issue labels on GitHub.
 // Idempotent: an existing subscription with the same id is updated in place.
 //
 // Secrets come from the environment, for example from 1Password:
@@ -36,6 +36,16 @@ const subscriptions = {
     watchedAttributes: ['check'],
     q: 'check=="urgent"|check=="review"',
     notification: { format: 'normalized', endpoint: endpoint('/notify?route=evacuation') },
+  },
+  // Step 3, the final decision (pointsman#101): when step 1 published, or once
+  // step 2 is there (it runs for urgent and review). A person's answer on
+  // check (finalAction) is a change of check too, so step 3 runs again.
+  'urn:ngsi-ld:Subscription:pointsman-demo-final': {
+    description: 'Pointsman demo: road restrictions with their earlier checks, to the final decision',
+    entities: [{ type: 'RoadRestriction' }],
+    watchedAttributes: ['check', 'evacuation'],
+    q: 'check=="publish"|evacuation',
+    notification: { format: 'normalized', endpoint: endpoint('/notify?route=final') },
   },
   // Reviews resolved in the broker (pointsman#83): from GitHub, or from any app.
   'urn:ngsi-ld:Subscription:pointsman-demo-reviews': {
