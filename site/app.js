@@ -1370,7 +1370,7 @@
       loadStats();
     }
     sideOpen();
-    // Keyboards land in the panel when it opens (it comes after the page), and back on the button when it closes.
+    // Keyboards land in the panel when it opens (it comes after the page); its Close button puts focus back on the header button.
     if (open) $('activity-title').focus();
   }
 
