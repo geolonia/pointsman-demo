@@ -37,8 +37,10 @@
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
-      working: 'Working…',
-      answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
+      working: 'Working…', together: 'Passed on to Pointsman; these two run at the same time', inAll: function (s) { return s + ' in all'; },
+      useTag: 'rule', srSource: 'source', usesMarked: 'The rule read the answers and map checks marked like this above.',
+      lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
+      answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
       ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
       checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
       secondRunning: 'The additional check is running…', cNone: 'The rules found no reason for an alert.',
@@ -119,7 +121,6 @@
         '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
         '1': 'Near an evacuation site, but the way around could not be worked out: a person looks.',
       },
-      usedTitle: 'Based on', usedAI: 'AI', usedMap: 'map',
       ruleUnknown: function (n) { return 'Rule ' + n + ' of the profile (this page does not describe it yet).'; },
       act: { publish: 'publish', review: 'review', urgent: 'urgent', reject: 'rejected', pending: 'being checked', alert: 'alert', none: 'no alert' },
       resultTitle: 'Final result',
@@ -143,7 +144,7 @@
       floodClass: {},
       mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
       fRouteMap: function (m) { return 'Way around on foot: +' + m + ' m'; },
-      fShelterNote: 'No rule of this check uses it: it is context for the person who checks. For reports that go to a person, the second check uses it.',
+      fShelterNote: 'Context for the person who checks; the additional check uses it.',
       fSecond: 'second check',
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
@@ -207,8 +208,10 @@
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
-      working: '処理中…',
-      answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
+      working: '処理中…', together: 'Pointsman に渡され、この 2 つは同時に進みます', inAll: function (s) { return '合計 ' + s; },
+      useTag: '規則', srSource: '出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
+      lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
+      answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
       ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
       checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
       secondRunning: '追加の確認をしています…', cNone: '規則では、警報を出す理由はありませんでした。',
@@ -287,7 +290,6 @@
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
         '1': '避難場所の近くだが、迂回路を求められなかった：人が確認する。',
       },
-      usedTitle: '判断に使ったもの', usedAI: 'AI', usedMap: '地図',
       ruleUnknown: function (n) { return 'プロファイルの規則 ' + n + '（このページではまだ説明していません）。'; },
       act: { publish: '公開', review: '確認', urgent: '緊急', reject: '非公開', pending: '判定中', alert: '警報', none: '警報なし' },
       resultTitle: '最終結果',
@@ -315,7 +317,7 @@
       },
       mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
       fRouteMap: function (m) { return '歩いて迂回：+' + m + ' m'; },
-      fShelterNote: 'この確認の規則では使いません。確認する人のための参考情報です。人に回る報告では、2 つ目の確認で使います。',
+      fShelterNote: '確認する人のための参考情報です。追加の確認で使います。',
       fSecond: '2 つ目の確認',
       dutyTitle: 'あなたが担当者です',
       dutyText: '市では、チームのメンバーがこれを仕事として受け取ります。ここではあなたが決めてください。この報告を住民に見せますか。',
@@ -449,6 +451,16 @@
       if (name === s) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
     });
     if (scroll) $('stepper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    renderMapReport();
+  }
+
+  /** Steps 3 and 4 no longer show the report: it stays above the map. */
+  function renderMapReport() {
+    var r = current && current.last;
+    var keep = !!r && (step === 'check' || step === 'result');
+    $('map-report').hidden = !keep;
+    $('map-report-kicker').textContent = keep ? $('cur-kicker').textContent : '';
+    $('map-report-text').textContent = keep ? quote(r.description) : '';
   }
 
   function setView(v) {
@@ -700,6 +712,7 @@
     var where = p ? [titleOf(p), placeOf(p)].filter(Boolean).join(' · ') : r ? r.roadName || t('noRoad') : '';
     $('cur-kicker').textContent = (current.sentAt ? t('yourReport') : t('aReport')) + (where ? ' · ' + where : '');
     $('cur-text').textContent = r ? quote(r.description) : '';
+    renderMapReport();
     renderTimeline(r);
     renderAnswers(r);
     renderDecisionFacts(r);
@@ -713,24 +726,49 @@
     if (devTag) devHighlight(devTag);
   }
 
+  /** A moving mark next to a text while something runs, so nobody mistakes it for a result. */
+  function busy(text) {
+    return el('span', { class: 'busy' }, [el('span', { class: 'spin', 'aria-hidden': 'true' }), el('span', { text: text })]);
+  }
+
+  /**
+   * The first check's parts in order, each with its result inside it: saved,
+   * then the AI and the map checks (at the same time, inside one Pointsman
+   * call), then the rule. Times: saving, Pointsman's part, and all of it.
+   */
   function renderTimeline(r) {
     var tl = $('timeline');
     tl.textContent = '';
     var shown = current.shown;
-    var times = [
-      r && r.createdAt && current.sentAt ? seconds(new Date(current.sentAt).toISOString(), r.createdAt) : '',
-      '', '',
-      r && r.check ? seconds(current.sentAt ? new Date(current.sentAt).toISOString() : r.createdAt, r.check.decidedAt) : '',
-    ];
-    ['s1', 's2', 's3', 's4'].forEach(function (k, i) {
+    var sent = current.sentAt ? new Date(current.sentAt).toISOString() : null;
+    var tSave = r && r.createdAt && sent ? seconds(sent, r.createdAt) : '';
+    var tPair = r && r.createdAt && r.check ? seconds(r.createdAt, r.check.decidedAt) : '';
+    var tAll = r && r.check && sent ? t('inAll')(seconds(sent, r.check.decidedAt)) : '';
+    var part = function (k, i, time) {
       var done = i < shown;
       var active = i === shown;
-      tl.appendChild(el('li', { class: done ? 'done' : active ? 'active' : '', 'data-dev': ['save', 'ai', 'maps', 'rule'][i] }, [
+      return el('li', { class: done ? 'done' : active ? 'active' : '', 'data-dev': ['save', 'ai', 'maps', 'rule'][i] }, [
         el('span', { class: 'mark', 'aria-hidden': 'true' }),
-        el('span', { class: 'what' }, [el('strong', { text: t(k) }), el('span', { text: done ? t(k + 'd') : active ? t('working') : '' })]),
-        el('span', { class: 'time', text: done ? times[i] : '' }),
-      ]));
-    });
+        el('div', { class: 'what' }, [
+          el('div', { class: 'head' }, [el('strong', { text: t(k) }), time && done ? el('span', { class: 'time', text: time }) : null]),
+          done ? el('span', { class: 'sub', text: t(k + 'd') }) : active ? busy(t('working')) : null,
+          // The result of this part, filled by renderAnswers, renderDecisionFacts and renderRule.
+          i > 0 ? el('div', { class: 'body', id: ['', 'answers', 'facts', 'rule'][i] }) : null,
+        ]),
+      ]);
+    };
+    tl.appendChild(part('s1', 0, tSave));
+    // The AI and the map checks run at the same time: one group, one time.
+    var pairDone = shown > 2;
+    tl.appendChild(el('li', { class: 'pair' + (pairDone ? ' done' : '') }, [
+      el('div', { class: 'pair-head' }, [el('span', { class: 'kicker', text: t('together') }), pairDone && tPair ? el('span', { class: 'time', text: tPair }) : null]),
+      el('ol', { class: 'pair-list' }, [part('s2', 1, ''), part('s3', 2, '')]),
+    ]));
+    tl.appendChild(part('s4', 3, tAll));
+    // One short line for screen readers, only when it changes.
+    var status = !r ? '' : shown < 4 ? t(['s1', 's2', 's3', 's4'][shown]) + ': ' + t('working')
+      : r.check ? t('s4') + ': ' + (t('act')[r.check.action] || r.check.action) : '';
+    if ($('decide-status').textContent !== status) $('decide-status').textContent = status;
   }
 
   function confidence(p) {
@@ -745,35 +783,60 @@
     return String(value);
   }
 
-  function renderAnswers(r) {
-    var box = $('answers');
-    box.textContent = '';
-    if (!r || !r.check || current.shown < 2) return;
+  /** The answer and fact names the decision's rule read (RULE_USES), or none for a rule this page does not know. */
+  function usedBy(profile, rule) {
+    var uses = RULE_USES[profile];
+    var key = rule === undefined ? 'default' : String(rule);
+    return Object.prototype.hasOwnProperty.call(uses, key) ? uses[key] : [];
+  }
+
+  function usedTag() {
+    return el('span', { class: 'use-tag', text: t('useTag') });
+  }
+
+  /** The AI's answers as rows: the question, the answer and how sure; the ones the rule read tagged. */
+  function answerRows(answers, used) {
+    var names = Object.keys(answers);
+    if (!names.length) return null;
     var list = el('div', { class: 'qa' });
-    Object.keys(r.check.answers).forEach(function (name) {
-      var a = r.check.answers[name];
+    names.forEach(function (name) {
+      var a = answers[name];
       var c = confidence(a.p);
-      list.appendChild(el('div', { class: 'row' }, [
+      var on = used.indexOf(name) >= 0;
+      list.appendChild(el('div', { class: 'row' + (on ? ' used-row' : '') }, [
         el('span', { class: 'q', text: (t('q')[name] || name) }),
+        on ? usedTag() : null,
         el('strong', { text: answerText(name, a.value) }),
         c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
       ]));
     });
-    box.appendChild(el('div', { class: 'box' }, [el('span', { class: 'kicker', text: t('answersTitle') }), list]));
+    return list;
+  }
+
+  function renderAnswers(r) {
+    var box = $('answers');
+    if (!box) return;
+    box.textContent = '';
+    if (!r || !r.check || current.shown < 2) return;
+    var list = answerRows(r.check.answers, usedBy('check', r.check.policyRule));
+    if (!list) return;
+    box.appendChild(list);
   }
 
   function renderDecisionFacts(r) {
     var box = $('facts');
+    if (!box) return;
     box.textContent = '';
     if (!r || !r.check || current.shown < 3) return;
     // Only this step's map checks; the way around on foot is step 3's.
-    var facts = renderFacts(r.facts || []);
+    var facts = renderFacts(r.facts || [], usedBy('check', r.check.policyRule));
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
   }
 
   function renderRule(r) {
     var box = $('rule');
+    if (!box) return;
     box.textContent = '';
     if (!r || !r.check || current.shown < 4) return;
     var a = r.check.action;
@@ -783,7 +846,7 @@
     box.appendChild(el('div', { class: 'box tint ' + a }, [
       el('span', { class: 'kicker', text: t('ruleTitle') }),
       el('span', { class: 'rule-text', text: text }),
-      renderUsed('check', r.check.policyRule, r.check.answers, r.facts),
+      usedBy('check', r.check.policyRule).length ? el('span', { class: 'uses-note' }, [usedTag(), ' ' + t('usesMarked')]) : null,
       el('div', { class: 'rule-foot' }, [
         el('span', { class: 'badge ' + a, text: t('act')[a] || a }),
         el('button', { class: 'btn', type: 'button', text: t('next'), onclick: function () {
@@ -825,17 +888,19 @@
     if (a === 'publish') {
       items.push(el('span', { text: t('secondNotNeeded') }));
     } else if (!ev) {
-      items.push(el('span', { text: secondLate() ? t('ev').secondLate[1] : t('secondRunning') }));
+      items.push(secondLate() ? el('span', { text: t('ev').secondLate[1] }) : busy(t('secondRunning')));
     } else {
-      var facts = renderFactList(ev.facts || []);
+      var used2 = usedBy('evacuation', ev.policyRule);
+      var asked = answerRows(ev.answers || {}, used2);
+      if (asked) items.push(asked);
+      var facts = renderFactList(ev.facts || [], false, used2);
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
       showRoute(ev.facts || []);
       var rules2 = t('rules2');
       var key2 = ev.policyRule === undefined ? 'default' : ev.policyRule;
       if (Object.prototype.hasOwnProperty.call(rules2, key2)) items.push(el('span', { class: 'rule-text', text: rules2[key2] }));
-      var used = renderUsed('evacuation', ev.policyRule, ev.answers, ev.facts);
-      if (used) items.push(used);
+      if (used2.length) items.push(el('span', { class: 'uses-note' }, [usedTag(), ' ' + t('usesMarked')]));
       var c = { alert: 'cAlert', review: 'cReview', none: 'cNone' }[ev.action];
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
     }
@@ -930,7 +995,7 @@
     }
     if (!f || (!finalFresh(r) && !finalLate(r))) {
       box.appendChild(el('div', { class: 'box' }, [
-        el('strong', { class: 'box-title', text: t('finalPending') }),
+        el('strong', { class: 'box-title' }, [busy(t('finalPending'))]),
         el('span', { text: t('finalPendingText') }),
       ]));
       return;
@@ -940,19 +1005,24 @@
     var rule = Object.prototype.hasOwnProperty.call(rules, f.policyRule === undefined ? 'default' : f.policyRule) ? rules[f.policyRule === undefined ? 'default' : f.policyRule] : null;
     var person = r.check.finalAction || r.visitorDecision;
     var ev = r.evacuation;
-    var chip = function (label, value) { return el('span', { class: 'chip-ai' }, [el('b', { text: label }), ' ' + value]); };
-    var from = [
-      el('span', { class: 'kicker', text: t('basedOn') }),
-      chip(t('bFirst'), t('act')[r.check.action] || r.check.action),
-      person ? chip(t('bPerson'), t('act')[person] || person) : null,
-      ev ? chip(t('bSecond'), t('act')[ev.action] || ev.action) : r.check.action === 'publish' ? chip(t('bSecond'), t('bNoSecond')) : null,
-    ];
+    // What it was made from, as the chain it went through: each earlier
+    // result with its colour, in order, the person's answer last.
+    var stage = function (label, action, text) {
+      return el('span', { class: 'stage' }, [el('span', { class: 'stage-label', text: label }), el('span', { class: 'badge small ' + (action || 'none'), text: text || t('act')[action] || action })]);
+    };
+    var arrow = function () { return el('span', { class: 'stage-arrow', 'aria-hidden': 'true', text: '→' }); };
+    // The person answers the first check, so their answer follows it; the
+    // additional check ran on the first result, beside that answer.
+    var from = [el('span', { class: 'kicker', text: t('basedOn') }), stage(t('bFirst'), r.check.action)];
+    if (person) from.push(arrow(), stage(t('bPerson'), person));
+    var second = ev ? stage(t('bSecond'), ev.action) : r.check.action === 'publish' ? stage(t('bSecond'), 'skip', t('bNoSecond')) : null;
+    if (second) from.push(el('span', { class: 'stage-arrow', 'aria-hidden': 'true', text: '·' }), second);
     // The step's own heading says "Final result": no kicker here.
     box.appendChild(el('div', { class: 'box tint final ' + f.action }, [
       el('strong', { class: 'headline', text: words[0] }),
       words[1] ? el('span', { text: words[1] }) : null,
       rule ? el('span', { class: 'rule-text', text: rule }) : null,
-      el('div', { class: 'used' }, from),
+      el('div', { class: 'stages' }, from),
     ]));
   }
 
@@ -1115,27 +1185,56 @@
     return JSON.stringify(f.values);
   }
 
-  /** One row per map check: the question, the answer, and where the data comes from. */
-  // `firstCheck`: the facts of step 1, where no rule uses the evacuation site.
-  function renderFactList(facts, firstCheck) {
-    if (!facts.length) return null;
-    var list = el('ul', { class: 'facts' });
-    facts.forEach(function (f) {
-      list.appendChild(el('li', { class: 'fact ' + f.name }, [
-        f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null,
-        el('span', { class: 'fq', text: t('fQ')[f.name] || f.name }),
-        el('strong', { class: 'fa', text: factText(f) }),
-        f.missing ? null : el('span', { class: 'fs', text: t('fSource') + f.source }),
-        firstCheck && f.name === 'shelter' && !f.missing && !f.second ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
-      ]));
-    });
-    return list;
+  /** How much a map check matters, in the terms of the rules: a level word and its colour. */
+  function factLevel(f) {
+    if (f.missing) return null;
+    var v = f.values;
+    // rank 5 and more is 3 m or deeper: the first check's rules read the same rank.
+    if (f.name === 'flood') return !v.inside ? ['low', t('lvl').noZone] : v.rank >= 5 ? ['high', t('lvl').deep] : ['mid', t('lvl').shallow];
+    if (f.name === 'shelter') return !v.found ? ['low', t('lvl').far] : v.distance_m <= 1000 ? ['mid', t('lvl').near] : ['low', t('lvl').far];
+    if (f.name === 'walk') return typeof v.extra_m !== 'number' ? ['high', t('lvl').noWay] : v.extra_m >= 200 ? ['high', t('lvl').long] : ['low', t('lvl').short];
+    return null;
   }
 
-  function renderFacts(facts) {
-    var list = renderFactList(facts, true);
+  /**
+   * One row per map check, laid out like the AI's answers: the question, the
+   * answer and its level; the rows the rule used are tagged. Where the data
+   * comes from is one numbered note under the list.
+   */
+  // `firstCheck`: the facts of the first check, where no rule uses the evacuation site.
+  function renderFactList(facts, firstCheck, used) {
+    if (!facts.length) return null;
+    used = used || [];
+    var sources = [];
+    var rows = el('div', { class: 'qa facts' });
+    facts.forEach(function (f) {
+      var on = used.indexOf(f.name) >= 0;
+      var level = factLevel(f);
+      // In the first check no rule reads the evacuation site: no colour for it there.
+      if (level && firstCheck && !on && f.name === 'shelter') level = ['ctx', level[1]];
+      var n = 0;
+      if (!f.missing && f.source) {
+        n = sources.indexOf(f.source) + 1 || sources.push(f.source);
+      }
+      rows.appendChild(el('div', { class: 'row fact ' + f.name + (on ? ' used-row' : '') }, [
+        el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
+        on ? usedTag() : null,
+        el('strong', { class: 'fa' }, [factText(f), n ? el('sup', { class: 'fnum' }, [el('span', { class: 'sr-only', text: ' ' + t('srSource') + ' ' }), String(n)]) : null]),
+        level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
+        firstCheck && f.name === 'shelter' && !f.missing && !f.second && !on ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
+      ]));
+    });
+    var wrap = el('div', { class: 'fact-wrap' }, [rows]);
+    if (sources.length) {
+      wrap.appendChild(el('ol', { class: 'sources', 'aria-label': t('fSource').replace(/[：:\s]+$/, '') }, sources.map(function (src) { return el('li', { text: src }); })));
+    }
+    return wrap;
+  }
+
+  function renderFacts(facts, used) {
+    var list = renderFactList(facts, true, used);
     if (!list) return null;
-    return el('div', { class: 'box map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
+    return el('div', { class: 'map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
   }
 
   // What each rule reads, by profile and rule index (the profiles'
@@ -1149,27 +1248,6 @@
     // Its default (none) reads nothing: no 'Based on' line for it.
     evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'] },
   };
-
-  /** "Based on": the AI answers and map checks the rule used, with their values. */
-  function renderUsed(profile, rule, answers, facts) {
-    var uses = RULE_USES[profile];
-    var key = rule === undefined ? 'default' : String(rule);
-    // A rule this page does not know (a newer profile): say nothing rather than something wrong.
-    if (!Object.prototype.hasOwnProperty.call(uses, key)) return null;
-    var names = uses[key];
-    var chips = [];
-    names.forEach(function (name) {
-      var f = (facts || []).filter(function (x) { return x.name === name; })[0];
-      if (f) {
-        chips.push(el('span', { class: 'chip-map' }, [el('b', { text: t('usedMap') }), ' ' + t('ch')[name] + ': ' + factText(f)]));
-        return;
-      }
-      var a = answers && answers[name];
-      if (a) chips.push(el('span', { class: 'chip-ai' }, [el('b', { text: t('usedAI') }), ' ' + (t('q')[name] || name) + ' ' + answerText(name, a.value)]));
-    });
-    if (!chips.length) return null;
-    return el('div', { class: 'used' }, [el('span', { class: 'kicker', text: t('usedTitle') })].concat(chips));
-  }
 
   // --- Developer view ------------------------------------------------------------------
 
@@ -1454,6 +1532,9 @@
     var m = new maplibregl.Map({ container: 'map', style: style(), center: CENTER, zoom: 13.4, attributionControl: { compact: true }, cooperativeGestures: true });
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     m.on('load', function () {
+      // The attribution starts folded: the (i) button opens it.
+      var attrib = m.getContainer().querySelector('.maplibregl-ctrl-attrib');
+      if (attrib) { attrib.classList.remove('maplibregl-compact-show'); attrib.removeAttribute('open'); }
       m.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       var color = ['match', ['get', 'outcome'], 'publish', COLORS.publish, 'review', COLORS.review, 'urgent', COLORS.urgent, 'reject', COLORS.reject, COLORS.pending];
       var width = ['case', ['get', 'current'], 12, 7];
