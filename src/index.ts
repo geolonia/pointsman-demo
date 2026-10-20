@@ -109,8 +109,11 @@ export default {
         continue;
       }
       const result = await handleMessage(body, config, { fresh: true });
-      if ('retry' in result && result.retry) {
-        console.error(`bridge queue: ${result.id} (attempt ${message.attempts}): ${result.error}`);
+      // A redirect (pointsman#105) is retried too, so the message ends in the
+      // dead-letter queue and can be replayed once the URL is fixed.
+      if (('retry' in result && result.retry) || ('redirect' in result && result.redirect)) {
+        const decision = 'decision' in result && result.decision ? ` (decision ${result.decision})` : '';
+        console.error(`bridge queue: ${result.id}${decision} (attempt ${message.attempts}): ${result.error}`);
         message.retry({ delaySeconds: retryDelay(message.attempts) });
         continue;
       }

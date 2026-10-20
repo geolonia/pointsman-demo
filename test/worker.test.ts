@@ -556,6 +556,17 @@ describe("the bridge's queue (pointsman#88)", () => {
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('bridge queue:'));
   });
 
+  it('retries a message when Pointsman answers with a redirect, so it can reach the dead-letter queue', async () => {
+    pointsmanSays(new Response(null, { status: 307, headers: { location: 'https://elsewhere.example/' } }));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = message({ path: '/notify', entity: report }, 2);
+    await consume(m);
+    expect(m.retry).toHaveBeenCalledWith({ delaySeconds: 60 });
+    expect(m.ack).not.toHaveBeenCalled();
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('redirect'));
+    expect(errors).not.toHaveBeenCalledWith(expect.stringContaining('elsewhere.example'));
+  });
+
   it('answers 502 when the queue refuses the notification, without deciding', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const refusing = { ...env, BRIDGE_QUEUE: { sendBatch: async () => { throw new Error('queue down'); } } } as unknown as Env;
