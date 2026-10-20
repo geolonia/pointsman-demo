@@ -67,11 +67,11 @@
         publishEnd: ['No second check', 'The second subscription matches only reports that go to a person (urgent or review).'],
         secondLate: ['The second check did not come', 'No result within a minute: the queue may still retry, or the check failed. The first result stands.'],
         notify2: ['Notification: check is urgent or review', 'A second subscription, on the check attribute, starts the second check.'],
-        decide2: ['POST /v1/decide/evacuation-access-check', 'The same connector, another profile; its Decision is linked to the first one (prov:wasInformedBy).'],
+        decide2: ['POST /v1/decide/evacuation-access-check', 'The same connector, another profile. It sends the first check’s id; Pointsman checks it, and the Decision is linked to it (prov:wasInformedBy).'],
         maps2: ['Map checks: evacuation site, way around on foot', 'GSI evacuation sites, and Valhalla routing on OpenStreetMap with and without the closed section.'],
         write2: ['Create Decision; PATCH evacuation (and Alert)', 'The connector writes the second result back; for an alert, the demo’s server then creates an Alert entity (Smart Data Models) for the site’s staff.'],
         notify3: ['Notification: the earlier results are there', 'A third subscription, on check and evacuation, starts the final decision once the earlier checks it needs are there.'],
-        decide3: ['POST /v1/decide/road-closure-final', 'The connector sends only the ids of the earlier decisions. Pointsman reads their results from its own log, so nobody can claim a result. Rules only: no model call.'],
+        decide3: ['POST /v1/decide/road-closure-final', 'The connector sends the report and the ids of the earlier decisions. Pointsman reads their results from its own log, so nobody can claim a result. Rules only: no model call.'],
         write3: ['Create Decision; PATCH final', 'The connector writes the final result back. Its Decision links both earlier ones (prov:wasInformedBy), and the one it replaces after a person’s answer (dcterms:replaces). The residents’ map reads this result.'],
         finalLate: ['The final decision did not come', 'No final result within a minute: the queue may still retry, or the step failed. The earlier results stand.'],
       },
@@ -115,7 +115,7 @@
       },
       basedOn: 'Made from', bFirst: 'first result', bPerson: 'person’s answer', bSecond: 'additional check', bNoSecond: 'no additional check needed',
       showDecision3: 'Decision entity of the final result',
-      graphKicker: 'How the city decides', graphText: 'The final result is made from the decisions below it. Each box is a profile with its own rules.',
+      graphKicker: 'How the city decides', graphText: 'A report goes from left to right. Each box is a profile with its own rules. A report published by the first check goes straight to the final result.',
       graphDmn: 'Download for DMN tools (.dmn)',
       // evacuation-access-check (pointsman-config): its rules, by index.
       rules2: {
@@ -239,11 +239,11 @@
         publishEnd: ['2 つ目の確認はなし', '2 つ目のサブスクリプションは、人に回る報告（緊急・確認）にだけ合います。'],
         secondLate: ['2 つ目の確認が届かない', '1 分以内に結果がありません。キューが再試行しているか、確認が失敗しました。1 つ目の結果はそのままです。'],
         notify2: ['通知：check が緊急または確認', 'check 属性の 2 つ目のサブスクリプションが、2 つ目の確認を始めます。'],
-        decide2: ['POST /v1/decide/evacuation-access-check', '同じつなぎ役、別のプロファイルです。その Decision は 1 つ目につながります（prov:wasInformedBy）。'],
+        decide2: ['POST /v1/decide/evacuation-access-check', '同じつなぎ役、別のプロファイルです。最初の確認の ID を送り、Pointsman がそれを確かめます。その Decision は最初の確認につながります（prov:wasInformedBy）。'],
         maps2: ['地図での確認：避難場所、歩いて迂回', '国土地理院の避難場所と、OpenStreetMap 上の Valhalla 経路（区間を閉じた場合と閉じない場合）。'],
         write2: ['Decision を作成、evacuation を PATCH（と Alert）', 'つなぎ役が 2 つ目の結果を書き戻します。警報のときは、デモのサーバーが避難場所の担当者向けの Alert エンティティ（Smart Data Models）を作ります。'],
         notify3: ['通知：前の結果がそろった', 'check と evacuation の 3 つ目のサブスクリプションが、必要な前の確認がそろったところで最終判断を始めます。'],
-        decide3: ['POST /v1/decide/road-closure-final', 'つなぎ役は前の判断の ID だけを送ります。Pointsman が自分の記録から結果を読むので、結果を偽ることはできません。規則だけで決め、モデルは呼びません。'],
+        decide3: ['POST /v1/decide/road-closure-final', 'つなぎ役は報告と前の判断の ID を送ります。Pointsman が自分の記録から結果を読むので、結果を偽ることはできません。規則だけで決め、モデルは呼びません。'],
         write3: ['Decision を作成、final を PATCH', 'つなぎ役が最終結果を書き戻します。その Decision は前の 2 つにつながり（prov:wasInformedBy）、人の答えの後に置き換えた判断にもつながります（dcterms:replaces）。住民向けの地図はこの結果を読みます。'],
         finalLate: ['最終判断が届かない', '1 分以内に最終結果がありません。キューが再試行しているか、処理が失敗しました。前の結果はそのままです。'],
       },
@@ -286,7 +286,7 @@
       },
       basedOn: 'もとにしたもの', bFirst: '最初の結果', bPerson: '人の答え', bSecond: '追加の確認', bNoSecond: '追加の確認は不要',
       showDecision3: '最終結果の Decision エンティティ',
-      graphKicker: '市の判断の流れ', graphText: '最終結果は、その下にある判断からつくられます。箱 1 つが、それぞれの規則をもつ 1 つのプロファイルです。',
+      graphKicker: '市の判断の流れ', graphText: '報告は左から右へ進みます。箱 1 つが、それぞれの規則をもつ 1 つのプロファイルです。最初の確認で公開された報告は、そのまま最終結果に進みます。',
       graphDmn: 'DMN ツール用にダウンロード（.dmn）',
       rules2: {
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
@@ -1048,7 +1048,8 @@
       el('span', { class: 'kicker', text: t('graphKicker') }),
       el('span', { text: t('graphText') }),
     ]);
-    var place = el('div', { class: 'graph-svg' });
+    // It may scroll sideways on narrow screens: focusable, so keyboards can scroll it too.
+    var place = el('div', { class: 'graph-svg', tabindex: '0', role: 'region', 'aria-label': t('graphKicker') });
     holder.appendChild(place);
     holder.appendChild(el('a', { href: '/api/graph?format=dmn&lang=' + l, download: 'road-closure-final.dmn', text: t('graphDmn') }));
     if (graphSvg[l]) {

@@ -376,6 +376,15 @@ describe('cleanup', () => {
           { id: 'urn:ngsi-ld:RoadRestriction:demo-new', type: 'RoadRestriction', createdAt: new Date().toISOString() },
         ]);
       }
+      // The additional check replaced an earlier one (it requires the first check).
+      if (c.method === 'GET' && c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-old'))) {
+        return Response.json({ id: 'urn:ngsi-ld:Decision:e-old', type: 'Decision', 'http://purl.org/dc/terms/replaces': { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-older' } });
+      }
+      // e-older has no entity (the bridge skipped it: a newer one was there);
+      // Pointsman's log says it replaced e-oldest, so the walk goes on.
+      if (c.method === 'GET' && c.url.includes('/entities/') && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:e-old')) && !c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-old'))) return new Response(null, { status: 404 });
+      if (c.method === 'GET' && c.url.endsWith('/v1/decisions/e-older')) return Response.json({ decision_id: 'e-older', replaces: 'e-oldest' });
+      if (c.method === 'GET' && c.url.endsWith('/v1/decisions/e-oldest')) return new Response(null, { status: 404 });
       if (c.method === 'DELETE') return new Response(null, { status: 204 });
       return undefined;
     };
@@ -384,10 +393,30 @@ describe('cleanup', () => {
     await env.DEMO.put('issue:9', JSON.stringify({ decision: 'd-old', entity: 'urn:ngsi-ld:RoadRestriction:demo-old', action: 'review', corrections: [], createdAt: old }));
     await env.DEMO.put('issue:10', JSON.stringify({ decision: 'd-new', entity: 'urn:ngsi-ld:RoadRestriction:demo-new', action: 'review', corrections: [], createdAt: new Date().toISOString() }));
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
-    // Step 1's Decision and Task, step 2's Decision and Alert, then the report.
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+    // The first check's Decision and Task, the additional check's Decisions
+    // and Alerts (also the one it replaced), then the report.
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:Decision:e-older', 'urn:ngsi-ld:Alert:demo-e-older', 'urn:ngsi-ld:Decision:e-oldest', 'urn:ngsi-ld:Alert:demo-e-oldest', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
+    // Pointsman was asked with the token.
+    expect(calls.find((c) => c.url.endsWith('/v1/decisions/e-older'))?.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
+  });
+
+  it('keeps a report when Pointsman cannot say what a skipped decision replaced', async () => {
+    const old = new Date(Date.now() - 25 * 3600_000).toISOString();
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.includes('/entities?type=RoadRestriction')) {
+        return Response.json([{ id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old,
+          evacuation: { type: 'Property', value: 'alert', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-gone' } } }]);
+      }
+      if (c.method === 'GET' && c.url.includes('/entities/')) return new Response(null, { status: 404 });
+      if (c.url.endsWith('/v1/decisions/e-gone')) return new Response('down', { status: 503 });
+      if (c.method === 'DELETE') return new Response(null, { status: 204 });
+      return undefined;
+    };
+    await expect(cleanup(env)).rejects.toThrow('pointsman decision read failed: 503');
+    // The report itself stays for the next run.
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.includes(encodeURIComponent('urn:ngsi-ld:RoadRestriction:demo-old')))).toBe(false);
   });
 
   it('deletes the final Decision entities, also the ones a rerun replaced', async () => {
@@ -428,19 +457,26 @@ describe('the chain (step 2)', () => {
   const report = {
     id: 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-000000000002', type: 'RoadRestriction', roadName: P('飯田橋三丁目の橋'),
     description: P('倒木で道路がふさがれ、車も歩行者も通れない。'), location,
-    check: { type: 'Property', value: 'urgent', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' } },
+    check: { type: 'Property', value: 'urgent', decisionId: P('22222222-2222-4222-8222-222222222222'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' } },
   };
   const step2 = (action: string) => ({
     decision_id: '33333333-3333-4333-8333-333333333333', action, profile: 'evacuation-access-check', profile_version: 1, model: 'clef-flash',
     created_at: '2026-10-07T01:00:05.000Z', rule: 0,
     answers: { foot_passable: { type: 'noul', value: false, p: 0.98, yes: 0.02 } },
+    requires: { check: { decision: '22222222-2222-4222-8222-222222222222' } },
     facts: {
       shelter: { missing: false, values: { found: true, distance_m: 443, name: '日本大学法学部①' }, source: 'GSI' },
       walk: { missing: false, values: { possible: true, extra_m: 316 }, source: 'OSM' },
     },
   });
   const FACTS = 'https://datamodels.jp/ns/decision/facts';
-  const notify = (route = 'evacuation') => worker(`/notify?route=${route}`, { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) });
+  // The route requires the first check, so it runs from the queue only, from
+  // a message with the id and type (the consumer reads the report itself).
+  const notify = async () => {
+    const m = { body: { path: '/notify', route: 'evacuation', entity: { id: report.id, type: report.type } }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+    await demo.queue!({ queue: 'pointsman-demo-bridge', messages: [m], retryAll: vi.fn(), ackAll: vi.fn() } as unknown as MessageBatch<BridgeMessage>, env);
+    return m;
+  };
 
   function pointsmanSays(action: string) {
     answer = (c) => {
@@ -455,9 +491,11 @@ describe('the chain (step 2)', () => {
 
   it('decides with the second profile, links step 1, and raises an Alert for the site', async () => {
     pointsmanSays('alert');
-    expect((await notify()).status).toBe(200);
+    expect((await notify()).ack).toHaveBeenCalled();
+    // The first check by id: Pointsman checks it (evacuation-access-check v4 requires it).
+    expect(calls.find((c) => c.url.endsWith('/v1/decide/evacuation-access-check'))?.body.decisions).toEqual({ check: '22222222-2222-4222-8222-222222222222' });
     const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision')!;
-    expect(decisionEntity.body.wasInformedBy).toEqual({ type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' });
+    expect(decisionEntity.body.wasInformedBy).toEqual([{ type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222', datasetId: 'urn:ngsi-ld:dataset:wasInformedBy:check' }]);
     expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/attrs/evacuation'))).toBe(true);
     await vi.waitFor(() => expect(calls.some((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Alert')).toBe(true));
     const alert = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Alert')!;
@@ -479,7 +517,7 @@ describe('the chain (step 2)', () => {
     // The Decision entity stays unreadable (404).
     answer = (c) => (c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:33333333')) ? new Response(null, { status: 404 }) : base(c));
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect((await notify()).status).toBe(200);
+    expect((await notify()).ack).toHaveBeenCalled();
     await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('no alert written')), { timeout: 5000 });
     expect(calls.some((c) => c.body?.type === 'Alert')).toBe(false);
     // It tried three times.
@@ -488,7 +526,7 @@ describe('the chain (step 2)', () => {
 
   it('raises no Alert when step 2 says none', async () => {
     pointsmanSays('none');
-    expect((await notify()).status).toBe(200);
+    expect((await notify()).ack).toHaveBeenCalled();
     await new Promise((r) => setTimeout(r, 50));
     expect(calls.some((c) => c.body?.type === 'Alert')).toBe(false);
   });
@@ -545,7 +583,8 @@ describe("the bridge's queue (pointsman#88)", () => {
   it('queues a notification and answers at once, without deciding', async () => {
     const res = await worker('/notify?route=evacuation', { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) }, queued);
     expect(res.status).toBe(202);
-    expect(sent).toEqual([{ body: { path: '/notify', route: 'evacuation', entity: report } }]);
+    // A route with requires: queued with id and type only.
+    expect(sent).toEqual([{ body: { path: '/notify', route: 'evacuation', entity: { id: report.id, type: 'RoadRestriction' } } }]);
     expect(calls.some((c) => c.url.includes('/v1/decide/'))).toBe(false);
   });
 
@@ -615,7 +654,7 @@ describe("the bridge's queue (pointsman#88)", () => {
       created_at: '2026-10-15T01:00:05.000Z', rule: 0, answers: { foot_passable: { type: 'noul', value: false, p: 0.98, yes: 0.02 } },
       facts: { shelter: { missing: false, values: { found: true, distance_m: 443, name: '日本大学法学部①' }, source: 'GSI' }, walk: { missing: false, values: { possible: true, extra_m: 316 }, source: 'OSM' } },
     };
-    const linked = { ...report, location: { type: 'GeoProperty', value: { type: 'LineString', coordinates: [[139.7505, 35.7025], [139.7507, 35.7010]] } }, check: { type: 'Property', value: 'urgent', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' } } };
+    const linked = { ...report, location: { type: 'GeoProperty', value: { type: 'LineString', coordinates: [[139.7505, 35.7025], [139.7507, 35.7010]] } }, check: { type: 'Property', value: 'urgent', decisionId: P('22222222-2222-4222-8222-222222222222'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:22222222-2222-4222-8222-222222222222' } } };
     answer = (c) => {
       if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/evacuation-access-check') return Response.json(step2);
       if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(linked.id)}`)) return Response.json(linked);

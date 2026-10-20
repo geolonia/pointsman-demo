@@ -27,9 +27,12 @@ const ROUTE: Route = {
   task: { actions: PERSON_ACTIONS, name: 'roadName', priority: { urgent: 1, review: 5 } },
 };
 /**
- * Step 2 of the chain (pointsman#66): for reports that step 1 decided
- * urgent or review (the subscription's q), does the closure cut people off
- * from their evacuation site? An alert creates an Alert entity.
+ * The additional check (pointsman#66): for reports that the first check
+ * decided urgent or review (the subscription's q), does the closure cut
+ * people off from their evacuation site? An alert creates an Alert entity.
+ * The profile requires the first check (evacuation-access-check v4), so
+ * Pointsman knows the order; a person's answer on the first check does not
+ * run it again (no rerunOnReview), so the alert is not sent twice.
  */
 const EVACUATION_ROUTE: Route = {
   type: 'RoadRestriction',
@@ -39,7 +42,7 @@ const EVACUATION_ROUTE: Route = {
   decisionEntity: true,
   reviewActions: ['review'],
   name: 'evacuation',
-  informedBy: 'check',
+  requires: { check: { attribute: 'check' } },
 };
 /**
  * Step 3, the final decision (pointsman#101, docs/decision-chains.md): from
@@ -190,7 +193,9 @@ function afterDecisions(env: Env, route: string | undefined, handled: EntityResu
   if (route === FINAL_ROUTE.name) return [];
   if (route === EVACUATION_ROUTE.name) {
     // Step 2: alerts for the evacuation sites' staff, nothing for GitHub.
-    return decided.filter((h) => h.action === 'alert')
+    // write 0: a newer decision was already on the report (nothing written,
+    // no Decision entity), so there is no Alert to raise for this one.
+    return decided.filter((h) => h.action === 'alert' && h.write !== 0)
       .map((h) => createAlert(env, h.id, h.decision).catch((err) => console.error(`alert for ${h.decision}: ${(err as Error).message}`)));
   }
   return decided.filter((h) => PERSON_ACTIONS.includes(h.action))
@@ -703,6 +708,31 @@ async function taskIdOf(e: Entity): Promise<string | null> {
   return typeof hash === 'string' ? taskEntityId(e.id, ROUTE.attribute, hash) : null;
 }
 
+/**
+ * The Decision entity this one replaced (dcterms:replaces). A decision the
+ * bridge skipped (a newer one was already on the report) has no entity, but
+ * a later one can still replace it: then Pointsman's log says what it
+ * replaced, so the walk goes on past it.
+ */
+async function replacedBy(env: Env, broker: Broker, decisionEntity: string): Promise<string | undefined> {
+  const entity = await broker.getDecision(decisionEntity);
+  if (entity) {
+    const next = (entity[REPLACES_IRI] as Attr | undefined)?.object;
+    return typeof next === 'string' ? next : undefined;
+  }
+  const PREFIX = 'urn:ngsi-ld:Decision:';
+  const id = decisionEntity.startsWith(PREFIX) ? decisionEntity.slice(PREFIX.length) : '';
+  // Letters, digits and dashes only (decision ids are UUIDs): no path parts reach Pointsman.
+  if (!/^[A-Za-z0-9-]{1,64}$/.test(id)) return undefined;
+  // Not known to Pointsman either: the end of the chain. Any other failure
+  // throws, so the report stays and the next run goes on from here.
+  const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${id}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+  if (got.status === 404) return undefined;
+  if (!got.ok) throw new Error(`pointsman decision read failed: ${got.status}`);
+  const replaces = ((await got.json()) as { replaces?: unknown }).replaces;
+  return typeof replaces === 'string' ? `${PREFIX}${replaces}` : undefined;
+}
+
 type PointsmanReview = { status?: string; resolved_by?: string; final_action?: string };
 
 /** The decision's review in Pointsman: null when it has none, 'unavailable' when Pointsman cannot say. */
@@ -881,11 +911,15 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     // Extra data: a Task that cannot be deleted must not keep the report.
     const taskId = await taskIdOf(e);
     if (taskId) await broker.delete(taskId).catch((err) => console.error(`task cleanup: ${(err as Error).message}`));
-    // Step 2: its Decision entity and the Alert it raised.
-    const second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
-    if (typeof second === 'string') {
+    // The additional check: its Decision entity and the Alert it raised, and
+    // the ones it replaced (it requires the first check, so a rerun replaces
+    // the earlier one), through their replaces links.
+    let second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
+    for (let i = 0; typeof second === 'string' && i < 50; i += 1) {
+      const replaced = await replacedBy(env, broker, second);
       await broker.delete(second);
       await broker.delete(alertId(second.split(':').pop()!));
+      second = replaced;
     }
     // Step 3: its Decision entity, and the ones it replaced (a rerun after a
     // person answered step 1), through their replaces links.
@@ -893,7 +927,7 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     // Read the next link before deleting, so a failed delete leaves the rest
     // reachable from the report on the next run (the report stays then).
     for (let i = 0; typeof third === 'string' && i < 50; i += 1) {
-      const replaced = ((await broker.getDecision(third))?.[REPLACES_IRI] as Attr | undefined)?.object;
+      const replaced = await replacedBy(env, broker, third);
       await broker.delete(third);
       third = replaced;
     }
