@@ -1344,6 +1344,8 @@
   // The developer view starts below the sticky header, whatever its height.
   function headerHeight() { document.documentElement.style.setProperty('--top-h', document.querySelector('.top').offsetHeight + 'px'); }
   window.addEventListener('resize', headerHeight);
+  // Also when the header wraps differently, for example after a language switch.
+  if (window.ResizeObserver) new ResizeObserver(headerHeight).observe(document.querySelector('.top'));
   applyLang();
   headerHeight();
   // On narrow screens the drawer covers the page: it opens only when asked.
