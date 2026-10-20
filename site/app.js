@@ -34,7 +34,7 @@
       decideTitle: 'Pointsman decides', yourReport: 'Your report', aReport: 'A report', noRoad: '(no road name)',
       s1: 'Saved in the city’s data platform', s1d: 'The way any city app would save it.',
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
-      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data.',
+      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…',
       answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
@@ -78,6 +78,9 @@
       fShelterMap: function (n, m) { return 'Evacuation site: ' + n + ' · ' + m + ' m'; },
       floodClass: {},
       mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
+      fRouteMap: function (m) { return 'Way around on foot: +' + m + ' m'; },
+      fShelterNote: 'No rule of this check uses it: it is context for the person who checks. For reports that go to a person, the second check uses it.',
+      fSecond: 'second check',
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
       doPublish: 'Publish it', doReject: 'Reject it', deciding: 'Sending…',
@@ -137,7 +140,7 @@
       decideTitle: 'Pointsman が決める', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
       s1: '市のデータ基盤に保存', s1d: '市のアプリが保存するのと同じ方法です。',
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
-      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。',
+      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…',
       answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
@@ -185,6 +188,9 @@
         '3 to 5 m': '3〜5 m', '5 to 10 m': '5〜10 m', '10 to 20 m': '10〜20 m', '20 m or more': '20 m 以上',
       },
       mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
+      fRouteMap: function (m) { return '歩いて迂回：+' + m + ' m'; },
+      fShelterNote: 'この確認の規則では使いません。確認する人のための参考情報です。人に回る報告では、2 つ目の確認で使います。',
+      fSecond: '2 つ目の確認',
       dutyTitle: 'あなたが担当者です',
       dutyText: '市では、チームのメンバーがこれを仕事として受け取ります。ここではあなたが決めてください。この報告を住民に見せますか。',
       doPublish: '公開する', doReject: '公開しない', deciding: '送信中…',
@@ -257,6 +263,20 @@
   }
   function $(id) { return document.getElementById(id); }
 
+  // The page redraws parts of itself when new data comes (a poll, the second
+  // check, the 8-second list update). A <details> the visitor opened stays
+  // open across those redraws: its state is kept by key.
+  var openDetails = {};
+  function details(key, props, children) {
+    var e = el('details', props, children);
+    if (openDetails[key]) e.open = true;
+    // At the click (a redraw may come before the toggle event), and at the toggle.
+    var summary = e.querySelector('summary');
+    if (summary) summary.addEventListener('click', function () { openDetails[key] = !e.open; });
+    e.addEventListener('toggle', function () { openDetails[key] = e.open; });
+    return e;
+  }
+
   // The key that lets this visitor decide their own report (sent with it).
   function keyOf(id) { try { return sessionStorage.getItem('key:' + id); } catch (e) { return null; } }
   function keepKey(id, key) { try { sessionStorage.setItem('key:' + id, key); } catch (e) {} }
@@ -306,6 +326,8 @@
     $('legend-flood').hidden = v !== 'hq';
     if (map && map.demoReady) map.setLayoutProperty('flood', 'visibility', v === 'hq' ? 'visible' : 'none');
     setShelterVisible();
+    // Back at headquarters: the checks that came while residents looked.
+    if (v === 'hq') fitMapChecks();
     updateMap();
     renderCaption();
   }
@@ -436,7 +458,7 @@
 
   function watch(id, info) {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
-    clearShelter();
+    clearMapChecks();
     current = Object.assign({ id: id, key: keyOf(id), last: null, shown: 0 }, info || {});
     setView('hq');
     if (current.location) focus(current.location);
@@ -506,8 +528,8 @@
     return isFinite(a) && isFinite(b) ? ((b - a) / 1000).toFixed(1) + ' s' : '';
   }
 
-  function json(label, value) {
-    return el('details', null, [el('summary', { text: label }), el('pre', { text: JSON.stringify(value, null, 2) })]);
+  function json(key, label, value) {
+    return details(current.id + ':' + key, null, [el('summary', { text: label }), el('pre', { text: JSON.stringify(value, null, 2) })]);
   }
 
   function renderCurrent() {
@@ -521,6 +543,7 @@
     renderDecisionFacts(r);
     renderRule(r);
     renderData(r);
+    if (r && r.evacuation && current.shown >= 3) showRoute(r.evacuation.facts || []);
     if (step === 'result') renderResult(r);
   }
 
@@ -577,7 +600,9 @@
     var box = $('facts');
     box.textContent = '';
     if (!r || !r.check || current.shown < 3) return;
-    var facts = renderFacts(r.facts || []);
+    // The way around on foot comes from the second check, a few seconds later.
+    var walk = r.evacuation ? (r.evacuation.facts || []).filter(function (f) { return f.name === 'walk'; }) : [];
+    var facts = renderFacts((r.facts || []).concat(walk.map(function (f) { return Object.assign({ second: true }, f); })));
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
   }
@@ -608,14 +633,14 @@
     var box = $('data');
     box.textContent = '';
     if (!r || !r.ngsi || current.shown < 4) return;
-    box.appendChild(el('details', { class: 'data' }, [
+    box.appendChild(details(current.id + ':data', { class: 'data' }, [
       el('summary', { text: t('showData') }),
-      current.request ? json(t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
-      json(t('showEntity'), r.ngsi.entity),
-      r.ngsi.decision ? json(t('showDecision'), r.ngsi.decision) : null,
-      r.ngsi.task ? json(t('showTask'), r.ngsi.task) : null,
-      r.evacuation ? json(t('showDecision2'), r.evacuation.ngsi.decision) : null,
-      r.evacuation && r.evacuation.ngsi.alert ? json(t('showAlert'), r.evacuation.ngsi.alert) : null,
+      current.request ? json('request', t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
+      json('entity', t('showEntity'), r.ngsi.entity),
+      r.ngsi.decision ? json('decision', t('showDecision'), r.ngsi.decision) : null,
+      r.ngsi.task ? json('task', t('showTask'), r.ngsi.task) : null,
+      r.evacuation ? json('decision2', t('showDecision2'), r.evacuation.ngsi.decision) : null,
+      r.evacuation && r.evacuation.ngsi.alert ? json('alert', t('showAlert'), r.evacuation.ngsi.alert) : null,
     ]));
   }
 
@@ -647,7 +672,7 @@
       showShelter(ev.facts || []);
       var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
-      chain.appendChild(el('div', { class: 'box' }, items));
+      chain.appendChild(el('div', { class: 'box map-checks' }, items));
     }
 
     if (a === 'publish') return;
@@ -758,21 +783,24 @@
   }
 
   /** One row per map check: the question, the answer, and where the data comes from. */
-  function renderFactList(facts) {
+  // `firstCheck`: the facts of step 1, where no rule uses the evacuation site.
+  function renderFactList(facts, firstCheck) {
     if (!facts.length) return null;
     var list = el('ul', { class: 'facts' });
     facts.forEach(function (f) {
       list.appendChild(el('li', { class: 'fact ' + f.name }, [
+        f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null,
         el('span', { class: 'fq', text: t('fQ')[f.name] || f.name }),
         el('strong', { class: 'fa', text: factText(f) }),
         f.missing ? null : el('span', { class: 'fs', text: t('fSource') + f.source }),
+        firstCheck && f.name === 'shelter' && !f.missing && !f.second ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
       ]));
     });
     return list;
   }
 
   function renderFacts(facts) {
-    var list = renderFactList(facts);
+    var list = renderFactList(facts, true);
     if (!list) return null;
     return el('div', { class: 'box map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
   }
@@ -821,7 +849,7 @@
     var q = pending.request;
     var url = q.url;
     try { url = decodeURIComponent(q.url); } catch (e) {}
-    info.appendChild(el('details', null, [el('summary', { text: t('showQuery') }),
+    info.appendChild(details('pending-query', null, [el('summary', { text: t('showQuery') }),
       el('pre', { text: q.method + ' ' + url + '\nNGSILD-Tenant: ' + q.tenant + '\nLink: <' + q.link + '>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"' })]));
   }
 
@@ -867,10 +895,13 @@
         m.on('mouseleave', layer, function () { m.getCanvas().style.cursor = ''; });
       });
       m.addSource('shelter', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      m.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1f5fa8', 'line-width': 4, 'line-dasharray': [2, 1.5] } }, 'halo');
       m.addLayer({ id: 'shelter-line', type: 'line', source: 'shelter', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#1E6B48', 'line-width': 3.5, 'line-dasharray': [0.5, 2] } });
       m.demoReady = true;
       if (current && current.last && current.shown >= 3) {
         showShelter((current.last.facts || []).concat(current.last.evacuation ? current.last.evacuation.facts || [] : []));
+        if (current.last.evacuation) showRoute(current.last.evacuation.facts || []);
       }
       m.setLayoutProperty('flood', 'visibility', view === 'hq' ? 'visible' : 'none');
       updateMap();
@@ -915,6 +946,85 @@
     if (map && map.demoReady) map.getSource('shelter').setData({ type: 'FeatureCollection', features: [] });
   }
 
+  function clearRoute() {
+    if (routeMarker) { routeMarker.remove(); routeMarker = null; }
+    if (map && map.demoReady) map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+  }
+
+  /** Headquarters sees the report, its evacuation site and the way around at once. */
+  function fitMapChecks() {
+    if (view !== 'hq') return;
+    var ps = [];
+    [shelterMarker, routeMarker].forEach(function (m) { if (m && m.demoLine) ps = ps.concat(m.demoLine); });
+    if (!ps.length) return;
+    var b = ps.reduce(function (acc, p) { return [[Math.min(acc[0][0], p[0]), Math.min(acc[0][1], p[1])], [Math.max(acc[1][0], p[0]), Math.max(acc[1][1], p[1])]]; }, [ps[0], ps[0]]);
+    // Room at the sides for the labels (centred on their points); a small map keeps a third of its width for the checks.
+    var side = Math.min(125, Math.round(map.getContainer().clientWidth / 3));
+    map.fitBounds(b, { padding: { top: 60, bottom: 40, left: side, right: side }, maxZoom: 15.5 });
+  }
+
+  /** A new report, or none: its map checks go. */
+  function clearMapChecks() {
+    clearShelter();
+    clearRoute();
+  }
+
+  // The way around on foot (step 2 of the chain): Pointsman's detour fact
+  // carries it as an encoded polyline (precision 6), from one end of the
+  // closed section to the other.
+  var routeMarker = null;
+
+  /** Positions of an encoded polyline; null when the text is not one. */
+  function decodePolyline(text, precision) {
+    var factor = Math.pow(10, precision);
+    var out = [];
+    var i = 0, lat = 0, lon = 0;
+    while (i < text.length) {
+      var d = [0, 0];
+      for (var k = 0; k < 2; k++) {
+        var shift = 0, result = 0, b;
+        do {
+          if (i >= text.length) return null;
+          b = text.charCodeAt(i++) - 63;
+          if (b < 0 || b > 63) return null;
+          result |= (b & 31) << shift;
+          shift += 5;
+        } while (b >= 32 && shift < 35);
+        // A number that does not end is not an encoded polyline.
+        if (b >= 32) return null;
+        d[k] = result & 1 ? ~(result >> 1) : result >> 1;
+      }
+      lat += d[0];
+      lon += d[1];
+      out.push([lon / factor, lat / factor]);
+    }
+    return out.length >= 2 ? out : null;
+  }
+
+  function showRoute(facts) {
+    var f = facts.filter(function (x) { return x.name === 'walk' && !x.missing && typeof x.values.route === 'string' && typeof x.values.extra_m === 'number'; })[0];
+    if (!f || !map || !map.demoReady || !current) return;
+    var key = current.id + '|' + f.values.route;
+    if (current.routeShown === key) return;
+    // Decoded once per value, also when it is refused. Pointsman keeps at most
+    // 6,000 characters; anything over 20,000 is not decoded at all.
+    current.routeShown = key;
+    var line = f.values.route.length <= 20000 ? decodePolyline(f.values.route, 6) : null;
+    // A route far from Tokyo is not this one: drawn only inside the demo area, with a margin.
+    if (!line || !line.every(function (p) { return p[0] > 139.6 && p[0] < 139.9 && p[1] > 35.6 && p[1] < 35.8; })) {
+      clearRoute();
+      return;
+    }
+    map.getSource('route').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} }] });
+    if (routeMarker) routeMarker.remove();
+    var node = el('div', { class: 'route-pin' }, [el('span', { class: 'name', text: t('fRouteMap')(f.values.extra_m) })]);
+    routeMarker = new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat(line[Math.floor(line.length / 2)]).addTo(map);
+    routeMarker.demoFact = f.values;
+    setShelterVisible();
+    routeMarker.demoLine = line;
+    fitMapChecks();
+  }
+
   function showShelter(facts) {
     // A site without a name cannot be found in the tile.
     var f = facts.filter(function (x) { return x.name === 'shelter' && !x.missing && x.values.found && x.values.name; })[0];
@@ -943,7 +1053,8 @@
       shelterMarker = new maplibregl.Marker({ element: node, anchor: 'bottom', offset: [0, 10] }).setLngLat(best.at).addTo(map);
       shelterMarker.demoFact = f.values;
       setShelterVisible();
-      if (view === 'hq') map.fitBounds([[Math.min(best.from[0], best.at[0]), Math.min(best.from[1], best.at[1])], [Math.max(best.from[0], best.at[0]), Math.max(best.from[1], best.at[1])]], { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 15.5 });
+      shelterMarker.demoLine = [best.from, best.at];
+      fitMapChecks();
     }).catch(function () {
       // A failed tile load: the next render tries again.
       if (me.shelterShown === key) me.shelterShown = null;
@@ -951,15 +1062,21 @@
   }
 
   function renderShelterLabel() {
-    if (!shelterMarker) return;
-    var v = shelterMarker.demoFact;
-    shelterMarker.getElement().querySelector('.name').textContent = t('fShelterMap')(String(v.name), v.distance_m);
+    if (shelterMarker) {
+      var v = shelterMarker.demoFact;
+      shelterMarker.getElement().querySelector('.name').textContent = t('fShelterMap')(String(v.name), v.distance_m);
+    }
+    if (routeMarker) routeMarker.getElement().querySelector('.name').textContent = t('fRouteMap')(routeMarker.demoFact.extra_m);
   }
 
   /** Like the flood zones, the evacuation site is for headquarters only. */
   function setShelterVisible() {
     if (shelterMarker) shelterMarker.getElement().hidden = view !== 'hq';
-    if (map && map.demoReady) map.setLayoutProperty('shelter-line', 'visibility', view === 'hq' ? 'visible' : 'none');
+    if (routeMarker) routeMarker.getElement().hidden = view !== 'hq';
+    if (map && map.demoReady) {
+      map.setLayoutProperty('shelter-line', 'visibility', view === 'hq' ? 'visible' : 'none');
+      map.setLayoutProperty('route-line', 'visibility', view === 'hq' ? 'visible' : 'none');
+    }
   }
 
   function focus(location) {
@@ -987,7 +1104,7 @@
   $('again').addEventListener('click', function () {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
     current = null;
-    clearShelter();
+    clearMapChecks();
     setView('hq');
     setStep('pick', true);
     updateMap();
