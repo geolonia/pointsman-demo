@@ -41,7 +41,7 @@
       ruleTitle: 'The city’s rule', next: 'What happens next →', showData: 'Show the data in the data platform (for developers)',
       showRequest: 'request', showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp)',
       showDecision2: 'Decision entity of the second check', showAlert: 'Alert entity (Smart Data Models)',
-      q: { category: 'Why is the road closed?', status_matches: 'Does the status match the text?', danger: 'Is someone in danger?', clarity: 'How clear is the report?' },
+      q: { category: 'Why is the road closed?', status_matches: 'Does the status match the text?', danger: 'Is someone in danger?', clarity: 'How clear is the report?', foot_passable: 'Can people pass on foot?' },
       cat: {
         closedWeather: 'Weather or disaster', closedConstruction: 'Roadworks', closedHeavyVehicle: 'Closed to large vehicles', closedWinter: 'Closed for winter',
         laneRestriction: 'Some lanes closed', alternatingOneWay: 'One lane, taking turns', mobileRestriction: 'Moving restriction',
@@ -57,6 +57,13 @@
         '3': 'Clear, consistent reports with nobody in danger are published at once.',
         'default': 'No rule for publishing fits: a person checks it.',
       },
+      // evacuation-access-check (pointsman-config): its rules, by index.
+      rules2: {
+        '0': 'Near an evacuation site (within 1 km), people on foot cannot pass, and the way around is 200 m or more longer: the site’s staff get an alert.',
+        '1': 'Near an evacuation site, but the way around could not be checked: a person looks.',
+        'default': 'No alert: no site within 1 km, the way around is short, or people can still pass on foot.',
+      },
+      usedTitle: 'Based on', usedAI: 'AI', usedMap: 'map',
       act: { publish: 'publish', review: 'review', urgent: 'urgent', reject: 'rejected', pending: 'being checked', alert: 'alert', none: 'no alert' },
       resultTitle: 'What happens next',
       oPublish: 'Published: residents see it now', ePublish: 'No person was needed. The report is on the residents’ map, seconds after it was sent.',
@@ -147,7 +154,7 @@
       ruleTitle: '市の規則', next: 'その後どうなるか →', showData: 'データ基盤のデータを見る（開発者向け）',
       showRequest: 'リクエスト', showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp）',
       showDecision2: '2 つ目の確認の Decision エンティティ', showAlert: 'Alert エンティティ（Smart Data Models）',
-      q: { category: 'なぜ通れないのか', status_matches: '状態と本文は合っているか', danger: '人に危険があるか', clarity: '報告はどのくらいはっきりしているか' },
+      q: { category: 'なぜ通れないのか', status_matches: '状態と本文は合っているか', danger: '人に危険があるか', clarity: '報告はどのくらいはっきりしているか', foot_passable: '歩いて通れるか' },
       cat: {
         closedWeather: '天候・災害', closedConstruction: '工事', closedHeavyVehicle: '大型車のみ通行止め', closedWinter: '冬期通行止め',
         laneRestriction: '一部の車線を規制', alternatingOneWay: '片側交互通行', mobileRestriction: '移動規制',
@@ -163,6 +170,12 @@
         '3': 'はっきりしていて矛盾がなく、危険のない報告は、すぐに公開する。',
         'default': '公開の規則に当てはまらないので、人が確認する。',
       },
+      rules2: {
+        '0': '避難場所（1 km 以内）の近くで、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
+        '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
+        'default': '警報なし：1 km 以内に避難場所がない、迂回が短い、または歩いて通れる。',
+      },
+      usedTitle: '判断に使ったもの', usedAI: 'AI', usedMap: '地図',
       act: { publish: '公開', review: '確認', urgent: '緊急', reject: '非公開', pending: '判定中', alert: '警報', none: '警報なし' },
       resultTitle: 'その後どうなるか',
       oPublish: '公開：住民がすぐに見られます', ePublish: '人の確認は不要でした。送ってから数秒で、住民向けの地図に載りました。',
@@ -616,6 +629,7 @@
     box.appendChild(el('div', { class: 'box tint ' + a }, [
       el('span', { class: 'kicker', text: t('ruleTitle') }),
       el('span', { class: 'rule-text', text: text }),
+      renderUsed('check', r.check.policyRule, r.check.answers, r.facts),
       el('div', { class: 'rule-foot' }, [
         el('span', { class: 'badge ' + a, text: t('act')[a] || a }),
         el('button', { class: 'btn', type: 'button', text: t('next'), onclick: function () {
@@ -671,6 +685,9 @@
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
       var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
+      items.push(el('span', { class: 'rule-text', text: t('rules2')[ev.policyRule === undefined ? 'default' : ev.policyRule] || t('rules2')['default'] }));
+      var used = renderUsed('evacuation', ev.policyRule, ev.answers, ev.facts);
+      if (used) items.push(used);
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
       chain.appendChild(el('div', { class: 'box map-checks' }, items));
     }
@@ -803,6 +820,35 @@
     var list = renderFactList(facts, true);
     if (!list) return null;
     return el('div', { class: 'box map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
+  }
+
+  // What each rule reads, by profile and rule index (the profiles'
+  // policy.rules in pointsman-config; the rule texts above mirror them).
+  // Answer names and fact names; a rule with no match uses its default.
+  var RULE_USES = {
+    check: {
+      '0': ['danger'], '1': ['flood', 'danger'], '2': ['flood', 'danger'],
+      '3': ['danger', 'category', 'status_matches', 'clarity'], 'default': ['danger', 'category', 'status_matches', 'clarity'],
+    },
+    evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'], 'default': ['shelter', 'walk', 'foot_passable'] },
+  };
+
+  /** "Based on": the AI answers and map checks the rule used, with their values. */
+  function renderUsed(profile, rule, answers, facts) {
+    var uses = RULE_USES[profile];
+    var names = uses[rule === undefined ? 'default' : rule] || uses['default'];
+    var chips = [];
+    names.forEach(function (name) {
+      var f = (facts || []).filter(function (x) { return x.name === name; })[0];
+      if (f) {
+        chips.push(el('span', { class: 'chip-map' }, [el('b', { text: t('usedMap') }), ' ' + t('ch')[name] + ': ' + factText(f)]));
+        return;
+      }
+      var a = answers && answers[name];
+      if (a) chips.push(el('span', { class: 'chip-ai' }, [el('b', { text: t('usedAI') }), ' ' + (t('q')[name] || name) + ' ' + answerText(name, a.value)]));
+    });
+    if (!chips.length) return null;
+    return el('div', { class: 'used' }, [el('span', { class: 'kicker', text: t('usedTitle') })].concat(chips));
   }
 
   // --- How it works: the live lists ------------------------------------------------------

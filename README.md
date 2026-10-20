@@ -102,7 +102,9 @@ a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
    who checks. When the second check has run (a closed section that goes to
    a person), the box also shows the way around on foot, marked "second
    check", and the map draws it from the `route` of Pointsman's detour fact
-   (the evacuation profile asks for it with `route: true`). The real NGSI-LD
+   (the evacuation profile asks for it with `route: true`). Each rule box
+   says what the rule was based on: the AI answers and the map checks it
+   used, with their values. The real NGSI-LD
    data is behind "Show the data"; open sections stay open when the page
    updates.
 3. **What happens next.** The outcome, the second check (evacuation site),
