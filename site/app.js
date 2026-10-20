@@ -1,4 +1,4 @@
-// The demo page, as a guided flow in three steps: pick a report, watch
+// The demo page, as a guided flow in four steps: pick a report, watch
 // Pointsman decide, see what happens next (and decide it yourself when a
 // person is needed). The technical layer is behind "How it works".
 // Report texts come from the API (anyone can send one): they are only ever set
@@ -8,14 +8,15 @@
 
   var CENTER = [139.753, 35.688];
   var COLORS = { publish: '#2E9E6B', review: '#C98A1B', urgent: '#C8463A', reject: '#7A68B8', pending: '#8f8a82' };
-  var STEPS = ['pick', 'decide', 'result'];
+  var STEPS = ['pick', 'decide', 'check', 'result'];
 
   var T = {
     en: {
       demo: 'demo', title: 'Heavy rain. Reports of closed roads are coming in.',
       lead: 'Send one, and watch Pointsman decide in seconds what happens to it. It reads the report, checks the place on public maps, and applies the city’s rules.',
-      st1: 'Pick a report', st2: 'Pointsman decides', st3: 'What happens next',
+      st1: 'Pick a report', st2: 'First check', st3: 'Additional check', st4: 'Final result',
       howTitle: 'How it works', close: 'Close',
+      activityTitle: 'Reports', activityLead: 'What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.',
       howLead: 'Pointsman is a small service that takes decisions for a city’s apps. The AI only answers questions. Public data gives facts about the place. The city’s own rules decide. People have the last word.',
       h1k: '1 · The report', h1t: 'A resident’s app saves it', h1d: 'in the city’s data platform. This demo uses GeonicDB, which follows the open FIWARE standard (NGSI-LD).',
       h2k: '2 · Passed on', h2t: 'The data platform tells Pointsman', h2d: 'A small connector passes each new report on. The apps do not change.',
@@ -31,14 +32,17 @@
       moreTitle: 'More examples', pickFoot: 'Invented events at real places in Tokyo. Everyone sees the same reports; they are deleted after a day.',
       usage: function (u, l) { return '(' + u + ' of ' + l + ' reports today)'; },
       limit: 'The demo reached its limit for today. Please come back tomorrow.', failed: 'Could not send the report: ',
-      decideTitle: 'Pointsman decides', yourReport: 'Your report', aReport: 'A report', noRoad: '(no road name)',
+      decideTitle: 'First check', yourReport: 'Your report', aReport: 'A report', noRoad: '(no road name)',
       s1: 'Saved in the city’s data platform', s1d: 'The way any city app would save it.',
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…',
       answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
-      ruleTitle: 'The city’s rule', next: 'What happens next →', devOpen: 'Show the data (developer view)',
+      ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
+      checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
+      secondRunning: 'The additional check is running…', cNone: 'The rules found no reason for an alert.',
+      fNotForPoint: 'Not checked: the report marks a point, not a road section, so there is no way around to work out.',
       showRequest: 'request', showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp)',
       showDecision2: 'Decision entity of the second check', showAlert: 'Alert entity (Smart Data Models)',
       showAnswers: 'answers', showFacts: 'map checks',
@@ -94,7 +98,11 @@
         '3': 'The first check, or the person who checked it, published it.',
         'default': 'A person has not checked the first result yet. When they do, the final result is decided again.',
       },
-      finalKicker: 'Final result', stage1: '1 · First result (intermediate)', stage2: '2 · Additional check (intermediate)',
+      finalKicker: 'Final result', stage1: 'The first check said',
+      finalMissing: 'No final result', missingSecond: 'The additional check did not come, so there is no final result.',
+      missingFinal: 'The final decision did not come.',
+      standsFirst: function (a) { return 'The first result stands: ' + a + '.'; },
+      standsPerson: function (a) { return 'The person’s answer stands: ' + a + '.'; },
       finalPending: 'The final result is being decided…', finalPendingText: 'Pointsman combines the first result and the additional check into one result.',
       fin: {
         publish: ['Published: residents see it now', 'The report is on the residents’ map.'],
@@ -109,18 +117,18 @@
       // evacuation-access-check (pointsman-config): its rules, by index.
       rules2: {
         '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
-        '1': 'Near an evacuation site, but the way around could not be checked: a person looks.',
+        '1': 'Near an evacuation site, but the way around could not be worked out: a person looks.',
       },
       usedTitle: 'Based on', usedAI: 'AI', usedMap: 'map',
       ruleUnknown: function (n) { return 'Rule ' + n + ' of the profile (this page does not describe it yet).'; },
       act: { publish: 'publish', review: 'review', urgent: 'urgent', reject: 'rejected', pending: 'being checked', alert: 'alert', none: 'no alert' },
-      resultTitle: 'What happens next',
+      resultTitle: 'Final result',
       oPublish: 'Published: residents see it now', ePublish: 'No person was needed. The report is on the residents’ map, seconds after it was sent.',
       oReview: 'Waiting for a person', eReview: 'Headquarters sees it. Residents don’t, until someone checks it.',
       oUrgent: 'Urgent: a person sees it first', eUrgent: 'It is at the top of the list at headquarters. Residents see it once a person has checked it.',
       oFinalPublish: 'Published after a check', eFinalPublish: 'A person checked it. Residents see it now.',
       oFinalReject: 'Rejected after a check', eFinalReject: 'A person checked it. Residents never see it.',
-      chainKicker: 'A second check, started by the first', chainTitle: 'Can people still walk to their evacuation site?',
+      chainKicker: 'Started by the first check', chainTitle: 'Can people still walk to their evacuation site?',
       cAlert: 'Alert sent to the staff of the evacuation site.', cReview: 'The way around could not be checked: a person looks at it.',
       fQ: { flood: 'Is the place in a river flood zone?', shelter: 'Where is the nearest flood evacuation site?', walk: 'With this road closed, how much longer is the walk?' },
       fFlood: function (c) { return 'Yes: water depth ' + c; },
@@ -176,8 +184,9 @@
     ja: {
       demo: 'デモ', title: '大雨。通行止めの報告が次々に届く。',
       lead: '報告を 1 件送ってみてください。その報告をどうするかを、Pointsman が数秒で決めます。報告を読み、場所を公開の地図で調べ、市の規則を当てはめます。',
-      st1: '報告を選ぶ', st2: 'Pointsman が決める', st3: 'その後どうなるか',
+      st1: '報告を選ぶ', st2: '最初の確認', st3: '追加の確認', st4: '最終結果',
       howTitle: '仕組み', close: '閉じる',
+      activityTitle: '報告の一覧', activityLead: 'デモが判断したもの：この 1 日の報告すべて、人の確認待ちの報告、そして直近 7 日間の数字です。',
       howLead: 'Pointsman は、市のアプリに代わって判断する小さなサービスです。AI は質問に答えるだけです。場所の事実は公開データから調べます。行動を決めるのは市の規則です。最後に決めるのは人です。',
       h1k: '1・報告', h1t: '住民のアプリが保存する', h1d: '保存先は市のデータ基盤です。このデモでは、オープンな FIWARE の標準（NGSI-LD）に沿った GeonicDB を使います。',
       h2k: '2・受け渡し', h2t: 'データ基盤が Pointsman に知らせる', h2d: '小さなつなぎ役が、新しい報告を 1 件ずつ渡します。アプリは変えなくて済みます。',
@@ -193,14 +202,17 @@
       moreTitle: 'ほかの例', pickFoot: '場所は東京に実在しますが、出来事は架空です。全員が同じ報告を見ています。報告は 1 日で消えます。',
       usage: function (u, l) { return '（本日 ' + u + ' / ' + l + ' 件）'; },
       limit: '本日のデモの上限に達しました。また明日お試しください。', failed: '報告を送れませんでした：',
-      decideTitle: 'Pointsman が決める', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
+      decideTitle: '最初の確認', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
       s1: '市のデータ基盤に保存', s1d: '市のアプリが保存するのと同じ方法です。',
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…',
       answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
-      ruleTitle: '市の規則', next: 'その後どうなるか →', devOpen: 'データを見る（開発者向け表示）',
+      ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
+      checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
+      secondRunning: '追加の確認をしています…', cNone: '規則では、警報を出す理由はありませんでした。',
+      fNotForPoint: '確認しません：報告は区間ではなく地点なので、迂回路は計算できません。',
       showRequest: 'リクエスト', showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp）',
       showDecision2: '2 つ目の確認の Decision エンティティ', showAlert: 'Alert エンティティ（Smart Data Models）',
       showAnswers: '答え', showFacts: '地図での確認',
@@ -255,7 +267,11 @@
         '3': '1 つ目の確認、またはそれを確認した人が公開とした。',
         'default': '1 つ目の結果を、まだ人が確認していない。確認すると、最終結果をもう一度決める。',
       },
-      finalKicker: '最終結果', stage1: '1 · 最初の結果（途中）', stage2: '2 · 追加の確認（途中）',
+      finalKicker: '最終結果', stage1: '最初の確認の結果',
+      finalMissing: '最終結果はありません', missingSecond: '追加の確認が届かなかったため、最終結果はありません。',
+      missingFinal: '最終判断が届きませんでした。',
+      standsFirst: function (a) { return '最初の結果のままです：' + a + '。'; },
+      standsPerson: function (a) { return '人の答えのままです：' + a + '。'; },
       finalPending: '最終結果を決めています…', finalPendingText: 'Pointsman が最初の結果と追加の確認を 1 つの結果にまとめます。',
       fin: {
         publish: ['公開：住民がすぐに見られます', '住民向けの地図に載りました。'],
@@ -269,18 +285,18 @@
       graphDmn: 'DMN ツール用にダウンロード（.dmn）',
       rules2: {
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
-        '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
+        '1': '避難場所の近くだが、迂回路を求められなかった：人が確認する。',
       },
       usedTitle: '判断に使ったもの', usedAI: 'AI', usedMap: '地図',
       ruleUnknown: function (n) { return 'プロファイルの規則 ' + n + '（このページではまだ説明していません）。'; },
       act: { publish: '公開', review: '確認', urgent: '緊急', reject: '非公開', pending: '判定中', alert: '警報', none: '警報なし' },
-      resultTitle: 'その後どうなるか',
+      resultTitle: '最終結果',
       oPublish: '公開：住民がすぐに見られます', ePublish: '人の確認は不要でした。送ってから数秒で、住民向けの地図に載りました。',
       oReview: '人の確認待ち', eReview: '災害対策本部では見えます。住民には、誰かが確認するまで見えません。',
       oUrgent: '緊急：真っ先に人が確認します', eUrgent: '災害対策本部の一覧のいちばん上に出ます。住民には、人が確認してから見えます。',
       oFinalPublish: '確認のうえ公開', eFinalPublish: '人が確認しました。住民が見られます。',
       oFinalReject: '確認のうえ非公開', eFinalReject: '人が確認しました。住民には見えません。',
-      chainKicker: '1 つ目の確認から始まった 2 つ目の確認', chainTitle: '歩いて避難場所まで行けるか',
+      chainKicker: '最初の確認から始まる確認', chainTitle: '歩いて避難場所まで行けるか',
       cAlert: '避難場所の担当者に警報を送りました。', cReview: '迂回路を確認できなかったので、人が確認します。',
       fQ: { flood: '洪水浸水想定区域の中か', shelter: '最寄りの指定緊急避難場所（洪水）はどこか', walk: 'この道を通れないと、歩く道のりはどれだけ長くなるか' },
       fFlood: function (c) { return 'はい：想定される深さ ' + c; },
@@ -407,6 +423,7 @@
     renderPending();
     renderCaption();
     renderStats();
+    if (!$('how').hidden) renderHowGraph();
     renderShelterLabel();
     if (current) renderCurrent();
     else renderDev();
@@ -569,7 +586,7 @@
       });
   }
 
-  // --- Step 2 and 3: one report ------------------------------------------------------
+  // --- Steps 2 to 4: one report ------------------------------------------------------
 
   function watch(id, info) {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
@@ -623,7 +640,7 @@
       // The second check comes a few seconds later; if it does not come within
       // a minute, poll slowly instead of fast forever.
       var done = decidedNow && (!chained || b.evacuation || Date.now() - me.chainSince > 60000);
-      // Then the final result (step 3); it is made again after a person's answer.
+      // Then the final result (step 4); it is made again after a person's answer.
       // It counts as late a minute after the earlier checks (or after a
       // person's answer, for the rerun), so the page never polls fast forever.
       if (done && !finalFresh(b) && !me.finalSince) me.finalSince = Date.now();
@@ -645,6 +662,11 @@
     if (!answered) return true;
     if (!b.check.reviewedAt || !b.final.decidedAt) return false;
     return Date.parse(b.final.decidedAt) >= Date.parse(b.check.reviewedAt);
+  }
+
+  /** The additional check did not come within a minute of the first check (as the developer view says). */
+  function secondLate() {
+    return !!(current && current.chainSince && Date.now() - current.chainSince > 60000);
   }
 
   /** No (new) final result within a minute of the earlier checks or of a person's answer. */
@@ -683,7 +705,9 @@
     renderDecisionFacts(r);
     renderRule(r);
     renderData(r);
-    if (r && r.evacuation && current.shown >= 3) showRoute(r.evacuation.facts || []);
+    // The way around on foot is step 3's: drawn from there on.
+    if (r && r.evacuation && (step === 'check' || step === 'result')) showRoute(r.evacuation.facts || []);
+    if (step === 'check') renderCheck(r);
     if (step === 'result') renderResult(r);
     renderDev();
     if (devTag) devHighlight(devTag);
@@ -742,9 +766,8 @@
     var box = $('facts');
     box.textContent = '';
     if (!r || !r.check || current.shown < 3) return;
-    // The way around on foot comes from the second check, a few seconds later.
-    var walk = r.evacuation ? (r.evacuation.facts || []).filter(function (f) { return f.name === 'walk'; }) : [];
-    var facts = renderFacts((r.facts || []).concat(walk.map(function (f) { return Object.assign({ second: true }, f); })));
+    // Only this step's map checks; the way around on foot is step 3's.
+    var facts = renderFacts(r.facts || []);
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
   }
@@ -764,11 +787,8 @@
       el('div', { class: 'rule-foot' }, [
         el('span', { class: 'badge ' + a, text: t('act')[a] || a }),
         el('button', { class: 'btn', type: 'button', text: t('next'), onclick: function () {
-          setStep('result', true);
-          renderResult(current.last);
-          loadStats();
-          // A published report: show it where residents see it.
-          if (current.last.published) setView('res');
+          setStep('check', true);
+          renderCheck(current.last);
         } }),
       ]),
     ]));
@@ -782,43 +802,68 @@
     box.appendChild(el('button', { class: 'chip', type: 'button', text: t('devOpen'), onclick: function () { setDev(true); } }));
   }
 
-  // --- Step 3: what happens next -------------------------------------------------------
+  // --- Step 3: the additional check ---------------------------------------------------
 
-  function renderResult(r) {
+  /**
+   * The first result in one line, then the additional check (the way to the
+   * evacuation site): what it found, or why it did not run.
+   */
+  function renderCheck(r) {
     var out = $('outcome');
     var chain = $('chain');
-    var person = $('person');
     out.textContent = '';
     chain.textContent = '';
+    if (!r || !r.check) return;
+    var a = r.check.action;
+    var o = { publish: 'Publish', review: 'Review', urgent: 'Urgent' }[a] || 'Review';
+    out.appendChild(el('div', { class: 'box tint ' + a }, [
+      el('span', { class: 'kicker', text: t('stage1') }),
+      el('strong', { class: 'headline', text: t('o' + o) }),
+    ]));
+    var ev = r.evacuation;
+    var items = [a === 'publish' ? null : el('span', { class: 'kicker', text: t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })].filter(Boolean);
+    if (a === 'publish') {
+      items.push(el('span', { text: t('secondNotNeeded') }));
+    } else if (!ev) {
+      items.push(el('span', { text: secondLate() ? t('ev').secondLate[1] : t('secondRunning') }));
+    } else {
+      var facts = renderFactList(ev.facts || []);
+      if (facts) items.push(facts);
+      showShelter(ev.facts || []);
+      showRoute(ev.facts || []);
+      var rules2 = t('rules2');
+      var key2 = ev.policyRule === undefined ? 'default' : ev.policyRule;
+      if (Object.prototype.hasOwnProperty.call(rules2, key2)) items.push(el('span', { class: 'rule-text', text: rules2[key2] }));
+      var used = renderUsed('evacuation', ev.policyRule, ev.answers, ev.facts);
+      if (used) items.push(used);
+      var c = { alert: 'cAlert', review: 'cReview', none: 'cNone' }[ev.action];
+      if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
+    }
+    chain.appendChild(el('div', { class: 'box map-checks' }, items));
+    // For screen readers: one short line when the state changes, not the whole box.
+    var status = a === 'publish' ? t('secondNotNeeded') : !ev ? (secondLate() ? t('ev').secondLate[0] : t('secondRunning'))
+      : t({ alert: 'cAlert', review: 'cReview', none: 'cNone' }[ev.action] || 'cNone');
+    if ($('check-status').textContent !== status) $('check-status').textContent = status;
+    // On to the final result once the additional check is there (or not needed, or late).
+    if (a === 'publish' || ev || secondLate()) {
+      chain.appendChild(el('div', { class: 'actions' }, [el('button', { class: 'btn', type: 'button', text: t('next2'), onclick: function () {
+        setStep('result', true);
+        renderResult(current.last);
+        // A published report: show it where residents see it.
+        if (current.last.published) setView('res');
+      } })]));
+    }
+  }
+
+  // --- Step 4: the final result ---------------------------------------------------------
+
+  function renderResult(r) {
+    var person = $('person');
     person.textContent = '';
     if (!r || !r.check) return;
     var a = r.check.action;
     var final = r.check.finalAction || r.visitorDecision;
-    var o = final === 'publish' ? 'FinalPublish' : final === 'reject' ? 'FinalReject' : { publish: 'Publish', review: 'Review', urgent: 'Urgent' }[a] || 'Review';
     renderFinal(r);
-    out.appendChild(el('div', { class: 'box tint ' + (final || a) }, [
-      el('span', { class: 'kicker', text: t('stage1') }),
-      el('strong', { class: 'headline', text: t('o' + o) }),
-      el('span', { text: t('e' + o) }),
-    ]));
-
-    // The second check runs for urgent and review reports, a few seconds
-    // later; shown only when it found something.
-    var ev = r.evacuation;
-    if (ev && ev.action !== 'none') {
-      var items = [el('span', { class: 'kicker', text: t('stage2') + ' · ' + t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })];
-      var facts = renderFactList(ev.facts || []);
-      if (facts) items.push(facts);
-      showShelter(ev.facts || []);
-      var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
-      // The box shows only alert and review; a rule index it does not know gets no sentence.
-      var rule2 = ev.policyRule !== undefined && Object.prototype.hasOwnProperty.call(t('rules2'), ev.policyRule) ? t('rules2')[ev.policyRule] : null;
-      if (rule2) items.push(el('span', { class: 'rule-text', text: rule2 }));
-      var used = renderUsed('evacuation', ev.policyRule, ev.answers, ev.facts);
-      if (used) items.push(used);
-      if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
-      chain.appendChild(el('div', { class: 'box map-checks' }, items));
-    }
 
     if (a === 'publish') return;
     if (final) {
@@ -868,9 +913,23 @@
     var f = r.final;
     // After a person's answer the final result is made again: until it is
     // there, "being decided" (not the old result next to the new answer).
+    // No final result in the end (the additional check did not come): say so,
+    // and that the first result stands.
+    var chained = r.check.action !== 'publish';
+    if (!f && (finalLate(r) || (chained && secondLate() && !r.evacuation))) {
+      // Why: the additional check (when one was needed) or the final decision itself did not come.
+      var why = chained && !r.evacuation ? t('missingSecond') : t('missingFinal');
+      // What stands: a person's answer, if there is one, else the first result.
+      var answer = r.check.finalAction || r.visitorDecision;
+      var stands = answer ? t('standsPerson')(t('act')[answer] || answer) : t('standsFirst')(t('act')[r.check.action] || r.check.action);
+      box.appendChild(el('div', { class: 'box tint ' + (answer || r.check.action) }, [
+        el('strong', { class: 'box-title', text: t('finalMissing') }),
+        el('span', { text: why + ' ' + stands }),
+      ]));
+      return;
+    }
     if (!f || (!finalFresh(r) && !finalLate(r))) {
       box.appendChild(el('div', { class: 'box' }, [
-        el('span', { class: 'kicker', text: t('finalKicker') }),
         el('strong', { class: 'box-title', text: t('finalPending') }),
         el('span', { text: t('finalPendingText') }),
       ]));
@@ -888,14 +947,20 @@
       person ? chip(t('bPerson'), t('act')[person] || person) : null,
       ev ? chip(t('bSecond'), t('act')[ev.action] || ev.action) : r.check.action === 'publish' ? chip(t('bSecond'), t('bNoSecond')) : null,
     ];
+    // The step's own heading says "Final result": no kicker here.
     box.appendChild(el('div', { class: 'box tint final ' + f.action }, [
-      el('span', { class: 'kicker', text: t('finalKicker') }),
       el('strong', { class: 'headline', text: words[0] }),
       words[1] ? el('span', { text: words[1] }) : null,
       rule ? el('span', { class: 'rule-text', text: rule }) : null,
       el('div', { class: 'used' }, from),
     ]));
-    box.appendChild(renderGraph());
+  }
+
+  /** How it works: the chain as a diagram (once per language). */
+  function renderHowGraph() {
+    var spot = $('how-graph');
+    spot.textContent = '';
+    spot.appendChild(renderGraph());
   }
 
   // The chain as a diagram (Pointsman's GET /v1/profiles/{id}/graph, through
@@ -906,7 +971,7 @@
   var GRAPH_TTL = 600000; // 10 minutes, as the server's cache
   function renderGraph() {
     var l = lang;
-    var holder = el('div', { class: 'box graph', id: 'final-graph', 'data-lang': l }, [
+    var holder = el('div', { class: 'box graph', id: 'graph-box', 'data-lang': l }, [
       el('span', { class: 'kicker', text: t('graphKicker') }),
       el('span', { text: t('graphText') }),
     ]);
@@ -942,7 +1007,7 @@
       graphSvg[l] = svg;
       graphAt[l] = Date.now();
       // The page may have been redrawn meanwhile: put it in the box shown now, if it is in this language.
-      var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
+      var now = document.querySelector('#graph-box[data-lang="' + l + '"]');
       var spot = now && now.querySelector('.graph-svg');
       if (spot) { spot.textContent = ''; spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
     });
@@ -977,7 +1042,7 @@
     return document.importNode(svg, true);
   }
 
-  // --- The week's numbers (step 3) -------------------------------------------------------
+  // --- The week's numbers (the Reports panel) ------------------------------------------
 
   var stats = null;
   function loadStats() {
@@ -1041,6 +1106,8 @@
 
   // Facts come from the broker: shown only as text.
   function factText(f) {
+    // A way around needs a closed road section; a point has none.
+    if (f.missing && f.name === 'walk' && f.reason === 'no_location') return t('fNotForPoint');
     if (f.missing) return t('fMissing')(f.reason);
     if (f.name === 'flood') return f.values.inside ? t('fFlood')(t('floodClass')[f.values.class] || String(f.values.class)) : t('fNoFlood');
     if (f.name === 'shelter') return f.values.found ? t('fShelter')(String(f.values.name), f.values.distance_m) : t('fNoShelter');
@@ -1079,7 +1146,7 @@
       '0': ['danger'], '1': ['flood', 'danger'], '2': ['flood', 'danger'], '3': ['flood'], '4': ['flood'],
       '5': ['danger', 'category', 'status_matches', 'clarity'], 'default': ['danger', 'category', 'status_matches', 'clarity'],
     },
-    // Its default (none) is never shown: the page shows the second check only for alert and review.
+    // Its default (none) reads nothing: no 'Based on' line for it.
     evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'] },
   };
 
@@ -1281,7 +1348,22 @@
     $('how').hidden = !open;
     $('how-toggle').setAttribute('aria-expanded', String(open));
     $('how-open').setAttribute('aria-expanded', String(open));
-    if (open) $('how').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (open) {
+      setActivity(false);
+      renderHowGraph();
+      $('how').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // The reports panel: recent reports, the ones waiting for a person, the week's numbers.
+  function setActivity(open) {
+    $('activity').hidden = !open;
+    $('activity-toggle').setAttribute('aria-expanded', String(open));
+    if (open) {
+      setHow(false);
+      loadStats();
+      $('activity').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   // --- Map ---------------------------------------------------------------------------------
@@ -1591,6 +1673,8 @@
     try { localStorage.setItem('theme', next); } catch (e) {}
   });
   $('how-toggle').addEventListener('click', function () { setHow($('how').hidden); });
+  $('activity-toggle').addEventListener('click', function () { setActivity($('activity').hidden); });
+  $('activity-close').addEventListener('click', function () { setActivity(false); });
   $('how-close').addEventListener('click', function () { setHow(false); });
   $('how-open').addEventListener('click', function () { setHow(true); });
   $('again').addEventListener('click', function () {
@@ -1609,6 +1693,7 @@
   // A click on a step on the page scrolls its first event into view.
   $('step-decide').addEventListener('click', devScroll);
   $('step-result').addEventListener('click', devScroll);
+  $('step-check').addEventListener('click', devScroll);
   function devScroll(e) {
     if (!devOn) return;
     var n = e.target.closest('[data-dev]');

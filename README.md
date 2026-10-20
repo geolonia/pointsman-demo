@@ -104,31 +104,33 @@ always written last.
 https://pointsman-demo.geolonia.workers.dev — `site/`, served by the Worker
 (static assets), in English and Japanese, light and dark:
 
-a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
+a guided flow in four steps, for visitors who know nothing about FIWARE or AI:
 
 1. **Pick a report.** Four examples, one for each outcome (a clear report, an
    unclear one, someone in danger, near an evacuation site); the others under
    "More examples". Each card says what happened and where, by a landmark
    (a station, park or river), since most streets in Japan have no name; it
    also lists the map checks Pointsman will run.
-2. **Pointsman decides.** Each step with its time, the AI's answers as plain
+2. **First check.** Each part with its time, the AI's answers as plain
    questions with a confidence word, the map checks (question, answer and
    data source, apart from the AI's answers), and the city's rule in one
    sentence. On the headquarters map, the nearest evacuation site is marked
    with a dotted line to the report (its place from the same GSI data). In
    step 1 no rule uses the site; the page says it is context for the person
-   who checks. When the second check has run (a closed section that goes to
-   a person), the box also shows the way around on foot, marked "second
-   check", and the map draws it from the `route` of Pointsman's detour fact
-   (the evacuation profile asks for it with `route: true`). Each rule box
-   says what the rule was based on: the AI answers and the map checks it
-   used, with their values. Open sections stay open when the page updates.
-3. **What happens next.** The final result as the headline, with what it was
-   made from and the chain as a diagram (with the DMN file to download); below it the two results on the way (the first result, and the
-   additional check of the evacuation site), and, for a report that waits for
-   a person, Publish and Reject buttons: the visitor who sent it decides it,
-   as the person on duty would, and the final result is made again. Below, the
-   numbers of the last 7 days from Pointsman's decision log.
+   who checks. The rule box says what the rule was based on: the AI answers
+   and the map checks it used, with their values. Open sections stay open
+   when the page updates.
+3. **Additional check.** The first result in one line, then the way to the
+   evacuation site: the nearest site, the way around on foot (the map draws
+   it from the `route` of Pointsman's detour fact; the evacuation profile
+   asks for it with `route: true`), the rule and whether the site's staff
+   were alerted. Or why it did not run: a report published at once needs no
+   check, and a report that marks a point (not a road section) has no way
+   around to work out.
+4. **Final result.** The headline, the rule that made it and what it was made
+   from, and, for a report that waits for a person, Publish and Reject
+   buttons: the visitor who sent it decides it, as the person on duty would,
+   and the final result is made again.
 
 **Developer view** (button in the header, remembered in the browser): a
 panel beside the page (a drawer at the bottom on narrow screens) shows the
@@ -146,9 +148,12 @@ Visitor-facing names: the page calls the FIWARE bridge the **connector**
 developer view adds the technical names in brackets.
 
 One map, switched between headquarters (every report) and residents (only
-what is published), on GSI tiles (地理院タイル). "How it works" opens the
-technical layer: the four parts of the system, links for developers, recent
-reports and the reports waiting for a person (with the NGSI-LD query).
+what is published), on GSI's vector tiles (地理院タイル). Two panels from the
+header: "How it works" (the four parts of the system, the chain as a diagram
+with the DMN file to download, why cities use it this way, links for
+developers) and "Reports" (the numbers of the last 7 days from Pointsman's
+decision log, recent reports, and the reports waiting for a person, with the
+NGSI-LD query).
 
 No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 (with integrity hashes).
