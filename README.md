@@ -26,7 +26,7 @@ Pointsman makes up to three decisions per report: the **first check**, the
 
 ```mermaid
 flowchart LR
-  Page["Demo page"] -->|"report, poll"| W["Demo Worker<br/>(Cloudflare, runs the bridge)"]
+  Page["Demo page"] -->|"report, poll, decide"| W["Demo Worker<br/>(Cloudflare, runs the bridge)"]
   W -->|"create report"| B["GeonicDB<br/>(tenant pointsman_demo)"]
   B -->|"notifications<br/>(5 subscriptions)"| W
   W -->|"first check, additional check,<br/>final result, resolve review"| P["Pointsman"]
@@ -58,10 +58,10 @@ flowchart LR
    entity (Smart Data Models) for the site's staff.
 5. The final result (pointsman#101): a third subscription, on `check` and
    `evacuation`, sends the report to `/notify?route=final` once the first
-   check published it or the additional check is there. The bridge sends only the ids of the two
-   earlier decisions; Pointsman (profile `road-closure-final`, rules only, no
+   check published it or the additional check is there. The bridge sends the
+   report and the ids of the earlier decisions; Pointsman (profile `road-closure-final`, rules only, no
    model) reads their results from its log and decides once more. The bridge
-   writes `final`, plus a `Decision` entity that links both earlier ones and,
+   writes `final`, plus a `Decision` entity that links the earlier ones and,
    after a rerun, the one it replaces. The residents' map reads this result.
    It runs again when a person answers the first or the additional check
    (their answer counts). When the additional check did not come (it
@@ -94,7 +94,7 @@ Without the profile, the final result's requests are refused and not retried.
 No notification gets lost (pointsman#88). The Worker puts each notified
 entity on a queue (`pointsman-demo-bridge`) and answers the broker at once.
 The Worker's queue handler then runs items 2 to 5 and 7 above. Item 5 runs only
-from the queue, one message at a time, so the newest final decision is
+from the queue, one message at a time, so the newest final result is
 always written last.
 
 - If Pointsman or the broker fails, the handler tries again after 30
