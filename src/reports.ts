@@ -120,27 +120,27 @@ export const PREPARED: Prepared[] = [
     // is about 316 m longer, with an evacuation site 443 m away: an Alert
     // for its staff. In the street grid it is about 143 m: no alert.
     id: 'bridge-blocked',
-    title: { en: 'Fallen tree at Koishikawa Bridge', ja: '小石川橋のたもとで倒木' },
+    title: { en: 'Wall collapsed at Koishikawa Bridge', ja: '小石川橋のたもとで壁が崩れた' },
     place: { en: 'By the Nihonbashi River, near Iidabashi Station', ja: '日本橋川沿い・飯田橋駅の近く' },
     featured: { en: 'Near an evacuation site', ja: '避難場所の近く' },
     roadName: '',
     status: 'closed',
     description: {
-      ja: '倒木で道路がふさがれ、車も歩行者も通れない。救急車も通れない。',
-      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass. Ambulances cannot get through.',
+      ja: '古い壁が崩れて道路をふさぎ、車も歩行者も通れない。救急車も通れない。',
+      en: 'An old wall collapsed onto the road; neither cars nor people on foot can pass. Ambulances cannot get through.',
     },
     location: { type: 'LineString', coordinates: [[139.750481, 35.702539], [139.750472, 35.702397], [139.750458, 35.701952], [139.750476, 35.701524], [139.750613, 35.701197], [139.750727, 35.700972]] },
     expected: 'urgent',
   },
   {
     id: 'street-blocked',
-    title: { en: 'Fallen tree blocks a side street', ja: '倒木で裏通りがふさがれた' },
+    title: { en: 'Truck overturned in a side street', ja: '裏通りでトラックが横転' },
     place: { en: 'Iidabashi 4-chome, near Iidabashi Station', ja: '飯田橋四丁目・飯田橋駅の近く' },
     roadName: '',
     status: 'closed',
     description: {
-      ja: '倒木で道路がふさがれ、車も歩行者も通れない。救急車も通れない。',
-      en: 'A fallen tree blocks the road; neither cars nor people on foot can pass. Ambulances cannot get through.',
+      ja: 'トラックが横転して道をふさぎ、歩いても通れない。荷台から油が漏れている。',
+      en: 'A truck overturned and blocks the street; people cannot pass on foot either. Oil is leaking from it.',
     },
     location: { type: 'LineString', coordinates: [[139.746432, 35.701305], [139.7461, 35.700931], [139.745926, 35.700653]] },
     expected: 'urgent',
