@@ -67,7 +67,7 @@
       chainKicker: 'A second check, started by the first', chainTitle: 'Can people still walk to their evacuation site?',
       cAlert: 'Alert sent to the staff of the evacuation site.', cReview: 'The way around could not be checked: a person looks at it.',
       fQ: { flood: 'Is the place in a river flood zone?', shelter: 'Where is the nearest flood evacuation site?', walk: 'With this road closed, how much longer is the walk?' },
-      fFlood: function (c) { return 'Yes: water could reach ' + c; },
+      fFlood: function (c) { return 'Yes: water depth ' + c; },
       fNoFlood: 'No, not in a published flood zone',
       fShelter: function (n, m) { return n + ', ' + m + ' m away'; },
       fNoShelter: 'None within 5 km',
@@ -77,7 +77,7 @@
       fSource: 'Source: ',
       fShelterMap: function (n, m) { return 'Evacuation site: ' + n + ' · ' + m + ' m'; },
       floodClass: {},
-      mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'walk around' },
+      mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
       doPublish: 'Publish it', doReject: 'Reject it', deciding: 'Sending…',
@@ -381,8 +381,8 @@
       if (p.featured) {
         featured.appendChild(el('li', null, [el('button', { type: 'button', class: 'card', onclick: function () { send(p); } }, [
           el('span', { class: 'label', text: p.featured[lang] }),
-          el('strong', { class: 'road', text: p.title[lang] }),
-          el('span', { class: 'place', text: p.place[lang] }),
+          el('strong', { class: 'road', text: titleOf(p) }),
+          placeOf(p) ? el('span', { class: 'place', text: placeOf(p) }) : null,
           el('span', { class: 'text', text: quote(p.description[lang]) }),
           el('span', { class: 'checks-hint' }, [el('span', { text: t('mapChecks') })].concat(checksOf(p).map(function (c) {
             return el('span', { class: 'chip-map', text: t('ch')[c] });
@@ -391,7 +391,7 @@
       } else {
         others += 1;
         more.appendChild(el('li', null, [el('button', { type: 'button', onclick: function () { send(p); } }, [
-          el('strong', { text: p.title[lang] }), ' · ', el('span', { class: 'muted', text: p.place[lang] }),
+          el('strong', { text: titleOf(p) }), placeOf(p) ? ' · ' : '', el('span', { class: 'muted', text: placeOf(p) }),
         ])]));
       }
     });
@@ -400,7 +400,11 @@
   }
 
   // The map checks a prepared report gets: the profile's two facts, and the
-  // walk around (step 2 of the chain) for a closed section that goes to a person.
+  // walk around (step 2 of the chain) for a closed section that goes to a
+  // person. An approximation of the server's routes: a Point gets no walk fact.
+  function titleOf(p) { return (p.title && p.title[lang]) || p.roadName || t('noRoad'); }
+  function placeOf(p) { return (p.place && p.place[lang]) || ''; }
+
   function checksOf(p) {
     return ['flood', 'shelter'].concat(p.location.type === 'LineString' && p.expected !== 'publish' ? ['walk'] : []);
   }
@@ -509,7 +513,7 @@
   function renderCurrent() {
     var r = current.last;
     var p = current.prepared;
-    var where = p ? p.title[lang] + ' · ' + p.place[lang] : r ? r.roadName || t('noRoad') : '';
+    var where = p ? [titleOf(p), placeOf(p)].filter(Boolean).join(' · ') : r ? r.roadName || t('noRoad') : '';
     $('cur-kicker').textContent = (current.sentAt ? t('yourReport') : t('aReport')) + (where ? ' · ' + where : '');
     $('cur-text').textContent = r ? quote(r.description) : '';
     renderTimeline(r);
@@ -912,7 +916,8 @@
   }
 
   function showShelter(facts) {
-    var f = facts.filter(function (x) { return x.name === 'shelter' && !x.missing && x.values.found; })[0];
+    // A site without a name cannot be found in the tile.
+    var f = facts.filter(function (x) { return x.name === 'shelter' && !x.missing && x.values.found && x.values.name; })[0];
     // Before the map is ready: shown from its load handler.
     if (!f || !map || !map.demoReady || !current || !current.last || !current.last.location) return;
     var me = current;
@@ -938,8 +943,11 @@
       shelterMarker = new maplibregl.Marker({ element: node, anchor: 'bottom', offset: [0, 10] }).setLngLat(best.at).addTo(map);
       shelterMarker.demoFact = f.values;
       setShelterVisible();
-      map.fitBounds([[Math.min(best.from[0], best.at[0]), Math.min(best.from[1], best.at[1])], [Math.max(best.from[0], best.at[0]), Math.max(best.from[1], best.at[1])]], { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 15.5 });
-    }).catch(function () {});
+      if (view === 'hq') map.fitBounds([[Math.min(best.from[0], best.at[0]), Math.min(best.from[1], best.at[1])], [Math.max(best.from[0], best.at[0]), Math.max(best.from[1], best.at[1])]], { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 15.5 });
+    }).catch(function () {
+      // A failed tile load: the next render tries again.
+      if (me.shelterShown === key) me.shelterShown = null;
+    });
   }
 
   function renderShelterLabel() {

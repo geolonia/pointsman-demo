@@ -114,7 +114,7 @@ export const PREPARED: Prepared[] = [
   },
   {
     // The chain (pointsman#66), same text at two places. Step 1: urgent
-    // (Clef-flash danger about 0.92 in both languages, 2026-10-15).
+    // (Clef-flash danger about 0.92 in both languages, 2026-10-20).
     // Step 2: no way through on foot. From Koishikawa Bridge along the river
     // (under the expressway), the way around on foot
     // is about 316 m longer, with an evacuation site 443 m away: an Alert
