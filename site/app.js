@@ -1011,12 +1011,12 @@
       return el('span', { class: 'stage' }, [el('span', { class: 'stage-label', text: label }), el('span', { class: 'badge small ' + (action || 'none'), text: text || t('act')[action] || action })]);
     };
     var arrow = function () { return el('span', { class: 'stage-arrow', 'aria-hidden': 'true', text: '→' }); };
-    var stages = [stage(t('bFirst'), r.check.action)];
-    if (ev) stages.push(stage(t('bSecond'), ev.action));
-    else if (r.check.action === 'publish') stages.push(stage(t('bSecond'), 'skip', t('bNoSecond')));
-    if (person) stages.push(stage(t('bPerson'), person));
-    var from = [el('span', { class: 'kicker', text: t('basedOn') })];
-    stages.forEach(function (s, i) { if (i) from.push(arrow()); from.push(s); });
+    // The person answers the first check, so their answer follows it; the
+    // additional check ran on the first result, beside that answer.
+    var from = [el('span', { class: 'kicker', text: t('basedOn') }), stage(t('bFirst'), r.check.action)];
+    if (person) from.push(arrow(), stage(t('bPerson'), person));
+    var second = ev ? stage(t('bSecond'), ev.action) : r.check.action === 'publish' ? stage(t('bSecond'), 'skip', t('bNoSecond')) : null;
+    if (second) from.push(el('span', { class: 'stage-arrow', 'aria-hidden': 'true', text: '·' }), second);
     // The step's own heading says "Final result": no kicker here.
     box.appendChild(el('div', { class: 'box tint final ' + f.action }, [
       el('strong', { class: 'headline', text: words[0] }),
