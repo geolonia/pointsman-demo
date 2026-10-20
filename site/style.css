@@ -208,7 +208,7 @@ pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 
 .dot.reject { background: var(--violet); } .dot.pending { background: var(--grey); }
 /* The flood layer: the 0.5 to 3 m colour of the GSI legend. */
 .swatch { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
-.swatch.flood { background: #FFD8C0; border: 1px solid #FFB7B7; }
+.swatch.flood { background: #FFD8C0; border: 1px solid #FFB7B7; opacity: 0.75; }
 
 /* How it works */
 .how { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: grid; gap: 20px; scroll-margin-top: 80px; }
