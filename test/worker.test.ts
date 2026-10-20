@@ -390,6 +390,25 @@ describe('cleanup', () => {
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });
 
+  it('deletes the final Decision entities, also the ones a rerun replaced', async () => {
+    const old = new Date(Date.now() - 25 * 3600_000).toISOString();
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.includes('/entities?type=RoadRestriction')) {
+        return Response.json([{ id: 'urn:ngsi-ld:RoadRestriction:demo-old', type: 'RoadRestriction', createdAt: old,
+          final: { type: 'Property', value: 'publish', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:f-2' } } }]);
+      }
+      if (c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:f-2'))) {
+        return Response.json({ id: 'urn:ngsi-ld:Decision:f-2', type: 'Decision', 'http://purl.org/dc/terms/replaces': { type: 'Relationship', object: 'urn:ngsi-ld:Decision:f-1' } });
+      }
+      if (c.method === 'GET' && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:f-1'))) return Response.json({ id: 'urn:ngsi-ld:Decision:f-1', type: 'Decision' });
+      if (c.method === 'DELETE') return new Response(null, { status: 204 });
+      return undefined;
+    };
+    expect(await cleanup(env)).toEqual({ deleted: 1, closed: 0 });
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!)))
+      .toEqual(['urn:ngsi-ld:Decision:f-2', 'urn:ngsi-ld:Decision:f-1', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+  });
+
   it('deletes the report even when its Task cannot be deleted', async () => {
     const old = new Date(Date.now() - 25 * 3600_000).toISOString();
     answer = (c) => {
@@ -614,6 +633,43 @@ describe("the bridge's queue (pointsman#88)", () => {
     expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
   });
 
+  it('makes the final decision (step 3) from the queue, with the earlier decisions by id, and opens no issue', async () => {
+    const C = 'urn:ngsi-ld:Decision:44444444-4444-4444-8444-444444444444';
+    const E = 'urn:ngsi-ld:Decision:55555555-5555-4555-8555-555555555555';
+    const both = {
+      ...report,
+      check: { type: 'Property', value: 'urgent', decisionId: P(C.split(':').pop()), decision: { type: 'Relationship', object: C }, inputHash: P('h1') },
+      evacuation: { type: 'Property', value: 'alert', decisionId: P(E.split(':').pop()), decision: { type: 'Relationship', object: E }, inputHash: P('h2') },
+    };
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'fallen-tree', createdAt: new Date().toISOString() }));
+    const finalDecision = {
+      decision_id: '77777777-7777-4777-8777-777777777777', action: 'urgent', profile: 'road-closure-final', profile_version: 1, model: 'none',
+      created_at: '2026-10-15T01:00:09.000Z', rule: 1, answers: {},
+      requires: { check: { decision: C.split(':').pop() }, evacuation: { decision: E.split(':').pop() } },
+    };
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decide/road-closure-final') return Response.json(finalDecision);
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(report.id)}`)) return Response.json(both);
+      return undefined;
+    };
+    // Queued with id and type only (routes with requires).
+    const res = await worker('/notify?route=final', { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [both] }) }, queued);
+    expect(res.status).toBe(202);
+    expect(sent).toEqual([{ body: { path: '/notify', route: 'final', entity: { id: report.id, type: 'RoadRestriction' } } }]);
+    const m = message(sent[0]!.body);
+    await consume(m);
+    expect(m.ack).toHaveBeenCalled();
+    const ask = calls.find((c) => c.url.endsWith('/v1/decide/road-closure-final'));
+    expect(ask?.body.decisions).toEqual({ check: C.split(':').pop(), evacuation: E.split(':').pop() });
+    expect(ask?.headers.get('idempotency-key')).toMatch(/^bridge-/);
+    const decisionEntity = calls.find((c) => c.url === `${BROKER}/entities` && c.body?.type === 'Decision');
+    expect(decisionEntity?.body.requiredDecisions.json.map((r: { name: string }) => r.name)).toEqual(['check', 'evacuation']);
+    expect(calls.find((c) => c.url.includes('/attrs/final'))?.body.value).toBe('urgent');
+    // Step 3 is rules only: no issue, no second alert.
+    expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
+    expect(calls.some((c) => c.body?.type === 'Alert')).toBe(false);
+  });
+
   it('retries the whole batch later when the Worker is not configured', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const retryAll = vi.fn();
@@ -683,11 +739,26 @@ describe('a visitor decides their own report', () => {
     expect((await decide(id, { action: 'reject', key })).status).toBe(409);
   });
 
-  it('records an urgent decision in the broker only (Pointsman queues reviews only)', async () => {
+  it('resolves an urgent decision in Pointsman too (people_check review and urgent)', async () => {
     const { id, key } = await sendOne();
     brokerHas(id, 'urgent');
+    const base = answer;
+    answer = (c) => (c.url.includes('/v1/reviews/') ? Response.json({ decision_id: DECISION }) : base(c));
     expect((await decide(id, { action: 'reject', key })).status).toBe(200);
-    expect(calls.some((c) => c.url.includes('/v1/reviews/'))).toBe(false);
+    expect(calls.find((c) => c.url.includes('/v1/reviews/'))?.body).toMatchObject({ action: 'reject', by: 'demo:visitor' });
+    expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('reject'));
+  });
+
+  it('records an older urgent decision without a review in the broker only', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'urgent');
+    const base = answer;
+    answer = (c) => {
+      if (c.url.includes('/v1/reviews/')) return Response.json({ error: 'not_pending' }, { status: 409 });
+      if (c.url.endsWith(`/v1/decisions/${DECISION}`)) return Response.json({ id: DECISION });
+      return base(c);
+    };
+    expect((await decide(id, { action: 'reject', key })).status).toBe(200);
     expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('reject'));
   });
 

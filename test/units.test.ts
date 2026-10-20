@@ -146,6 +146,13 @@ describe('summary for the page', () => {
     expect(summarize({ ...entity, check: { ...entity.check, value: 'publish' } }).published).toBe(true);
     expect(summarize({ ...entity, check: { ...entity.check, value: 'publish', finalAction: P('reject') } }).published).toBe(false);
     expect(summarize({ ...entity, check: undefined }).published).toBe(false);
+    // With the final decision (step 3), it decides what the map shows.
+    const final = (value: string) => ({ type: 'Property', value, observedAt: '2026-10-07T01:06:00Z', policyRule: P(3) });
+    expect(summarize({ ...entity, check: { ...entity.check, value: 'publish' }, final: final('review') }).published).toBe(false);
+    expect(summarize({ ...entity, final: final('publish') })).toMatchObject({ published: true, final: { action: 'publish', policyRule: '3', decidedAt: '2026-10-07T01:06:00Z' } });
+    expect(summarize({ ...entity, final: final('urgent') }).published).toBe(false);
+    expect(summarize({ ...entity, check: { ...entity.check, finalAction: P('publish') }, final: final('urgent') }).published).toBe(true);
+    expect(summarize({ ...entity, check: { ...entity.check, finalAction: P('publish') }, final: final('reject') }).published).toBe(false);
   });
 });
 

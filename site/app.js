@@ -63,6 +63,10 @@
         decide2: ['POST /v1/decide/evacuation-access-check', 'The same connector, another profile; its Decision is linked to the first one (prov:wasInformedBy).'],
         maps2: ['Map checks: evacuation site, way around on foot', 'GSI evacuation sites, and Valhalla routing on OpenStreetMap with and without the closed section.'],
         write2: ['Create Decision; PATCH evacuation (and Alert)', 'The connector writes the second result back; for an alert, the demo’s server then creates an Alert entity (Smart Data Models) for the site’s staff.'],
+        notify3: ['Notification: the earlier results are there', 'A third subscription, on check and evacuation, starts the final decision once the earlier checks it needs are there.'],
+        decide3: ['POST /v1/decide/road-closure-final', 'The connector sends only the ids of the earlier decisions. Pointsman reads their results from its own log, so nobody can claim a result. Rules only: no model call.'],
+        write3: ['Create Decision; PATCH final', 'The connector writes the final result back. Its Decision links both earlier ones (prov:wasInformedBy), and the one it replaces after a person’s answer (dcterms:replaces). The residents’ map reads this result.'],
+        finalLate: ['The final decision did not come', 'No final result within a minute: the queue may still retry, or the step failed. The earlier results stand.'],
       },
       q: { category: 'Why is the road closed?', status_matches: 'Does the status match the text?', danger: 'Is someone in danger?', clarity: 'How clear is the report?', foot_passable: 'Can people pass on foot?' },
       cat: {
@@ -77,9 +81,29 @@
         '0': 'If someone may be in danger, a person sees it first.',
         '1': 'In a deep flood zone (3 m or more), a report that may mean danger goes to a person first.',
         '2': 'The flood zone could not be checked, and someone may be in danger: a person looks.',
-        '3': 'Clear, consistent reports with nobody in danger are published at once.',
+        '3': 'In a deep flood zone (3 m or more), a person looks before it is published.',
+        '4': 'The flood zone could not be checked: a person looks before it is published.',
+        '5': 'Clear, consistent reports with nobody in danger are published at once.',
         'default': 'No rule for publishing fits: a person checks it.',
       },
+      // road-closure-final (pointsman-config): the final decision's rules, by index.
+      rules3: {
+        '0': 'A person rejected the report: it stays rejected.',
+        '1': 'People on foot are cut off from their evacuation site: urgent.',
+        '2': 'The first check found it urgent, and no person has answered otherwise.',
+        '3': 'The first check, or the person who checked it, published it.',
+        'default': 'A person has not checked the first result yet. When they do, the final result is decided again.',
+      },
+      finalKicker: 'Final result', stage1: '1 · First result (intermediate)', stage2: '2 · Additional check (intermediate)',
+      finalPending: 'The final result is being decided…', finalPendingText: 'Pointsman combines the first result and the additional check into one result.',
+      fin: {
+        publish: ['Published: residents see it now', 'The report is on the residents’ map.'],
+        urgent: ['Urgent: people must be told', 'Headquarters acts on it first.'],
+        reject: ['Rejected: residents never see it', 'A person decided the report is wrong.'],
+        review: ['Waiting for a person', 'Residents see it only after someone checks the first result.'],
+      },
+      basedOn: 'Made from', bFirst: 'first result', bPerson: 'person’s answer', bSecond: 'additional check', bNoSecond: 'no additional check needed',
+      showDecision3: 'Decision entity of the final result',
       // evacuation-access-check (pointsman-config): its rules, by index.
       rules2: {
         '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
@@ -199,6 +223,10 @@
         decide2: ['POST /v1/decide/evacuation-access-check', '同じつなぎ役、別のプロファイルです。その Decision は 1 つ目につながります（prov:wasInformedBy）。'],
         maps2: ['地図での確認：避難場所、歩いて迂回', '国土地理院の避難場所と、OpenStreetMap 上の Valhalla 経路（区間を閉じた場合と閉じない場合）。'],
         write2: ['Decision を作成、evacuation を PATCH（と Alert）', 'つなぎ役が 2 つ目の結果を書き戻します。警報のときは、デモのサーバーが避難場所の担当者向けの Alert エンティティ（Smart Data Models）を作ります。'],
+        notify3: ['通知：前の結果がそろった', 'check と evacuation の 3 つ目のサブスクリプションが、必要な前の確認がそろったところで最終判断を始めます。'],
+        decide3: ['POST /v1/decide/road-closure-final', 'つなぎ役は前の判断の ID だけを送ります。Pointsman が自分の記録から結果を読むので、結果を偽ることはできません。規則だけで決め、モデルは呼びません。'],
+        write3: ['Decision を作成、final を PATCH', 'つなぎ役が最終結果を書き戻します。その Decision は前の 2 つにつながり（prov:wasInformedBy）、人の答えの後に置き換えた判断にもつながります（dcterms:replaces）。住民向けの地図はこの結果を読みます。'],
+        finalLate: ['最終判断が届かない', '1 分以内に最終結果がありません。キューが再試行しているか、処理が失敗しました。前の結果はそのままです。'],
       },
       q: { category: 'なぜ通れないのか', status_matches: '状態と本文は合っているか', danger: '人に危険があるか', clarity: '報告はどのくらいはっきりしているか', foot_passable: '歩いて通れるか' },
       cat: {
@@ -213,9 +241,28 @@
         '0': '人に危険がありそうなら、真っ先に人が確認する。',
         '1': '深い浸水想定区域（3 m 以上）で危険がありそうな報告は、真っ先に人が確認する。',
         '2': '浸水想定区域を調べられず、危険がありそうなら、人が確認する。',
-        '3': 'はっきりしていて矛盾がなく、危険のない報告は、すぐに公開する。',
+        '3': '深い浸水想定区域（3 m 以上）では、公開の前に人が確認する。',
+        '4': '浸水想定区域を調べられなかったので、公開の前に人が確認する。',
+        '5': 'はっきりしていて矛盾がなく、危険のない報告は、すぐに公開する。',
         'default': '公開の規則に当てはまらないので、人が確認する。',
       },
+      rules3: {
+        '0': '人が報告を非公開にした：非公開のまま。',
+        '1': '歩いて避難場所まで行けない人がいる：緊急。',
+        '2': '1 つ目の確認で緊急となり、人はそれと違う答えをしていない。',
+        '3': '1 つ目の確認、またはそれを確認した人が公開とした。',
+        'default': '1 つ目の結果を、まだ人が確認していない。確認すると、最終結果をもう一度決める。',
+      },
+      finalKicker: '最終結果', stage1: '1 · 最初の結果（途中）', stage2: '2 · 追加の確認（途中）',
+      finalPending: '最終結果を決めています…', finalPendingText: 'Pointsman が最初の結果と追加の確認を 1 つの結果にまとめます。',
+      fin: {
+        publish: ['公開：住民がすぐに見られます', '住民向けの地図に載りました。'],
+        urgent: ['緊急：人に知らせる必要があります', '災害対策本部が真っ先に対応します。'],
+        reject: ['非公開：住民には見えません', '人が、報告は正しくないと判断しました。'],
+        review: ['人の確認待ち', '誰かが最初の結果を確認するまで、住民には見えません。'],
+      },
+      basedOn: 'もとにしたもの', bFirst: '最初の結果', bPerson: '人の答え', bSecond: '追加の確認', bNoSecond: '追加の確認は不要',
+      showDecision3: '最終結果の Decision エンティティ',
       rules2: {
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
         '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
@@ -552,7 +599,8 @@
         // check may not come at all (then the developer view says so after a minute).
         var late = !!(me.chainSince && !b0.evacuation && Date.now() - me.chainSince > 60000);
         var sig = JSON.stringify([b0.createdAt, b0.check && [b0.check.action, b0.check.finalAction, b0.check.policyRule], !!(b0.ngsi && b0.ngsi.decision), !!(b0.ngsi && b0.ngsi.task),
-          b0.evacuation && b0.evacuation.action, !!(b0.evacuation && b0.evacuation.ngsi && b0.evacuation.ngsi.alert), b0.visitorDecision, b0.issue, late]);
+          b0.evacuation && b0.evacuation.action, !!(b0.evacuation && b0.evacuation.ngsi && b0.evacuation.ngsi.alert), b0.visitorDecision, b0.issue, late,
+          b0.final && [b0.final.action, b0.final.policyRule, b0.final.decidedAt, !!(b0.final.ngsi && b0.final.ngsi.decision)], finalLate(b0)]);
         if (sig !== me.sig) {
           me.sig = sig;
           renderCurrent();
@@ -567,10 +615,21 @@
       // The second check comes a few seconds later; if it does not come within
       // a minute, poll slowly instead of fast forever.
       var done = decidedNow && (!chained || b.evacuation || Date.now() - me.chainSince > 60000);
-      var resolved = done && (b.check.finalAction || b.check.action === 'publish');
+      // Then the final result (step 3); it is made again after a person's answer.
+      if (done && !b.final && !me.finalSince) me.finalSince = Date.now();
+      if (b && b.final) me.finalSince = null;
+      var answered = b && b.check && (b.check.finalAction || b.visitorDecision);
+      var finalFresh = b && b.final && (!answered || !b.check.reviewedAt || !b.final.decidedAt || Date.parse(b.final.decidedAt) >= Date.parse(b.check.reviewedAt));
+      done = done && (finalFresh || finalLate(b));
+      var resolved = done && b.final && b.final.action !== 'review';
       me.poll = setTimeout(poll, !done ? 1200 : resolved ? 30000 : 4000);
       if (decidedNow && !me.mapped) { me.mapped = true; loadReports(); }
     }).catch(function () { if (current === me && seq === me.seq) me.poll = setTimeout(poll, 3000); });
+  }
+
+  /** The final result did not come within a minute of the earlier checks. */
+  function finalLate(b) {
+    return !!(b && !b.final && current && current.finalSince && Date.now() - current.finalSince > 60000);
   }
 
   // Once the decision is there, its parts appear one after the other.
@@ -716,7 +775,9 @@
     var a = r.check.action;
     var final = r.check.finalAction || r.visitorDecision;
     var o = final === 'publish' ? 'FinalPublish' : final === 'reject' ? 'FinalReject' : { publish: 'Publish', review: 'Review', urgent: 'Urgent' }[a] || 'Review';
+    renderFinal(r);
     out.appendChild(el('div', { class: 'box tint ' + (final || a) }, [
+      el('span', { class: 'kicker', text: t('stage1') }),
       el('strong', { class: 'headline', text: t('o' + o) }),
       el('span', { text: t('e' + o) }),
     ]));
@@ -725,7 +786,7 @@
     // later; shown only when it found something.
     var ev = r.evacuation;
     if (ev && ev.action !== 'none') {
-      var items = [el('span', { class: 'kicker', text: t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })];
+      var items = [el('span', { class: 'kicker', text: t('stage2') + ' · ' + t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })];
       var facts = renderFactList(ev.facts || []);
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
@@ -773,6 +834,45 @@
         r.issue ? el('a', { href: r.issue, target: '_blank', rel: 'noopener', text: t('openIssue') + ' (#' + r.issue.split('/').pop() + ')' }) : null,
       ]));
     }
+  }
+
+  /**
+   * The final result (step 3 of the chain) as the headline: what it is, the
+   * rule that made it, and what it was made from. Before it comes, a short
+   * "being decided" line.
+   */
+  function renderFinal(r) {
+    var box = $('final');
+    box.textContent = '';
+    if (!r || !r.check) return;
+    var f = r.final;
+    if (!f) {
+      box.appendChild(el('div', { class: 'box' }, [
+        el('span', { class: 'kicker', text: t('finalKicker') }),
+        el('strong', { class: 'box-title', text: t('finalPending') }),
+        el('span', { text: t('finalPendingText') }),
+      ]));
+      return;
+    }
+    var words = t('fin')[f.action] || [t('act')[f.action] || f.action, ''];
+    var rules = t('rules3');
+    var rule = Object.prototype.hasOwnProperty.call(rules, f.policyRule === undefined ? 'default' : f.policyRule) ? rules[f.policyRule === undefined ? 'default' : f.policyRule] : null;
+    var person = r.check.finalAction || r.visitorDecision;
+    var ev = r.evacuation;
+    var chip = function (label, value) { return el('span', { class: 'chip-ai' }, [el('b', { text: label }), ' ' + value]); };
+    var from = [
+      el('span', { class: 'kicker', text: t('basedOn') }),
+      chip(t('bFirst'), t('act')[r.check.action] || r.check.action),
+      person ? chip(t('bPerson'), t('act')[person] || person) : null,
+      ev ? chip(t('bSecond'), t('act')[ev.action] || ev.action) : r.check.action === 'publish' ? chip(t('bSecond'), t('bNoSecond')) : null,
+    ];
+    box.appendChild(el('div', { class: 'box tint final ' + f.action }, [
+      el('span', { class: 'kicker', text: t('finalKicker') }),
+      el('strong', { class: 'headline', text: words[0] }),
+      words[1] ? el('span', { text: words[1] }) : null,
+      rule ? el('span', { class: 'rule-text', text: rule }) : null,
+      el('div', { class: 'used' }, from),
+    ]));
   }
 
   // --- The week's numbers (step 3) -------------------------------------------------------
@@ -874,8 +974,8 @@
   // Answer names and fact names; a rule with no match uses its default.
   var RULE_USES = {
     check: {
-      '0': ['danger'], '1': ['flood', 'danger'], '2': ['flood', 'danger'],
-      '3': ['danger', 'category', 'status_matches', 'clarity'], 'default': ['danger', 'category', 'status_matches', 'clarity'],
+      '0': ['danger'], '1': ['flood', 'danger'], '2': ['flood', 'danger'], '3': ['flood'], '4': ['flood'],
+      '5': ['danger', 'category', 'status_matches', 'clarity'], 'default': ['danger', 'category', 'status_matches', 'clarity'],
     },
     // Its default (none) is never shown: the page shows the second check only for alert and review.
     evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'] },
@@ -911,7 +1011,7 @@
   var devOn = false;
   try { devOn = localStorage.getItem('dev') === '1'; } catch (e) {}
   var LANES = ['page', 'platform', 'bridge', 'pointsman', 'data'];
-  var DEV_TAGS = ['save', 'ai', 'maps', 'rule', 'second'];
+  var DEV_TAGS = ['save', 'ai', 'maps', 'rule', 'second', 'final'];
 
   function devEvents(r) {
     // In step with the page, which shows the first check's parts one after the other.
@@ -936,11 +1036,18 @@
         data(t('showTask'), r && r.ngsi && r.ngsi.task),
       ] },
     ];
-    if (c4 && c4.action === 'publish') return ev.concat([{ key: 'publishEnd', tag: 'second', done: true }]);
+    var f = c4 && r.final;
+    var third = [
+      { key: 'notify3', tag: 'final', from: 1, to: 2, done: !!f },
+      { key: 'decide3', tag: 'final', from: 2, to: 3, done: !!f },
+      { key: 'write3', tag: 'final', from: 2, to: 1, done: !!(f && f.ngsi && f.ngsi.decision), data: [data(t('showDecision3'), f && f.ngsi && f.ngsi.decision)] },
+    ];
+    if (c4 && !f && finalLate(r)) third = [{ key: 'finalLate', tag: 'final', done: true }];
+    if (c4 && c4.action === 'publish') return ev.concat([{ key: 'publishEnd', tag: 'second', done: true }], third);
     var e2 = c4 && r.evacuation;
     // The page stops waiting for the second check after a minute; so does this view.
     if (c4 && !e2 && current.chainSince && Date.now() - current.chainSince > 60000) {
-      return ev.concat([{ key: 'secondLate', tag: 'second', done: true }]);
+      return ev.concat([{ key: 'secondLate', tag: 'second', done: true }], third);
     }
     return ev.concat([
       { key: 'notify2', tag: 'second', from: 1, to: 2, done: !!e2 },
@@ -950,7 +1057,7 @@
         data(t('showDecision2'), e2 && e2.ngsi && e2.ngsi.decision),
         data(t('showAlert'), e2 && e2.ngsi && e2.ngsi.alert),
       ] },
-    ]);
+    ], third);
   }
 
   var devSig = null;

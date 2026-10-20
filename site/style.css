@@ -289,3 +289,8 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* The header button: a short label on phones, so the header does not wrap. */
 .short { display: none; }
 @media (max-width: 600px) { .long { display: none; } .short { display: inline; } }
+/* The final result (step 3 of the chain) is the headline of "What happens next". */
+.box.final .headline { font-size: 1.45rem; }
+.box.final .rule-text { display: block; margin-top: 4px; }
+/* The first two results are steps on the way: smaller than the final one. */
+#outcome .headline { font-size: 1.05rem; }

@@ -26,7 +26,7 @@ flowchart LR
   W -->|create entity| B["GeonicDB<br/>(tenant pointsman_demo)"]
   B -->|notification| W
   W -->|decide| P["Pointsman"]
-  W -->|write check, Decision, Task| B
+  W -->|write check, evacuation, final, Decision, Task| B
   W -->|urgent / review| G["GitHub issues<br/>(this repository)"]
   G -->|"/publish comment"| W
 ```
@@ -47,12 +47,20 @@ flowchart LR
    evacuation site?) and writes `evacuation`, plus a `Decision` entity that
    links the first one (`wasInformedBy`). An `alert` creates an `Alert`
    entity (Smart Data Models) for the site's staff.
-5. A member comments `/publish` or `/reject`, optionally with corrections
+5. The final decision (pointsman#101): a third subscription, on `check` and
+   `evacuation`, sends the report to `/notify?route=final` once step 1
+   published it or step 2 is there. The bridge sends only the ids of the two
+   earlier decisions; Pointsman (profile `road-closure-final`, rules only, no
+   model) reads their results from its log and decides once more. The bridge
+   writes `final`, plus a `Decision` entity that links both earlier ones and,
+   after a rerun, the one it replaces. The residents' map reads this result.
+   It runs again when a person answers step 1 (their answer counts).
+6. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
-   in Pointsman, writes the result to the `Decision` entity, and closes the
-   issue. On the page, the visitor who sent a report can decide it the same
+   in Pointsman (also for `urgent`: the profile's `people_check`), writes the
+   result to the `Decision` entity, and closes the issue. On the page, the visitor who sent a report can decide it the same
    way (Publish or Reject).
-6. A third subscription sends resolved `Decision` entities to `/reviews`. The
+7. Another subscription sends resolved `Decision` entities to `/reviews`. The
    bridge writes the final action to the report (the page shows it as
    published) and completes the Task. This also works without GitHub: any
    app that writes the result to the Decision entity resolves the review
@@ -61,12 +69,15 @@ flowchart LR
    `Task` that refers to the report (pointsman#85): its status name gives
    the final action ([src/work-orders.json](src/work-orders.json):
    `Published` or `公開` → publish, `Rejected` or `却下` → reject).
-7. Every hour, data older than a day is deleted (with its Decision, Task and
-   Alert entities) and its issues are closed.
+8. Every hour, data older than a day is deleted (with its Decision, Task and
+   Alert entities, also the final ones a rerun replaced) and its issues are
+   closed.
 
 No notification gets lost (pointsman#88). The Worker puts each notified
 entity on a queue (`pointsman-demo-bridge`) and answers the broker at once.
-The Worker's queue handler then runs steps 2 to 4 and 6.
+The Worker's queue handler then runs steps 2 to 5 and 7. Step 5 runs only
+from the queue, one message at a time, so the newest final decision is
+always written last.
 
 - If Pointsman or the broker fails, the handler tries again after 30
   seconds, then waits twice as long each time, up to an hour: about 14 hours
@@ -105,9 +116,11 @@ a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
    (the evacuation profile asks for it with `route: true`). Each rule box
    says what the rule was based on: the AI answers and the map checks it
    used, with their values. Open sections stay open when the page updates.
-3. **What happens next.** The outcome, the second check (evacuation site),
-   and, for a report that waits for a person, Publish and Reject buttons: the
-   visitor who sent it decides it, as the person on duty would. Below, the
+3. **What happens next.** The final result as the headline, with what it was
+   made from; below it the two results on the way (the first result, and the
+   additional check of the evacuation site), and, for a report that waits for
+   a person, Publish and Reject buttons: the visitor who sent it decides it,
+   as the person on duty would, and the final result is made again. Below, the
    numbers of the last 7 days from Pointsman's decision log.
 
 **Developer view** (button in the header, remembered in the browser): a
@@ -139,7 +152,7 @@ No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 |---|---|
 | `GET /api/config` | Prepared reports, the demo area, whether free text is on, today's usage |
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
-| `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`, `ngsi.task`) |
+| `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, `evacuation` (step 2) and `final` (the final result, with its Decision entity), and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`, `ngsi.task`) |
 | `GET /api/stats` | The last 7 days from Pointsman's decision log (`GET /v1/stats/{profile}?days=7`): reports, published at once, sent to a person (urgent), what people decided on unclear reports, corrections. Counts only; browsers keep it for a minute |
 | `GET /api/decisions` | `Decision` entities waiting for a person (`reviewStatus` "pending"), newest first, with the NGSI-LD request that found them |
 | `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}`. Answers `{"id", "key"}` |
@@ -153,8 +166,8 @@ Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.
   (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET`), at most 300 characters, inside
   the demo area.
 - 10 reports per visitor and minute; `DAILY_LIMIT` reports a day. A report
-  is one Pointsman call, or two when step 1 decides `urgent` or `review` and
-  the chain runs.
+  is two Pointsman calls (step 1 and the final decision, which needs no
+  model), or three when step 1 decides `urgent` or `review` and step 2 runs.
 - Everything is deleted after a day. Do not write personal data.
 
 ## Setup
@@ -163,9 +176,9 @@ Settings are in [wrangler.jsonc](wrangler.jsonc). Secrets (`wrangler secret put 
 
 | Secret | Source |
 |---|---|
-| `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check` and `evacuation-access-check` |
+| `POINTSMAN_TOKEN` | A Pointsman token limited to `road-restriction-check`, `evacuation-access-check` and `road-closure-final` |
 | `BROKER_API_KEY` | 1Password `geonic-apps` / `geonicdb-production-geolonia-demo-pointsman_demo-apikey` |
-| `NOTIFY_SECRET` | Random; both subscriptions send it (`scripts/setup.mjs`) |
+| `NOTIFY_SECRET` | Random; every subscription sends it (`scripts/setup.mjs`) |
 | `GITHUB_WEBHOOK_SECRET` | 1Password `geolonia-ops` / "Pointsman demo GitHub App" (password) |
 | `GITHUB_APP_PRIVATE_KEY` | Same item, the private key converted to PKCS#8: `openssl pkcs8 -topk8 -nocrypt` |
 | `TURNSTILE_SECRET` | Optional |
@@ -174,9 +187,10 @@ The two queues are created once in the Cloudflare account:
 `wrangler queues create pointsman-demo-bridge` and
 `wrangler queues create pointsman-demo-bridge-dlq` (done on 2026-10-15).
 
-Then, once: `node scripts/setup.mjs` creates the four subscriptions in the
-broker (new reports, the chain's step 2, resolved decisions, completed work
-orders) and the issue labels.
+Then, once: `node scripts/setup.mjs` creates the five subscriptions in the
+broker (new reports, the chain's step 2, the final decision, resolved
+decisions, completed work orders) and the issue labels. Run it again after
+an update: existing subscriptions are updated in place.
 
 To resolve a review in the broker, as another app would (a member of the
 team, with the broker key):

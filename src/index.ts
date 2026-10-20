@@ -41,6 +41,20 @@ const EVACUATION_ROUTE: Route = {
   name: 'evacuation',
   informedBy: 'check',
 };
+/**
+ * Step 3, the final decision (pointsman#101, docs/decision-chains.md): from
+ * step 1 and, when it ran, step 2, by rules only. It runs again when a person
+ * answers step 1. Apps (the residents' map) read this result.
+ */
+const FINAL_ROUTE: Route = {
+  type: 'RoadRestriction',
+  profile: 'road-closure-final',
+  inputs: ['check', 'evacuation'],
+  attribute: 'final',
+  decisionEntity: true,
+  name: 'final',
+  requires: { check: { attribute: 'check', rerunOnReview: true }, evacuation: { attribute: 'evacuation', optional: true } },
+};
 // Work orders from other apps (pointsman#85): a completed Task that refers to
 // a report, for example a Redmine GTT issue, resolves the report's review; its
 // status name gives the final action (src/work-orders.json, also read by
@@ -113,7 +127,9 @@ export default {
       // As in the engine's queue loop: a redirect (pointsman#105) is retried
       // too, so the message ends in the dead-letter queue and can be replayed
       // once the URL is fixed.
-      if ('retry' in result && (result.retry || ('redirect' in result && result.redirect))) {
+      // A request no retry can fix (idempotency_conflict) too: it ends in the
+      // dead-letter queue, from where it can be looked at.
+      if ('retry' in result && (result.retry || ('redirect' in result && result.redirect) || ('deadLetter' in result && result.deadLetter))) {
         console.error(`bridge queue: ${result.id}${decision} (attempt ${message.attempts}): ${result.error}`);
         message.retry({ delaySeconds: retryDelay(message.attempts) });
         continue;
@@ -135,7 +151,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
 
 function bridgeConfig(env: Env): BridgeConfig {
   return {
-    routes: [ROUTE, EVACUATION_ROUTE],
+    routes: [ROUTE, EVACUATION_ROUTE, FINAL_ROUTE],
     // Optional (wrangler.jsonc "queues"): notifications are queued and
     // answered at once; the queue handler above runs the bridge.
     ...(env.BRIDGE_QUEUE && { queue: env.BRIDGE_QUEUE }),
@@ -168,6 +184,8 @@ async function notify(request: Request, env: Env, ctx: ExecutionContext): Promis
  */
 function afterDecisions(env: Env, route: string | undefined, handled: EntityResult[]): Promise<void>[] {
   const decided = handled.filter((h): h is Extract<EntityResult, { action: string }> => 'action' in h && typeof h.decision === 'string');
+  // Step 3 is rules only: nobody checks it, and step 2 sent any alert.
+  if (route === FINAL_ROUTE.name) return [];
   if (route === EVACUATION_ROUTE.name) {
     // Step 2: alerts for the evacuation sites' staff, nothing for GitHub.
     return decided.filter((h) => h.action === 'alert')
@@ -310,11 +328,16 @@ async function webhook(request: Request, env: Env): Promise<Response> {
   const now = new Date().toISOString();
   const pointsman = (path: string, payload: unknown) => pointsmanPost(env, path, payload);
   const hasCorrections = Object.keys(command.correct).length > 0;
-  // Pointsman queues only `review` decisions; for the others the final action
-  // is recorded in the broker, and corrections go in as feedback.
-  const res = command.final && record.action === 'review'
+  // Pointsman queues the decisions a person checks (review and urgent, the
+  // profile's people_check); for the others the final action is recorded in
+  // the broker, and corrections go in as feedback. An urgent decision from
+  // before people_check had no review: Pointsman answers 409, and it is
+  // handled like the others.
+  let res = command.final && PERSON_ACTIONS.includes(record.action)
     ? await pointsman(`/v1/reviews/${record.decision}/resolve`, { action: command.final, correct: command.correct, by })
-    : hasCorrections ? await pointsman(`/v1/decisions/${record.decision}/feedback`, { correct: command.correct, by }) : null;
+    : null;
+  if (res?.status === 409 && !(await hasReview(env, record.decision))) res = null;
+  if (!res && hasCorrections) res = await pointsman(`/v1/decisions/${record.decision}/feedback`, { correct: command.correct, by });
   if (res && !res.ok) {
     await github.comment(p.issue.number, `Pointsman refused this (${res.status}); nothing was changed.`);
     return json({ error: `pointsman ${res.status}` }, 200);
@@ -395,11 +418,13 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
   if (!check?.decision || !PERSON_ACTIONS.includes(check.action) || check.finalAction) return json({ error: 'this report does not wait for a person' }, 409, cors);
   const decision = check.decision.split(':').pop()!;
   const by = 'demo:visitor';
-  // Pointsman queues only `review` decisions; for `urgent` the final action
-  // is recorded in the broker only.
-  if (check.action === 'review') {
+  // Pointsman queues review and urgent decisions (people_check). An urgent
+  // decision from before that has no review: recorded in the broker only.
+  {
     const res = await pointsmanPost(env, `/v1/reviews/${decision}/resolve`, { action: final, correct: {}, by });
-    if (res.status === 409) {
+    if (res.status === 409 && !(await hasReview(env, decision))) {
+      // Nothing to resolve in Pointsman.
+    } else if (res.status === 409) {
       // No longer pending. Only this visitor's own earlier try with the same
       // answer (whose broker update failed) is finished below; anything else
       // (a team member, or this visitor's other answer) stays as it is.
@@ -524,13 +549,14 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       env.DEMO.get<ReportRecord>(`report:${entity.id}`, 'json'),
     ]);
     const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
-    const [evacuation, task] = await Promise.all([
+    const [evacuation, finalResult, task] = await Promise.all([
       evacuationOf(broker, entity),
+      finalOf(broker, entity),
       // Extra data for developers: the page still works without it.
       PERSON_ACTIONS.includes(summary.check?.action ?? '') ? taskIdOf(entity).then((id) => (id ? broker.getEntity(id) : null)).catch(() => null) : null,
     ]);
     // Only prepared reports go to the GitHub queue; the page says so.
-    return json({ ...summary, prepared: Boolean(report?.prepared), visitorDecision: report?.resolved ?? null, issue, facts: factsOf(decisionEntity), evacuation, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
+    return json({ ...summary, prepared: Boolean(report?.prepared), visitorDecision: report?.resolved ?? null, issue, facts: factsOf(decisionEntity), evacuation, final: finalResult, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
@@ -645,6 +671,31 @@ async function taskIdOf(e: Entity): Promise<string | null> {
   return typeof hash === 'string' ? taskEntityId(e.id, ROUTE.attribute, hash) : null;
 }
 
+/** Whether Pointsman has a review for this decision (pending or not). */
+async function hasReview(env: Env, decision: string): Promise<boolean> {
+  const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${decision}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+  if (!got.ok) return true;
+  return Boolean(((await got.json()) as { review?: unknown }).review);
+}
+
+/**
+ * Step 3 for the page: the final result, what it was based on, and its
+ * NGSI-LD data; null before it ran.
+ */
+async function finalOf(broker: Broker, entity: Entity) {
+  const attr = entity.final as Attr | undefined;
+  if (!attr || typeof attr.value !== 'string') return null;
+  const decision = (attr.decision as Attr | undefined)?.object;
+  const decisionEntity = typeof decision === 'string' ? await broker.getDecision(decision) : null;
+  return {
+    action: attr.value,
+    ...(typeof attr.observedAt === 'string' && { decidedAt: attr.observedAt }),
+    ...(val(attr.policyRule) !== undefined && { policyRule: String(val(attr.policyRule)) }),
+    ...(typeof decision === 'string' && { decision }),
+    ngsi: { decision: decisionEntity },
+  };
+}
+
 /** Step 2 of the chain for the page: its action, facts, Alert and NGSI-LD data; null before it ran. */
 async function evacuationOf(broker: Broker, entity: Entity) {
   const attr = entity.evacuation as Attr | undefined;
@@ -669,6 +720,8 @@ export type PageFact =
   | { name: string; missing: true; reason: string };
 
 const FACTS_IRI = 'https://datamodels.jp/ns/decision/facts';
+/** dcterms:replaces on a Decision entity read without a context (datamodels.jp Decision model). */
+const REPLACES_IRI = 'http://purl.org/dc/terms/replaces';
 
 /**
  * The facts of a Decision entity (read without a context, so the attribute
@@ -713,11 +766,13 @@ export interface Summary {
     finalAction?: string;
     reviewedAt?: string;
   };
-  /** Shown on the residents' map. */
+  /** The final decision (step 3), when it ran. */
+  final?: { action: string; decidedAt?: string; policyRule?: string };
+  /** Shown on the residents' map: the final result, or step 1's before step 3 runs. */
   published: boolean;
 }
 
-const CHECK_META = new Set(['type', 'value', 'observedAt', 'createdAt', 'modifiedAt', 'decisionId', 'decision', 'profile', 'profileVersion', 'policyRule', 'model', 'inputHash', 'finalAction', 'reviewedAt']);
+const CHECK_META = new Set(['type', 'value', 'observedAt', 'createdAt', 'modifiedAt', 'decisionId', 'decision', 'profile', 'profileVersion', 'policyRule', 'model', 'inputHash', 'finalAction', 'reviewedAt', 'reviewStatus']);
 
 /** The model's answers on a decision attribute (check or evacuation), with their probabilities. */
 function answersOf(c: Attr): Record<string, { value: unknown; p?: number }> {
@@ -748,7 +803,11 @@ export function summarize(e: Entity): Summary {
       ...(typeof val(c.reviewedAt) === 'string' && { reviewedAt: val(c.reviewedAt) as string }),
     };
   }
-  const outcome = check?.finalAction ?? check?.action;
+  const f = e.final as Attr | undefined;
+  const final = f && typeof f.value === 'string'
+    ? { action: f.value, ...(typeof f.observedAt === 'string' && { decidedAt: f.observedAt }), ...(val(f.policyRule) !== undefined && { policyRule: String(val(f.policyRule)) }) }
+    : undefined;
+  const outcome = final ? final.action : check?.finalAction ?? check?.action;
   return {
     id: e.id,
     roadName: String(val(e.roadName) ?? ''),
@@ -758,7 +817,10 @@ export function summarize(e: Entity): Summary {
     location: val(e.location),
     ...(typeof e.createdAt === 'string' && { createdAt: e.createdAt }),
     ...(check && { check }),
-    published: outcome === 'publish',
+    ...(final && { final }),
+    // An urgent final result is shown once a person said publish (people
+    // on foot are cut off: still published, and urgent).
+    published: outcome === 'publish' || (outcome === 'urgent' && check?.finalAction === 'publish'),
   };
 }
 
@@ -781,6 +843,14 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     if (typeof second === 'string') {
       await broker.delete(second);
       await broker.delete(alertId(second.split(':').pop()!));
+    }
+    // Step 3: its Decision entity, and the ones it replaced (a rerun after a
+    // person answered step 1), through their replaces links.
+    let third = ((e.final as Attr | undefined)?.decision as Attr | undefined)?.object;
+    for (let i = 0; typeof third === 'string' && i < 10; i += 1) {
+      const replaced = ((await broker.getDecision(third))?.[REPLACES_IRI] as Attr | undefined)?.object;
+      await broker.delete(third);
+      third = replaced;
     }
     await broker.delete(e.id);
     deleted += 1;
