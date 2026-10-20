@@ -16,6 +16,7 @@
       lead: 'Send one, and watch Pointsman decide in seconds what happens to it. It reads the report, checks the place on public maps, and applies the city’s rules.',
       st1: 'Pick a report', st2: 'First check', st3: 'Additional check', st4: 'Final result',
       howTitle: 'How it works', close: 'Close',
+      resize: 'Drag to make the panel wider or narrower (arrow keys work too)',
       activityTitle: 'Reports', activityLead: 'What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.',
       howLead: 'Pointsman is a small service that takes decisions for a city’s apps. The AI only answers questions. Public data gives facts about the place. The city’s own rules decide. People have the last word.',
       h1k: '1 · The report', h1t: 'A resident’s app saves it', h1d: 'in the city’s data platform. This demo uses GeonicDB, which follows the open FIWARE standard (NGSI-LD).',
@@ -186,6 +187,7 @@
       lead: '報告を 1 件送ってみてください。その報告をどうするかを、Pointsman が数秒で決めます。報告を読み、場所を公開の地図で調べ、市の規則を当てはめます。',
       st1: '報告を選ぶ', st2: '最初の確認', st3: '追加の確認', st4: '最終結果',
       howTitle: '仕組み', close: '閉じる',
+      resize: 'ドラッグでパネルの幅を変えられます（矢印キーでも変えられます）',
       activityTitle: '報告の一覧', activityLead: 'デモが判断したもの：この 1 日の報告すべて、人の確認待ちの報告、そして直近 7 日間の数字です。',
       howLead: 'Pointsman は、市のアプリに代わって判断する小さなサービスです。AI は質問に答えるだけです。場所の事実は公開データから調べます。行動を決めるのは市の規則です。最後に決めるのは人です。',
       h1k: '1・報告', h1t: '住民のアプリが保存する', h1d: '保存先は市のデータ基盤です。このデモでは、オープンな FIWARE の標準（NGSI-LD）に沿った GeonicDB を使います。',
@@ -411,6 +413,7 @@
   function applyLang() {
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach(function (n) { var v = t(n.dataset.i18n); if (typeof v === 'string') n.innerHTML = v; });
+    document.querySelectorAll('[data-i18n-label]').forEach(function (n) { n.setAttribute('aria-label', t(n.dataset.i18nLabel)); });
     $('lang').textContent = lang === 'ja' ? 'English' : '日本語';
     $('lang').setAttribute('lang', lang === 'ja' ? 'en' : 'ja');
     $('stepper').setAttribute('aria-label', t('aSteps'));
@@ -1273,7 +1276,9 @@
     devOn = on;
     if (remember !== false) try { localStorage.setItem('dev', on ? '1' : '0'); } catch (e) {}
     $('dev').hidden = !on;
-    document.body.classList.toggle('dev-open', on);
+    // One side panel at a time: the developer view or the reports.
+    if (on && !$('activity').hidden) setActivity(false);
+    sideOpen();
     $('dev-toggle').setAttribute('aria-pressed', String(on));
     devTag = null;
     devHighlight(null);
@@ -1349,22 +1354,75 @@
     $('how-toggle').setAttribute('aria-expanded', String(open));
     $('how-open').setAttribute('aria-expanded', String(open));
     if (open) {
-      setActivity(false);
       renderHowGraph();
       $('how').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  // The reports panel: recent reports, the ones waiting for a person, the week's numbers.
+  // The reports panel, beside the page like the developer view: recent
+  // reports, the ones waiting for a person, the week's numbers.
   function setActivity(open) {
     $('activity').hidden = !open;
     $('activity-toggle').setAttribute('aria-expanded', String(open));
     if (open) {
-      setHow(false);
+      if (devOn) setDev(false);
       loadStats();
-      $('activity').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    sideOpen();
   }
+
+  /** The page makes room for the open side panel (body class, wide screens). */
+  function sideOpen() {
+    document.body.classList.toggle('dev-open', devOn || !$('activity').hidden);
+  }
+
+  // The side panels can be made wider or narrower by their left edge (wide
+  // screens; on narrow ones they are a drawer at the bottom). Remembered.
+  var SIDE_MIN = 320;
+  function sideWidth() {
+    return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--side-w'), 10) || 440;
+  }
+  function setSideWidth(w) {
+    var max = Math.max(SIDE_MIN, Math.min(900, window.innerWidth - 480));
+    w = Math.round(Math.min(max, Math.max(SIDE_MIN, w)));
+    document.documentElement.style.setProperty('--side-w', w + 'px');
+    document.querySelectorAll('.side-grip').forEach(function (g) {
+      g.setAttribute('aria-valuenow', String(w));
+      g.setAttribute('aria-valuemin', String(SIDE_MIN));
+      g.setAttribute('aria-valuemax', String(max));
+    });
+    return w;
+  }
+  (function () {
+    var saved = 0;
+    try { saved = Number(localStorage.getItem('sideW')) || 0; } catch (e) {}
+    setSideWidth(saved || 440);
+    var save = function (w) { try { localStorage.setItem('sideW', String(w)); } catch (e) {} };
+    document.querySelectorAll('.side-grip').forEach(function (g) {
+      g.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        g.setPointerCapture(e.pointerId);
+        document.body.classList.add('resizing');
+        var move = function (ev) { setSideWidth(window.innerWidth - ev.clientX); };
+        var up = function () {
+          g.removeEventListener('pointermove', move);
+          g.removeEventListener('pointerup', up);
+          g.removeEventListener('pointercancel', up);
+          document.body.classList.remove('resizing');
+          save(sideWidth());
+        };
+        g.addEventListener('pointermove', move);
+        g.addEventListener('pointerup', up);
+        g.addEventListener('pointercancel', up);
+      });
+      // Keyboard: the arrow keys move the edge.
+      g.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        save(setSideWidth(sideWidth() + (e.key === 'ArrowLeft' ? 24 : -24)));
+      });
+    });
+  })();
 
   // --- Map ---------------------------------------------------------------------------------
 

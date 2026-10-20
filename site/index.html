@@ -68,30 +68,6 @@
     </div>
   </section>
 
-  <section id="activity" class="how" hidden aria-labelledby="activity-title">
-    <div class="how-head">
-      <div>
-        <h2 id="activity-title" data-i18n="activityTitle">Reports</h2>
-        <p data-i18n="activityLead">What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.</p>
-      </div>
-      <button class="btn ghost" id="activity-close" type="button" data-i18n="close">Close</button>
-    </div>
-    <div id="stats"></div>
-    <div class="live">
-      <section>
-        <h3 data-i18n="recent">Recent reports</h3>
-        <p class="muted small" data-i18n="recentNote">Everyone sees the same reports. Demo data is deleted after a day.</p>
-        <ul id="reports" class="reports"></ul>
-      </section>
-      <section>
-        <h3 data-i18n="waitingTitle">Waiting for a person</h3>
-        <p class="muted small" data-i18n="waitingNote"></p>
-        <ul id="pending" class="reports pending"></ul>
-        <div id="pending-info"></div>
-      </section>
-    </div>
-  </section>
-
   <section class="intro">
     <h1 data-i18n="title">Heavy rain. Reports of closed roads are coming in.</h1>
     <p data-i18n="lead">Send one, and watch Pointsman decide in seconds what happens to it. It reads the report, checks the place on public maps, and applies the city’s rules.</p>
@@ -170,12 +146,34 @@
 </main>
 
 <aside id="dev" class="dev" hidden aria-labelledby="dev-title">
+  <div class="side-grip" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-label="resize"></div>
   <div class="dev-head">
     <h2 id="dev-title" data-i18n="devTitle">Developer view</h2>
     <button class="chip" id="dev-close" type="button" data-i18n="close">Close</button>
   </div>
   <p class="muted small" data-i18n="devLead">What happens to the report, part by part, with the real data. Point at a step on the page to see its part here.</p>
   <div id="dev-body"></div>
+</aside>
+
+<aside id="activity" class="dev side-reports" hidden aria-labelledby="activity-title">
+  <div class="side-grip" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-label="resize"></div>
+  <div class="dev-head">
+    <h2 id="activity-title" data-i18n="activityTitle">Reports</h2>
+    <button class="chip" id="activity-close" type="button" data-i18n="close">Close</button>
+  </div>
+  <p class="muted small" data-i18n="activityLead">What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.</p>
+  <div id="stats"></div>
+  <section>
+    <h3 data-i18n="waitingTitle">Waiting for a person</h3>
+    <p class="muted small" data-i18n="waitingNote"></p>
+    <ul id="pending" class="reports pending"></ul>
+    <div id="pending-info"></div>
+  </section>
+  <section>
+    <h3 data-i18n="recent">Recent reports</h3>
+    <p class="muted small" data-i18n="recentNote">Everyone sees the same reports. Demo data is deleted after a day.</p>
+    <ul id="reports" class="reports"></ul>
+  </section>
 </aside>
 
 <footer>
