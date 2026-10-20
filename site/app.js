@@ -38,7 +38,7 @@
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…', together: 'At the same time, inside Pointsman', inAll: function (s) { return s + ' in all'; },
-      useTag: 'rule',
+      useTag: 'rule', usesMarked: 'The rule read the answers and map checks marked like this above.',
       lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
       answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
       ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
@@ -210,7 +210,7 @@
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…', together: '同時に、Pointsman の中で', inAll: function (s) { return '合計 ' + s; },
-      useTag: '規則',
+      useTag: '規則', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
       lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
       answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
       ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
@@ -453,6 +453,16 @@
       if (name === s) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
     });
     if (scroll) $('stepper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    renderMapReport();
+  }
+
+  /** Steps 3 and 4 no longer show the report: it stays above the map. */
+  function renderMapReport() {
+    var r = current && current.last;
+    var keep = !!r && (step === 'check' || step === 'result');
+    $('map-report').hidden = !keep;
+    $('map-report-kicker').textContent = keep ? $('cur-kicker').textContent : '';
+    $('map-report-text').textContent = keep ? quote(r.description) : '';
   }
 
   function setView(v) {
@@ -704,6 +714,7 @@
     var where = p ? [titleOf(p), placeOf(p)].filter(Boolean).join(' · ') : r ? r.roadName || t('noRoad') : '';
     $('cur-kicker').textContent = (current.sentAt ? t('yourReport') : t('aReport')) + (where ? ' · ' + where : '');
     $('cur-text').textContent = r ? quote(r.description) : '';
+    renderMapReport();
     renderTimeline(r);
     renderAnswers(r);
     renderDecisionFacts(r);
@@ -781,15 +792,13 @@
     return el('span', { class: 'use-tag', text: t('useTag') });
   }
 
-  function renderAnswers(r) {
-    var box = $('answers');
-    if (!box) return;
-    box.textContent = '';
-    if (!r || !r.check || current.shown < 2) return;
-    var used = usedBy('check', r.check.policyRule);
+  /** The AI's answers as rows: the question, the answer and how sure; the ones the rule read tagged. */
+  function answerRows(answers, used) {
+    var names = Object.keys(answers);
+    if (!names.length) return null;
     var list = el('div', { class: 'qa' });
-    Object.keys(r.check.answers).forEach(function (name) {
-      var a = r.check.answers[name];
+    names.forEach(function (name) {
+      var a = answers[name];
       var c = confidence(a.p);
       var on = used.indexOf(name) >= 0;
       list.appendChild(el('div', { class: 'row' + (on ? ' used-row' : '') }, [
@@ -799,6 +808,16 @@
         c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
       ]));
     });
+    return list;
+  }
+
+  function renderAnswers(r) {
+    var box = $('answers');
+    if (!box) return;
+    box.textContent = '';
+    if (!r || !r.check || current.shown < 2) return;
+    var list = answerRows(r.check.answers, usedBy('check', r.check.policyRule));
+    if (!list) return;
     box.appendChild(list);
   }
 
@@ -825,7 +844,7 @@
     box.appendChild(el('div', { class: 'box tint ' + a }, [
       el('span', { class: 'kicker', text: t('ruleTitle') }),
       el('span', { class: 'rule-text', text: text }),
-      renderUsed('check', r.check.policyRule, r.check.answers, r.facts),
+      usedBy('check', r.check.policyRule).length ? el('span', { class: 'uses-note' }, [usedTag(), ' ' + t('usesMarked')]) : null,
       el('div', { class: 'rule-foot' }, [
         el('span', { class: 'badge ' + a, text: t('act')[a] || a }),
         el('button', { class: 'btn', type: 'button', text: t('next'), onclick: function () {
@@ -869,15 +888,17 @@
     } else if (!ev) {
       items.push(secondLate() ? el('span', { text: t('ev').secondLate[1] }) : busy(t('secondRunning')));
     } else {
-      var facts = renderFactList(ev.facts || [], false, usedBy('evacuation', ev.policyRule));
+      var used2 = usedBy('evacuation', ev.policyRule);
+      var asked = answerRows(ev.answers || {}, used2);
+      if (asked) items.push(asked);
+      var facts = renderFactList(ev.facts || [], false, used2);
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
       showRoute(ev.facts || []);
       var rules2 = t('rules2');
       var key2 = ev.policyRule === undefined ? 'default' : ev.policyRule;
       if (Object.prototype.hasOwnProperty.call(rules2, key2)) items.push(el('span', { class: 'rule-text', text: rules2[key2] }));
-      var used = renderUsed('evacuation', ev.policyRule, ev.answers, ev.facts);
-      if (used) items.push(used);
+      if (used2.length) items.push(el('span', { class: 'uses-note' }, [usedTag(), ' ' + t('usesMarked')]));
       var c = { alert: 'cAlert', review: 'cReview', none: 'cNone' }[ev.action];
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
     }
@@ -982,19 +1003,24 @@
     var rule = Object.prototype.hasOwnProperty.call(rules, f.policyRule === undefined ? 'default' : f.policyRule) ? rules[f.policyRule === undefined ? 'default' : f.policyRule] : null;
     var person = r.check.finalAction || r.visitorDecision;
     var ev = r.evacuation;
-    var chip = function (label, value) { return el('span', { class: 'chip-ai' }, [el('b', { text: label }), ' ' + value]); };
-    var from = [
-      el('span', { class: 'kicker', text: t('basedOn') }),
-      chip(t('bFirst'), t('act')[r.check.action] || r.check.action),
-      person ? chip(t('bPerson'), t('act')[person] || person) : null,
-      ev ? chip(t('bSecond'), t('act')[ev.action] || ev.action) : r.check.action === 'publish' ? chip(t('bSecond'), t('bNoSecond')) : null,
-    ];
+    // What it was made from, as the chain it went through: each earlier
+    // result with its colour, in order, the person's answer last.
+    var stage = function (label, action, text) {
+      return el('span', { class: 'stage' }, [el('span', { class: 'stage-label', text: label }), el('span', { class: 'badge small ' + (action || 'none'), text: text || t('act')[action] || action })]);
+    };
+    var arrow = function () { return el('span', { class: 'stage-arrow', 'aria-hidden': 'true', text: '→' }); };
+    var stages = [stage(t('bFirst'), r.check.action)];
+    if (ev) stages.push(stage(t('bSecond'), ev.action));
+    else if (r.check.action === 'publish') stages.push(stage(t('bSecond'), 'skip', t('bNoSecond')));
+    if (person) stages.push(stage(t('bPerson'), person));
+    var from = [el('span', { class: 'kicker', text: t('basedOn') })];
+    stages.forEach(function (s, i) { if (i) from.push(arrow()); from.push(s); });
     // The step's own heading says "Final result": no kicker here.
     box.appendChild(el('div', { class: 'box tint final ' + f.action }, [
       el('strong', { class: 'headline', text: words[0] }),
       words[1] ? el('span', { text: words[1] }) : null,
       rule ? el('span', { class: 'rule-text', text: rule }) : null,
-      el('div', { class: 'used' }, from),
+      el('div', { class: 'stages' }, from),
     ]));
   }
 
@@ -1219,27 +1245,6 @@
     // Its default (none) reads nothing: no 'Based on' line for it.
     evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'] },
   };
-
-  /** "Based on": the AI answers and map checks the rule used, with their values. */
-  function renderUsed(profile, rule, answers, facts) {
-    var uses = RULE_USES[profile];
-    var key = rule === undefined ? 'default' : String(rule);
-    // A rule this page does not know (a newer profile): say nothing rather than something wrong.
-    if (!Object.prototype.hasOwnProperty.call(uses, key)) return null;
-    var names = uses[key];
-    var chips = [];
-    names.forEach(function (name) {
-      var f = (facts || []).filter(function (x) { return x.name === name; })[0];
-      if (f) {
-        chips.push(el('span', { class: 'chip-map' }, [el('b', { text: t('usedMap') }), ' ' + t('ch')[name] + ': ' + factText(f)]));
-        return;
-      }
-      var a = answers && answers[name];
-      if (a) chips.push(el('span', { class: 'chip-ai' }, [el('b', { text: t('usedAI') }), ' ' + (t('q')[name] || name) + ' ' + answerText(name, a.value)]));
-    });
-    if (!chips.length) return null;
-    return el('div', { class: 'used' }, [el('span', { class: 'kicker', text: t('usedTitle') })].concat(chips));
-  }
 
   // --- Developer view ------------------------------------------------------------------
 
@@ -1524,6 +1529,9 @@
     var m = new maplibregl.Map({ container: 'map', style: style(), center: CENTER, zoom: 13.4, attributionControl: { compact: true }, cooperativeGestures: true });
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     m.on('load', function () {
+      // The attribution starts folded: the (i) button opens it.
+      var attrib = m.getContainer().querySelector('.maplibregl-ctrl-attrib');
+      if (attrib) { attrib.classList.remove('maplibregl-compact-show'); attrib.removeAttribute('open'); }
       m.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       var color = ['match', ['get', 'outcome'], 'publish', COLORS.publish, 'review', COLORS.review, 'urgent', COLORS.urgent, 'reject', COLORS.reject, COLORS.pending];
       var width = ['case', ['get', 'current'], 12, 7];

@@ -326,3 +326,18 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
   .timeline li { padding: 10px; gap: 10px; }
   .timeline li.pair { padding: 8px 6px; }
 }
+
+/* Steps 2 and 3: one line under the rule instead of repeating the answers. */
+.uses-note { font-size: 0.85rem; color: var(--fg-2); }
+.uses-note .use-tag { margin-right: 2px; }
+/* Step 4: what the final result was made from, as the chain it went through. */
+.stages { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.stages .kicker { flex-basis: 100%; }
+.stage { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--fg-2); }
+.stage-arrow { color: var(--muted); }
+.badge.small { font-size: 0.78rem; padding: 1px 9px; }
+.badge.skip { background: var(--panel-2); color: var(--fg-2); }
+/* The report, above the map in steps 3 and 4. */
+.map-report { display: grid; gap: 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+.map-report[hidden] { display: none; }
+.map-report #map-report-text { font-size: 0.98rem; }
