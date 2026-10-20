@@ -54,7 +54,9 @@ flowchart LR
    model) reads their results from its log and decides once more. The bridge
    writes `final`, plus a `Decision` entity that links both earlier ones and,
    after a rerun, the one it replaces. The residents' map reads this result.
-   It runs again when a person answers step 1 (their answer counts).
+   It runs again when a person answers step 1 or step 2 (their answer
+   counts). When step 2 did not come (it failed), step 3 does not run either;
+   the map then shows step 1's result.
 6. A member comments `/publish` or `/reject`, optionally with corrections
    (`/category laneRestriction`, `/danger no`). The Worker resolves the review
    in Pointsman (also for `urgent`: the profile's `people_check`), writes the
@@ -72,6 +74,11 @@ flowchart LR
 8. Every hour, data older than a day is deleted (with its Decision, Task and
    Alert entities, also the final ones a rerun replaced) and its issues are
    closed.
+
+Deploy order for the final step: Pointsman first (pointsman-config, with
+`road-closure-final` and `road-restriction-check` v3, and the token's scope),
+then this Worker, then `node scripts/setup.mjs` for the new subscription.
+Without the profile, step 3's requests are refused and not retried.
 
 No notification gets lost (pointsman#88). The Worker puts each notified
 entity on a queue (`pointsman-demo-bridge`) and answers the broker at once.

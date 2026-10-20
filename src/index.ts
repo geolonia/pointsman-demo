@@ -128,8 +128,9 @@ export default {
       // As in the engine's queue loop: a redirect (pointsman#105) is retried
       // too, so the message ends in the dead-letter queue and can be replayed
       // once the URL is fixed.
-      // A request no retry can fix (idempotency_conflict) too: it ends in the
-      // dead-letter queue, from where it can be looked at.
+      // A request no retry can fix (idempotency_conflict) too: the demo has
+      // no dead-letter producer, so it is retried until max_retries moves it
+      // to the dead-letter queue, from where it can be looked at.
       if ('retry' in result && (result.retry || ('redirect' in result && result.redirect) || ('deadLetter' in result && result.deadLetter))) {
         console.error(`bridge queue: ${result.id}${decision} (attempt ${message.attempts}): ${result.error}`);
         message.retry({ delaySeconds: retryDelay(message.attempts) });
@@ -337,7 +338,14 @@ async function webhook(request: Request, env: Env): Promise<Response> {
   let res = command.final && PERSON_ACTIONS.includes(record.action)
     ? await pointsman(`/v1/reviews/${record.decision}/resolve`, { action: command.final, correct: command.correct, by })
     : null;
-  if (res?.status === 409 && !(await hasReview(env, record.decision))) res = null;
+  if (res?.status === 409) {
+    const got = await reviewOf(env, record.decision);
+    if (got === 'unavailable') {
+      await github.comment(p.issue.number, 'Pointsman could not be reached; nothing was changed. Try again in a moment.');
+      return json({ error: 'pointsman unavailable' }, 200);
+    }
+    if (!got) res = null;
+  }
   if (!res && hasCorrections) res = await pointsman(`/v1/decisions/${record.decision}/feedback`, { correct: command.correct, by });
   if (res && !res.ok) {
     await github.comment(p.issue.number, `Pointsman refused this (${res.status}); nothing was changed.`);
@@ -392,7 +400,7 @@ async function sha256(text: string): Promise<string> {
  * A visitor decides their own report (publish or reject), as the person on
  * duty would: only with the key the page got when it sent the report, only
  * once, and only while the report waits for a person. Like a GitHub review:
- * Pointsman gets the review (for `review` decisions), the Decision entity is
+ * Pointsman gets the review (for review and urgent decisions), the Decision entity is
  * resolved (the bridge then writes the final action to the report), and the
  * report's issue is closed.
  */
@@ -423,16 +431,15 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
   // decision from before that has no review: recorded in the broker only.
   {
     const res = await pointsmanPost(env, `/v1/reviews/${decision}/resolve`, { action: final, correct: {}, by });
-    if (res.status === 409 && !(await hasReview(env, decision))) {
-      // Nothing to resolve in Pointsman.
-    } else if (res.status === 409) {
+    if (res.status === 409) {
+      const review = await reviewOf(env, decision);
+      if (review === 'unavailable') return json({ error: 'Pointsman could not be reached' }, 502, cors);
       // No longer pending. Only this visitor's own earlier try with the same
       // answer (whose broker update failed) is finished below; anything else
-      // (a team member, or this visitor's other answer) stays as it is.
-      const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${decision}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
-      const review = got.ok ? ((await got.json()) as { review?: { resolved_by?: string; final_action?: string } }).review : undefined;
-      if (review?.resolved_by !== by || review.final_action !== final) {
-        return json({ error: 'already decided', ...(review?.resolved_by === by && { finalAction: review.final_action }) }, 409, cors);
+      // (a team member, or this visitor's other answer) stays as it is. No
+      // review at all: nothing to resolve in Pointsman.
+      if (review && (review.resolved_by !== by || review.final_action !== final)) {
+        return json({ error: 'already decided', ...(review.resolved_by === by && { finalAction: review.final_action }) }, 409, cors);
       }
     } else if (!res.ok) {
       return json({ error: `Pointsman refused this (${res.status})` }, 502, cors);
@@ -450,7 +457,7 @@ async function closeIssueFor(env: Env, decision: string, action: string, final: 
   const n = await env.DEMO.get(`decision-issue:${decision}`);
   if (!n || !/^\d+$/.test(n)) return;
   const github = new GitHub(env);
-  const sent = action === 'review' ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.';
+  const sent = PERSON_ACTIONS.includes(action) ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.';
   await github.comment(Number(n), `Decided on the demo page by the visitor who sent it: **${final}**. ${sent}`);
   await github.close(Number(n), ['demo', action, final]);
 }
@@ -672,11 +679,17 @@ async function taskIdOf(e: Entity): Promise<string | null> {
   return typeof hash === 'string' ? taskEntityId(e.id, ROUTE.attribute, hash) : null;
 }
 
-/** Whether Pointsman has a review for this decision (pending or not). */
-async function hasReview(env: Env, decision: string): Promise<boolean> {
-  const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${decision}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
-  if (!got.ok) return true;
-  return Boolean(((await got.json()) as { review?: unknown }).review);
+type PointsmanReview = { status?: string; resolved_by?: string; final_action?: string };
+
+/** The decision's review in Pointsman: null when it has none, 'unavailable' when Pointsman cannot say. */
+async function reviewOf(env: Env, decision: string): Promise<PointsmanReview | null | 'unavailable'> {
+  try {
+    const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${decision}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+    if (!got.ok) return 'unavailable';
+    return ((await got.json()) as { review?: PointsmanReview }).review ?? null;
+  } catch {
+    return 'unavailable';
+  }
 }
 
 /**
@@ -848,7 +861,9 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     // Step 3: its Decision entity, and the ones it replaced (a rerun after a
     // person answered step 1), through their replaces links.
     let third = ((e.final as Attr | undefined)?.decision as Attr | undefined)?.object;
-    for (let i = 0; typeof third === 'string' && i < 10; i += 1) {
+    // Read the next link before deleting, so a failed delete leaves the rest
+    // reachable from the report on the next run (the report stays then).
+    for (let i = 0; typeof third === 'string' && i < 50; i += 1) {
       const replaced = ((await broker.getDecision(third))?.[REPLACES_IRI] as Attr | undefined)?.object;
       await broker.delete(third);
       third = replaced;

@@ -749,6 +749,19 @@ describe('a visitor decides their own report', () => {
     expect(calls.find((c) => c.url.endsWith('/attrs') && c.body?.finalAction)?.body.finalAction).toEqual(P('reject'));
   });
 
+  it('says Pointsman is not available instead of "already decided" when it cannot read the review', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'urgent');
+    const base = answer;
+    answer = (c) => {
+      if (c.url.includes('/v1/reviews/')) return Response.json({ error: 'not_pending' }, { status: 409 });
+      if (c.url.endsWith(`/v1/decisions/${DECISION}`)) return new Response('down', { status: 503 });
+      return base(c);
+    };
+    expect((await decide(id, { action: 'reject', key })).status).toBe(502);
+    expect(calls.some((c) => c.url.endsWith('/attrs') && c.body?.finalAction)).toBe(false);
+  });
+
   it('records an older urgent decision without a review in the broker only', async () => {
     const { id, key } = await sendOne();
     brokerHas(id, 'urgent');

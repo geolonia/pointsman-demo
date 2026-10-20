@@ -616,20 +616,32 @@
       // a minute, poll slowly instead of fast forever.
       var done = decidedNow && (!chained || b.evacuation || Date.now() - me.chainSince > 60000);
       // Then the final result (step 3); it is made again after a person's answer.
-      if (done && !b.final && !me.finalSince) me.finalSince = Date.now();
-      if (b && b.final) me.finalSince = null;
-      var answered = b && b.check && (b.check.finalAction || b.visitorDecision);
-      var finalFresh = b && b.final && (!answered || !b.check.reviewedAt || !b.final.decidedAt || Date.parse(b.final.decidedAt) >= Date.parse(b.check.reviewedAt));
-      done = done && (finalFresh || finalLate(b));
+      // It counts as late a minute after the earlier checks (or after a
+      // person's answer, for the rerun), so the page never polls fast forever.
+      if (done && !finalFresh(b) && !me.finalSince) me.finalSince = Date.now();
+      if (finalFresh(b)) me.finalSince = null;
+      done = done && (finalFresh(b) || finalLate(b));
       var resolved = done && b.final && b.final.action !== 'review';
       me.poll = setTimeout(poll, !done ? 1200 : resolved ? 30000 : 4000);
       if (decidedNow && !me.mapped) { me.mapped = true; loadReports(); }
     }).catch(function () { if (current === me && seq === me.seq) me.poll = setTimeout(poll, 3000); });
   }
 
-  /** The final result did not come within a minute of the earlier checks. */
+  /**
+   * The final result is there and made after a person's answer, if there was
+   * one (the bridge writes reviewedAt with the answer; until then it is not).
+   */
+  function finalFresh(b) {
+    if (!b || !b.final) return false;
+    var answered = b.check && (b.check.finalAction || b.visitorDecision);
+    if (!answered) return true;
+    if (!b.check.reviewedAt || !b.final.decidedAt) return false;
+    return Date.parse(b.final.decidedAt) >= Date.parse(b.check.reviewedAt);
+  }
+
+  /** No (new) final result within a minute of the earlier checks or of a person's answer. */
   function finalLate(b) {
-    return !!(b && !b.final && current && current.finalSince && Date.now() - current.finalSince > 60000);
+    return !!(b && !finalFresh(b) && current && current.finalSince && Date.now() - current.finalSince > 60000);
   }
 
   // Once the decision is there, its parts appear one after the other.
@@ -846,7 +858,9 @@
     box.textContent = '';
     if (!r || !r.check) return;
     var f = r.final;
-    if (!f) {
+    // After a person's answer the final result is made again: until it is
+    // there, "being decided" (not the old result next to the new answer).
+    if (!f || (!finalFresh(r) && !finalLate(r))) {
       box.appendChild(el('div', { class: 'box' }, [
         el('span', { class: 'kicker', text: t('finalKicker') }),
         el('strong', { class: 'box-title', text: t('finalPending') }),
