@@ -97,9 +97,12 @@ a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
    questions with a confidence word, the map checks (question, answer and
    data source, apart from the AI's answers), and the city's rule in one
    sentence. On the headquarters map, the nearest evacuation site is marked
-   with a dotted line to the report (its place from the same GSI data). The
-   real NGSI-LD data is behind "Show the data".
-3. **What happens next.** The outcome, the second check (evacuation site),
+   with a dotted line to the report (its place from the same GSI data). In
+   step 1 no rule uses the site; the page says it is context for the person
+   who checks. The real NGSI-LD data is behind "Show the data".
+3. **What happens next.** The outcome, the second check (evacuation site;
+   the map draws the way around on foot from the `route` of Pointsman's
+   detour fact, which the evacuation profile asks for with `route: true`),
    and, for a report that waits for a person, Publish and Reject buttons: the
    visitor who sent it decides it, as the person on duty would. Below, the
    numbers of the last 7 days from Pointsman's decision log.

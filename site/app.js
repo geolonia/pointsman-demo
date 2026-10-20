@@ -78,6 +78,8 @@
       fShelterMap: function (n, m) { return 'Evacuation site: ' + n + ' · ' + m + ' m'; },
       floodClass: {},
       mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
+      fRouteMap: function (m) { return 'Way around on foot: +' + m + ' m'; },
+      fShelterNote: 'No rule of this check uses it: it is context for the person who checks. The second check uses it.',
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
       doPublish: 'Publish it', doReject: 'Reject it', deciding: 'Sending…',
@@ -185,6 +187,8 @@
         '3 to 5 m': '3〜5 m', '5 to 10 m': '5〜10 m', '10 to 20 m': '10〜20 m', '20 m or more': '20 m 以上',
       },
       mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
+      fRouteMap: function (m) { return '歩いて迂回：+' + m + ' m'; },
+      fShelterNote: 'この確認の規則では使いません。確認する人のための参考情報です。2 つ目の確認で使います。',
       dutyTitle: 'あなたが担当者です',
       dutyText: '市では、チームのメンバーがこれを仕事として受け取ります。ここではあなたが決めてください。この報告を住民に見せますか。',
       doPublish: '公開する', doReject: '公開しない', deciding: '送信中…',
@@ -521,6 +525,7 @@
     renderDecisionFacts(r);
     renderRule(r);
     renderData(r);
+    if (r && r.evacuation && current.shown >= 3) showRoute(r.evacuation.facts || []);
     if (step === 'result') renderResult(r);
   }
 
@@ -758,7 +763,8 @@
   }
 
   /** One row per map check: the question, the answer, and where the data comes from. */
-  function renderFactList(facts) {
+  // `firstCheck`: the facts of step 1, where no rule uses the evacuation site.
+  function renderFactList(facts, firstCheck) {
     if (!facts.length) return null;
     var list = el('ul', { class: 'facts' });
     facts.forEach(function (f) {
@@ -766,13 +772,14 @@
         el('span', { class: 'fq', text: t('fQ')[f.name] || f.name }),
         el('strong', { class: 'fa', text: factText(f) }),
         f.missing ? null : el('span', { class: 'fs', text: t('fSource') + f.source }),
+        firstCheck && f.name === 'shelter' && !f.missing ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
       ]));
     });
     return list;
   }
 
   function renderFacts(facts) {
-    var list = renderFactList(facts);
+    var list = renderFactList(facts, true);
     if (!list) return null;
     return el('div', { class: 'box map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
   }
@@ -867,10 +874,13 @@
         m.on('mouseleave', layer, function () { m.getCanvas().style.cursor = ''; });
       });
       m.addSource('shelter', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      m.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1f5fa8', 'line-width': 4, 'line-dasharray': [2, 1.5] } }, 'halo');
       m.addLayer({ id: 'shelter-line', type: 'line', source: 'shelter', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#1E6B48', 'line-width': 3.5, 'line-dasharray': [0.5, 2] } });
       m.demoReady = true;
       if (current && current.last && current.shown >= 3) {
         showShelter((current.last.facts || []).concat(current.last.evacuation ? current.last.evacuation.facts || [] : []));
+        if (current.last.evacuation) showRoute(current.last.evacuation.facts || []);
       }
       m.setLayoutProperty('flood', 'visibility', view === 'hq' ? 'visible' : 'none');
       updateMap();
@@ -912,7 +922,62 @@
 
   function clearShelter() {
     if (shelterMarker) { shelterMarker.remove(); shelterMarker = null; }
-    if (map && map.demoReady) map.getSource('shelter').setData({ type: 'FeatureCollection', features: [] });
+    if (routeMarker) { routeMarker.remove(); routeMarker = null; }
+    if (map && map.demoReady) {
+      map.getSource('shelter').setData({ type: 'FeatureCollection', features: [] });
+      map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+    }
+  }
+
+  // The way around on foot (step 2 of the chain): Pointsman's detour fact
+  // carries it as an encoded polyline (precision 6), from one end of the
+  // closed section to the other.
+  var routeMarker = null;
+
+  /** Positions of an encoded polyline; null when the text is not one. */
+  function decodePolyline(text, precision) {
+    var factor = Math.pow(10, precision);
+    var out = [];
+    var i = 0, lat = 0, lon = 0;
+    while (i < text.length) {
+      var d = [0, 0];
+      for (var k = 0; k < 2; k++) {
+        var shift = 0, result = 0, b;
+        do {
+          if (i >= text.length) return null;
+          b = text.charCodeAt(i++) - 63;
+          if (b < 0 || b > 63) return null;
+          result |= (b & 31) << shift;
+          shift += 5;
+        } while (b >= 32 && shift < 35);
+        d[k] = result & 1 ? ~(result >> 1) : result >> 1;
+      }
+      lat += d[0];
+      lon += d[1];
+      out.push([lon / factor, lat / factor]);
+    }
+    return out.length >= 2 ? out : null;
+  }
+
+  function showRoute(facts) {
+    var f = facts.filter(function (x) { return x.name === 'walk' && !x.missing && typeof x.values.route === 'string' && typeof x.values.extra_m === 'number'; })[0];
+    if (!f || !map || !map.demoReady || !current) return;
+    var key = current.id + '|' + f.values.route;
+    if (current.routeShown === key) return;
+    var line = decodePolyline(f.values.route, 6);
+    // A route far from Tokyo is not this one: drawn only inside the demo area, with a margin.
+    if (!line || !line.every(function (p) { return p[0] > 139.6 && p[0] < 139.9 && p[1] > 35.6 && p[1] < 35.8; })) return;
+    current.routeShown = key;
+    map.getSource('route').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} }] });
+    if (routeMarker) routeMarker.remove();
+    var node = el('div', { class: 'route-pin' }, [el('span', { class: 'name', text: t('fRouteMap')(f.values.extra_m) })]);
+    routeMarker = new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat(line[Math.floor(line.length / 2)]).addTo(map);
+    routeMarker.demoFact = f.values;
+    setShelterVisible();
+    if (view === 'hq') {
+      var b = line.reduce(function (acc, p) { return [[Math.min(acc[0][0], p[0]), Math.min(acc[0][1], p[1])], [Math.max(acc[1][0], p[0]), Math.max(acc[1][1], p[1])]]; }, [line[0], line[0]]);
+      map.fitBounds(b, { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 16.5 });
+    }
   }
 
   function showShelter(facts) {
@@ -951,15 +1016,21 @@
   }
 
   function renderShelterLabel() {
-    if (!shelterMarker) return;
-    var v = shelterMarker.demoFact;
-    shelterMarker.getElement().querySelector('.name').textContent = t('fShelterMap')(String(v.name), v.distance_m);
+    if (shelterMarker) {
+      var v = shelterMarker.demoFact;
+      shelterMarker.getElement().querySelector('.name').textContent = t('fShelterMap')(String(v.name), v.distance_m);
+    }
+    if (routeMarker) routeMarker.getElement().querySelector('.name').textContent = t('fRouteMap')(routeMarker.demoFact.extra_m);
   }
 
   /** Like the flood zones, the evacuation site is for headquarters only. */
   function setShelterVisible() {
     if (shelterMarker) shelterMarker.getElement().hidden = view !== 'hq';
-    if (map && map.demoReady) map.setLayoutProperty('shelter-line', 'visibility', view === 'hq' ? 'visible' : 'none');
+    if (routeMarker) routeMarker.getElement().hidden = view !== 'hq';
+    if (map && map.demoReady) {
+      map.setLayoutProperty('shelter-line', 'visibility', view === 'hq' ? 'visible' : 'none');
+      map.setLayoutProperty('route-line', 'visibility', view === 'hq' ? 'visible' : 'none');
+    }
   }
 
   function focus(location) {
