@@ -24,6 +24,7 @@
   --t-review: #3a2c0f; --i-review: #f0c477;
   --t-urgent: #3d1a16; --i-urgent: #f2a196;
   --t-reject: #28223d; --i-reject: #c3b7ec;
+  --t-map: #15263a; --i-map: #9fc6ee; --line-map: #2b4a6b;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -39,6 +40,7 @@
   --t-review: #F6E7C8; --i-review: #7A520C;
   --t-urgent: #F5D9D5; --i-urgent: #8E2A20;
   --t-reject: #E6E1F3; --i-reject: #4E3F86;
+  --t-map: #E3EDF8; --i-map: #1F4F80; --line-map: #C3D6EC;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
@@ -47,6 +49,7 @@
     --panel: #FBFAF7; --panel-2: #F1EEE7; --line: #DCD6CA; --code-bg: #F1EEE7;
     --t-publish: #DDF0E6; --i-publish: #1E6B48; --t-review: #F6E7C8; --i-review: #7A520C;
     --t-urgent: #F5D9D5; --i-urgent: #8E2A20; --t-reject: #E6E1F3; --i-reject: #4E3F86;
+    --t-map: #E3EDF8; --i-map: #1F4F80; --line-map: #C3D6EC;
   }
 }
 
@@ -108,8 +111,13 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
   border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; cursor: pointer; }
 .card:hover:not(:disabled) { border-color: var(--fg); }
 .card .label { align-self: flex-start; font: 500 0.8rem var(--mono); padding: 3px 10px; border-radius: 999px; background: var(--panel-2); color: var(--fg-2); }
-.card .road { font-size: 1.05rem; }
-.card .text { color: var(--fg-2); font-size: 0.95rem; }
+.card .road { font-size: 1.15rem; }
+/* A pin before the landmark. */
+.card .place { display: flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 0.92rem; }
+.card .place::before { content: ''; flex: none; width: 8px; height: 8px; border: 2px solid currentColor; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); margin: 0 1px 2px; }
+.card .text { color: var(--muted); font-size: 0.9rem; }
+.card .checks-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--line); font: 0.75rem var(--mono); color: var(--muted); }
+.chip-map { padding: 2px 8px; border-radius: 999px; background: var(--t-map); color: var(--i-map); }
 .more { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .more summary { cursor: pointer; font-weight: 500; min-height: 28px; }
 .more-list { list-style: none; margin: 8px 0 2px; padding: 0; display: grid; gap: 6px; }
@@ -152,7 +160,18 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .conf { font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; background: var(--panel-2); color: var(--fg-2); }
 .conf.vsure, .conf.sure { background: var(--t-publish); color: var(--i-publish); }
 .conf.unsure { background: var(--t-review); color: var(--i-review); }
-.facts { margin: 0; padding-left: 1.2rem; display: grid; gap: 2px; }
+/* The map checks: question, answer, source. In blue, apart from the AI's answers. */
+.facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.facts .fact { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line); }
+.facts .fact:first-child { padding-top: 0; border-top: none; }
+.facts .fq { color: var(--fg-2); font-size: 0.9rem; }
+.facts .fs { font: 0.72rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.box.map-checks { background: var(--t-map); border-color: var(--line-map); }
+.box.map-checks .kicker { color: var(--i-map); }
+.box.map-checks .fact { border-top-color: var(--line-map); }
+.shelter-pin { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; pointer-events: none; }
+.shelter-pin .mark { width: 16px; height: 16px; border-radius: 4px; background: #2E9E6B; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.shelter-pin .name { font: 600 12px var(--sans); color: #1E6B48; background: #fff; padding: 3px 7px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); white-space: nowrap; }
 details.data > summary, .box details > summary, #pending-info details > summary { cursor: pointer; font: 0.8rem var(--mono); color: var(--muted); }
 details.data { display: grid; gap: 4px; }
 pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; max-height: 320px; margin: 6px 0 0; }
