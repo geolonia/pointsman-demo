@@ -863,3 +863,29 @@ describe('the week in numbers (/api/stats)', () => {
     expect(res.status).toBe(502);
   });
 });
+
+describe('the chain as a diagram (/api/graph)', () => {
+  const SVG = '<svg class="flow-diagram pm-graph" xmlns="http://www.w3.org/2000/svg"><text>final</text></svg>';
+
+  it('passes on the final profile graph from Pointsman as SVG, and as DMN for download', async () => {
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/profiles/road-closure-final/graph?format=svg&lang=ja') return new Response(SVG, { headers: { 'content-type': 'image/svg+xml' } });
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/profiles/road-closure-final/graph?format=dmn&lang=en') return new Response('<definitions/>');
+      return undefined;
+    };
+    const svg = await worker('/api/graph?format=svg&lang=ja', { headers: { origin: PAGE } });
+    expect(svg.status).toBe(200);
+    expect(svg.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
+    expect(await svg.text()).toBe(SVG);
+    expect(calls.find((c) => c.url.includes('/graph'))!.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
+    const dmn = await worker('/api/graph?format=dmn&lang=en');
+    expect(dmn.headers.get('content-disposition')).toBe('attachment; filename="road-closure-final.dmn"');
+  });
+
+  it('refuses other formats and languages, and answers 502 when Pointsman cannot give it', async () => {
+    expect((await worker('/api/graph?format=png')).status).toBe(400);
+    expect((await worker('/api/graph?lang=fr')).status).toBe(400);
+    answer = (c) => (c.url.includes('/graph') ? new Response(null, { status: 503 }) : undefined);
+    expect((await worker('/api/graph?format=svg&lang=en')).status).toBe(502);
+  });
+});

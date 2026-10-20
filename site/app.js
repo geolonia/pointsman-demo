@@ -104,6 +104,8 @@
       },
       basedOn: 'Made from', bFirst: 'first result', bPerson: 'person’s answer', bSecond: 'additional check', bNoSecond: 'no additional check needed',
       showDecision3: 'Decision entity of the final result',
+      graphKicker: 'How the city decides', graphText: 'The final result is made from the decisions below it. Each box is a profile with its own rules.',
+      graphDmn: 'Download for DMN tools (.dmn)',
       // evacuation-access-check (pointsman-config): its rules, by index.
       rules2: {
         '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
@@ -263,6 +265,8 @@
       },
       basedOn: 'もとにしたもの', bFirst: '最初の結果', bPerson: '人の答え', bSecond: '追加の確認', bNoSecond: '追加の確認は不要',
       showDecision3: '最終結果の Decision エンティティ',
+      graphKicker: '市の判断の流れ', graphText: '最終結果は、その下にある判断からつくられます。箱 1 つが、それぞれの規則をもつ 1 つのプロファイルです。',
+      graphDmn: 'DMN ツール用にダウンロード（.dmn）',
       rules2: {
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
         '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
@@ -891,6 +895,86 @@
       rule ? el('span', { class: 'rule-text', text: rule }) : null,
       el('div', { class: 'used' }, from),
     ]));
+    box.appendChild(renderGraph());
+  }
+
+  // The chain as a diagram (Pointsman's GET /v1/profiles/{id}/graph, through
+  // the demo's server), fetched once per language; a failed fetch is tried
+  // again later (fetchGraph), and the box is left out until it works.
+  var graphSvg = {};
+  var graphAt = {};
+  var GRAPH_TTL = 600000; // 10 minutes, as the server's cache
+  function renderGraph() {
+    var l = lang;
+    var holder = el('div', { class: 'box graph', id: 'final-graph', 'data-lang': l }, [
+      el('span', { class: 'kicker', text: t('graphKicker') }),
+      el('span', { text: t('graphText') }),
+    ]);
+    var place = el('div', { class: 'graph-svg' });
+    holder.appendChild(place);
+    holder.appendChild(el('a', { href: '/api/graph?format=dmn&lang=' + l, download: 'road-closure-final.dmn', text: t('graphDmn') }));
+    if (graphSvg[l]) {
+      place.appendChild(graphSvg[l].cloneNode(true));
+      // Older than the server's cache: fetch the current one, keep this one meanwhile.
+      if (Date.now() - graphAt[l] > GRAPH_TTL && !graphAt[l + ':fetching']) fetchGraph(l, 0);
+      return holder;
+    }
+    holder.hidden = true;
+    if (graphSvg[l] === undefined) fetchGraph(l, 0);
+    return holder;
+  }
+
+  /** Fetches the diagram; after a failure it tries again by itself (20 s, 40 s, …; five tries). */
+  function fetchGraph(l, tries) {
+    var had = !!graphSvg[l];
+    if (!had) graphSvg[l] = null; // fetching
+    graphAt[l + ':fetching'] = true;
+    fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; }).then(function (text) {
+      graphAt[l + ':fetching'] = false;
+      var svg = cleanSvg(text);
+      if (!svg) {
+        // A diagram shown already stays; it is tried again at the next redraw after the TTL.
+        if (had) { graphAt[l] = Date.now(); return; }
+        delete graphSvg[l];
+        if (tries < 4) setTimeout(function () { if (graphSvg[l] === undefined) fetchGraph(l, tries + 1); }, 20000 * (tries + 1));
+        return;
+      }
+      graphSvg[l] = svg;
+      graphAt[l] = Date.now();
+      // The page may have been redrawn meanwhile: put it in the box shown now, if it is in this language.
+      var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
+      var spot = now && now.querySelector('.graph-svg');
+      if (spot) { spot.textContent = ''; spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
+    });
+  }
+
+  // Only what Pointsman's diagram uses (src/graph.ts toSvg): SVG elements and
+  // attributes on these lists; everything else is dropped, so nothing in it
+  // can run or load anything.
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var SVG_ELEMENTS = ['svg', 'style', 'defs', 'marker', 'path', 'line', 'rect', 'text', 'tspan', 'title', 'g'];
+  var SVG_ATTRS = ['class', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'rx', 'd', 'viewBox', 'refX', 'refY', 'markerWidth',
+    'markerHeight', 'orient', 'marker-end', 'textLength', 'lengthAdjust', 'id', 'role', 'aria-label'];
+  function cleanSvg(text) {
+    if (!text) return null;
+    var doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    var svg = doc.documentElement;
+    if (!svg || svg.namespaceURI !== SVG_NS || svg.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) return null;
+    var keep = function (n) { return n.namespaceURI === SVG_NS && SVG_ELEMENTS.indexOf(n.localName) >= 0; };
+    Array.prototype.slice.call(svg.getElementsByTagName('*')).forEach(function (n) { if (!keep(n) && n.parentNode) n.parentNode.removeChild(n); });
+    [svg].concat(Array.prototype.slice.call(svg.getElementsByTagName('*'))).forEach(function (n) {
+      Array.prototype.slice.call(n.attributes).forEach(function (a) {
+        var ok = SVG_ATTRS.indexOf(a.localName) >= 0 && !a.namespaceURI
+          // A marker is referenced only within the diagram.
+          && !(a.localName === 'marker-end' && !/^url\(#[A-Za-z0-9_.-]+\)$/.test(a.value));
+        if (!ok && !(n === svg && a.name === 'xmlns')) n.removeAttribute(a.name);
+      });
+    });
+    // The style element: Pointsman's own rules, but no outside resources.
+    Array.prototype.slice.call(svg.getElementsByTagName('style')).forEach(function (st) {
+      if (/@import|url\(/i.test(st.textContent)) st.parentNode.removeChild(st);
+    });
+    return document.importNode(svg, true);
   }
 
   // --- The week's numbers (step 3) -------------------------------------------------------

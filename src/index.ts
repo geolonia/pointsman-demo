@@ -503,6 +503,30 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
+  if (url.pathname === '/api/graph' && request.method === 'GET') {
+    // The chain of decisions as a diagram (pointsman#110): the final profile's
+    // graph from Pointsman, as SVG for the page (format=svg, lang en or ja) or
+    // DMN 1.3 for DMN tools (format=dmn). Cached 10 minutes: right after a
+    // profile update the graph can briefly lack a profile (KV).
+    const format = url.searchParams.get('format') ?? 'svg';
+    const lang = url.searchParams.get('lang') ?? 'en';
+    if (!['svg', 'dmn'].includes(format) || !['en', 'ja'].includes(lang)) return json({ error: 'format svg or dmn, lang en or ja' }, 400, cors);
+    const key = new Request(new URL(`/api/graph?format=${format}&lang=${lang}`, url).toString());
+    const hit = await caches.default.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
+    const pm = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/profiles/${FINAL_ROUTE.profile}/graph?format=${format}&lang=${lang}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+    if (!pm.ok) return json({ error: `Pointsman ${pm.status}` }, 502, cors);
+    const res = new Response(await pm.text(), {
+      headers: {
+        'content-type': format === 'svg' ? 'image/svg+xml; charset=utf-8' : 'application/xml; charset=utf-8',
+        'cache-control': 'max-age=600',
+        ...(format === 'dmn' && { 'content-disposition': `attachment; filename="${FINAL_ROUTE.profile}.dmn"` }),
+      },
+    });
+    ctx.waitUntil(caches.default.put(key, res.clone()));
+    return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
+  }
+
   if (url.pathname === '/api/stats' && request.method === 'GET') {
     // The last 7 days from Pointsman's decision log (GET /v1/stats/{profile}),
     // for the page: counts only. Browsers keep it for a minute (the Cache API
