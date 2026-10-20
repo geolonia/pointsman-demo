@@ -37,8 +37,8 @@
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
-      working: 'Working…', together: 'At the same time, inside Pointsman', inAll: function (s) { return s + ' in all'; },
-      useTag: 'rule', usesMarked: 'The rule read the answers and map checks marked like this above.',
+      working: 'Working…', together: 'Passed on to Pointsman; these two run at the same time', inAll: function (s) { return s + ' in all'; },
+      useTag: 'rule', srSource: 'source', usesMarked: 'The rule read the answers and map checks marked like this above.',
       lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
       answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
       ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
@@ -121,7 +121,6 @@
         '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
         '1': 'Near an evacuation site, but the way around could not be worked out: a person looks.',
       },
-      usedTitle: 'Based on', usedAI: 'AI', usedMap: 'map',
       ruleUnknown: function (n) { return 'Rule ' + n + ' of the profile (this page does not describe it yet).'; },
       act: { publish: 'publish', review: 'review', urgent: 'urgent', reject: 'rejected', pending: 'being checked', alert: 'alert', none: 'no alert' },
       resultTitle: 'Final result',
@@ -209,8 +208,8 @@
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
-      working: '処理中…', together: '同時に、Pointsman の中で', inAll: function (s) { return '合計 ' + s; },
-      useTag: '規則', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
+      working: '処理中…', together: 'Pointsman に渡され、この 2 つは同時に進みます', inAll: function (s) { return '合計 ' + s; },
+      useTag: '規則', srSource: '出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
       lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
       answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
       ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
@@ -291,7 +290,6 @@
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
         '1': '避難場所の近くだが、迂回路を求められなかった：人が確認する。',
       },
-      usedTitle: '判断に使ったもの', usedAI: 'AI', usedMap: '地図',
       ruleUnknown: function (n) { return 'プロファイルの規則 ' + n + '（このページではまだ説明していません）。'; },
       act: { publish: '公開', review: '確認', urgent: '緊急', reject: '非公開', pending: '判定中', alert: '警報', none: '警報なし' },
       resultTitle: '最終結果',
@@ -767,6 +765,10 @@
       el('ol', { class: 'pair-list' }, [part('s2', 1, ''), part('s3', 2, '')]),
     ]));
     tl.appendChild(part('s4', 3, tAll));
+    // One short line for screen readers, only when it changes.
+    var status = !r ? '' : shown < 4 ? t(['s1', 's2', 's3', 's4'][shown]) + ': ' + t('working')
+      : r.check ? t('s4') + ': ' + (t('act')[r.check.action] || r.check.action) : '';
+    if ($('decide-status').textContent !== status) $('decide-status').textContent = status;
   }
 
   function confidence(p) {
@@ -1183,13 +1185,12 @@
     return JSON.stringify(f.values);
   }
 
-  var DEEP = ['3 to 5 m', '5 to 10 m', '10 to 20 m', '20 m or more'];
-
   /** How much a map check matters, in the terms of the rules: a level word and its colour. */
   function factLevel(f) {
     if (f.missing) return null;
     var v = f.values;
-    if (f.name === 'flood') return !v.inside ? ['low', t('lvl').noZone] : DEEP.indexOf(v.class) >= 0 ? ['high', t('lvl').deep] : ['mid', t('lvl').shallow];
+    // rank 5 and more is 3 m or deeper: the first check's rules read the same rank.
+    if (f.name === 'flood') return !v.inside ? ['low', t('lvl').noZone] : v.rank >= 5 ? ['high', t('lvl').deep] : ['mid', t('lvl').shallow];
     if (f.name === 'shelter') return !v.found ? ['low', t('lvl').far] : v.distance_m <= 1000 ? ['mid', t('lvl').near] : ['low', t('lvl').far];
     if (f.name === 'walk') return typeof v.extra_m !== 'number' ? ['high', t('lvl').noWay] : v.extra_m >= 200 ? ['high', t('lvl').long] : ['low', t('lvl').short];
     return null;
@@ -1207,16 +1208,18 @@
     var sources = [];
     var rows = el('div', { class: 'qa facts' });
     facts.forEach(function (f) {
+      var on = used.indexOf(f.name) >= 0;
       var level = factLevel(f);
+      // In the first check no rule reads the evacuation site: no colour for it there.
+      if (level && firstCheck && !on && f.name === 'shelter') level = ['ctx', level[1]];
       var n = 0;
       if (!f.missing && f.source) {
         n = sources.indexOf(f.source) + 1 || sources.push(f.source);
       }
-      var on = used.indexOf(f.name) >= 0;
       rows.appendChild(el('div', { class: 'row fact ' + f.name + (on ? ' used-row' : '') }, [
         el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
         on ? usedTag() : null,
-        el('strong', { class: 'fa' }, [factText(f), n ? el('sup', { class: 'fnum', text: String(n) }) : null]),
+        el('strong', { class: 'fa' }, [factText(f), n ? el('sup', { class: 'fnum' }, [el('span', { class: 'sr-only', text: ' ' + t('srSource') + ' ' }), String(n)]) : null]),
         level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
         firstCheck && f.name === 'shelter' && !f.missing && !f.second && !on ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
       ]));

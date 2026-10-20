@@ -118,11 +118,6 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .card .text { color: var(--muted); font-size: 0.9rem; }
 .card .checks-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--line); font: 0.75rem var(--mono); color: var(--muted); }
 /* "Based on": what the rule used; AI answers neutral, map checks blue. */
-.used { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.used .kicker { margin-right: 2px; }
-.used .chip-map, .used .chip-ai { font: 0.78rem var(--sans); padding: 3px 9px; border-radius: 999px; }
-.used b { font-family: var(--mono); font-weight: 600; font-size: 0.72rem; margin-right: 2px; }
-.chip-ai { background: var(--panel-2); color: var(--fg-2); }
 .chip-map { padding: 2px 8px; border-radius: 999px; background: var(--t-map); color: var(--i-map); }
 .more { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .more summary { cursor: pointer; font-weight: 500; min-height: 28px; }
@@ -168,7 +163,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .busy { display: inline-flex; align-items: center; gap: 8px; }
 .spin { flex: none; width: 0.95em; height: 0.95em; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--fg); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spin { animation: pulse 1s ease-in-out infinite alternate; } }
+/* Without motion: a still ring, like the timeline's still mark (the text says it runs). */
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 @keyframes pulse { from { opacity: 0.35; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .timeline li.active .mark { animation: none; } }
 .qa { display: grid; }
@@ -178,7 +174,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .conf { font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; background: var(--panel-2); color: var(--fg-2); }
 .conf.vsure, .conf.sure { background: var(--t-publish); color: var(--i-publish); }
 .conf.unsure { background: var(--t-review); color: var(--i-review); }
-/* The map checks: question, answer, source. In blue, apart from the AI's answers. */
+/* The map checks: question, answer and level, like the AI's answers; the sources as numbered notes. */
 .facts .ftag { margin-right: 6px; font: 0.7rem var(--mono); color: var(--i-map); border: 1px solid var(--line-map); border-radius: 999px; padding: 1px 8px; }
 .facts .fn { flex-basis: 100%; font-size: 0.8rem; color: var(--muted); }
 .facts .fnum { font: 0.65rem var(--mono); color: var(--muted); margin-left: 2px; }
@@ -189,6 +185,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .lvl.high { background: var(--t-urgent); color: var(--i-urgent); }
 .lvl.mid { background: var(--t-review); color: var(--i-review); }
 .lvl.low { background: var(--t-publish); color: var(--i-publish); }
+/* A map check no rule of this step reads: context only, no colour. */
+.lvl.ctx { background: var(--panel-2); color: var(--fg-2); }
 /* The answers and checks the rule used: the same mark here and in "Based on". */
 .qa .row.used-row { box-shadow: inset 3px 0 0 var(--fg); padding-left: 10px; }
 .use-tag { font: 500 0.7rem var(--mono); color: var(--fg-2); border: 1px solid var(--fg-2); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
