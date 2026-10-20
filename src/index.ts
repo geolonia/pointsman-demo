@@ -53,7 +53,8 @@ const FINAL_ROUTE: Route = {
   attribute: 'final',
   decisionEntity: true,
   name: 'final',
-  requires: { check: { attribute: 'check', rerunOnReview: true }, evacuation: { attribute: 'evacuation', optional: true } },
+  // Both rerun when a person answers them: their answer counts (outcome).
+  requires: { check: { attribute: 'check', rerunOnReview: true }, evacuation: { attribute: 'evacuation', optional: true, rerunOnReview: true } },
 };
 // Work orders from other apps (pointsman#85): a completed Task that refers to
 // a report, for example a Redmine GTT issue, resolves the report's review; its

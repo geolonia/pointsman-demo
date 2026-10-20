@@ -89,7 +89,7 @@
       // road-closure-final (pointsman-config): the final decision's rules, by index.
       rules3: {
         '0': 'A person rejected the report: it stays rejected.',
-        '1': 'People on foot are cut off from their evacuation site: urgent.',
+        '1': 'People on foot are cut off from their evacuation site (found by the check, or by the person who checked it): urgent.',
         '2': 'The first check found it urgent, and no person has answered otherwise.',
         '3': 'The first check, or the person who checked it, published it.',
         'default': 'A person has not checked the first result yet. When they do, the final result is decided again.',
@@ -248,7 +248,7 @@
       },
       rules3: {
         '0': '人が報告を非公開にした：非公開のまま。',
-        '1': '歩いて避難場所まで行けない人がいる：緊急。',
+        '1': '歩いて避難場所まで行けない人がいる（確認の結果、または確認した人の答え）：緊急。',
         '2': '1 つ目の確認で緊急となり、人はそれと違う答えをしていない。',
         '3': '1 つ目の確認、またはそれを確認した人が公開とした。',
         'default': '1 つ目の結果を、まだ人が確認していない。確認すると、最終結果をもう一度決める。',
