@@ -87,6 +87,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .btn.go { background: #1E6B48; border-color: #1E6B48; color: #fff; }
 .btn:disabled { opacity: 0.55; cursor: wait; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+/* Step 3's button below the check's box. */
+#chain > .actions { margin-top: 18px; }
 
 /* Intro and steps */
 .intro { display: grid; gap: 12px; }
