@@ -13,7 +13,7 @@
   var T = {
     en: {
       demo: 'demo', title: 'Heavy rain. Reports of closed roads are coming in.',
-      lead: 'Send one, and watch Pointsman decide in seconds what happens to it.',
+      lead: 'Send one, and watch Pointsman decide in seconds what happens to it. It reads the report, checks the place on public maps, and applies the city’s rules.',
       st1: 'Pick a report', st2: 'Pointsman decides', st3: 'What happens next',
       howTitle: 'How it works', close: 'Close',
       howLead: 'Pointsman is a small service that takes decisions for a city’s apps. The AI only answers questions. Public data gives facts about the place. The city’s own rules decide. People have the last word.',
@@ -34,10 +34,10 @@
       decideTitle: 'Pointsman decides', yourReport: 'Your report', aReport: 'A report', noRoad: '(no road name)',
       s1: 'Saved in the city’s data platform', s1d: 'The way any city app would save it.',
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
-      s3: 'Facts about the place were looked up', s3d: 'Flood zones and evacuation sites, from public data.',
+      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…',
-      answersTitle: 'What the AI answered', factsTitle: 'Facts about the place · from public map data, not from the AI',
+      answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
       ruleTitle: 'The city’s rule', next: 'What happens next →', showData: 'Show the data in the data platform (for developers)',
       showRequest: 'request', showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp)',
       showDecision2: 'Decision entity of the second check', showAlert: 'Alert entity (Smart Data Models)',
@@ -66,13 +66,18 @@
       oFinalReject: 'Rejected after a check', eFinalReject: 'A person checked it. Residents never see it.',
       chainKicker: 'A second check, started by the first', chainTitle: 'Can people still walk to their evacuation site?',
       cAlert: 'Alert sent to the staff of the evacuation site.', cReview: 'The way around could not be checked: a person looks at it.',
-      fFlood: function (c) { return 'Inside a river flood zone: water could reach ' + c; },
-      fNoFlood: 'Not inside a published river flood zone',
-      fShelter: function (n, m) { return 'Nearest flood evacuation site: ' + n + ', ' + m + ' m'; },
-      fNoShelter: 'No flood evacuation site within 5 km',
-      fWalk: function (m) { return 'The way around on foot is ' + m + ' m longer'; },
-      fMissing: function (n, r) { return n + ': could not be looked up (' + r + ')'; },
+      fQ: { flood: 'Is the place in a river flood zone?', shelter: 'Where is the nearest flood evacuation site?', walk: 'With this road closed, how much longer is the walk?' },
+      fFlood: function (c) { return 'Yes: water depth ' + c; },
+      fNoFlood: 'No, not in a published flood zone',
+      fShelter: function (n, m) { return n + ', ' + m + ' m away'; },
+      fNoShelter: 'None within 5 km',
+      fWalk: function (m) { return m + ' m longer on foot'; },
+      fNoWalk: 'No way around on foot',
+      fMissing: function (r) { return 'Could not be checked (' + r + ')'; },
       fSource: 'Source: ',
+      fShelterMap: function (n, m) { return 'Evacuation site: ' + n + ' · ' + m + ' m'; },
+      floodClass: {},
+      mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
       doPublish: 'Publish it', doReject: 'Reject it', deciding: 'Sending…',
@@ -111,7 +116,7 @@
     },
     ja: {
       demo: 'デモ', title: '大雨。通行止めの報告が次々に届く。',
-      lead: '報告を 1 件送ってみてください。その報告をどうするかを、Pointsman が数秒で決めます。',
+      lead: '報告を 1 件送ってみてください。その報告をどうするかを、Pointsman が数秒で決めます。報告を読み、場所を公開の地図で調べ、市の規則を当てはめます。',
       st1: '報告を選ぶ', st2: 'Pointsman が決める', st3: 'その後どうなるか',
       howTitle: '仕組み', close: '閉じる',
       howLead: 'Pointsman は、市のアプリに代わって判断する小さなサービスです。AI は質問に答えるだけです。場所の事実は公開データから調べます。行動を決めるのは市の規則です。最後に決めるのは人です。',
@@ -132,10 +137,10 @@
       decideTitle: 'Pointsman が決める', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
       s1: '市のデータ基盤に保存', s1d: '市のアプリが保存するのと同じ方法です。',
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
-      s3: '場所の事実を調べた', s3d: '浸水想定区域と避難場所を、公開データから調べます。',
+      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…',
-      answersTitle: 'AI の答え', factsTitle: '場所の事実・AI ではなく公開の地図データから',
+      answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
       ruleTitle: '市の規則', next: 'その後どうなるか →', showData: 'データ基盤のデータを見る（開発者向け）',
       showRequest: 'リクエスト', showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp）',
       showDecision2: '2 つ目の確認の Decision エンティティ', showAlert: 'Alert エンティティ（Smart Data Models）',
@@ -164,13 +169,22 @@
       oFinalReject: '確認のうえ非公開', eFinalReject: '人が確認しました。住民には見えません。',
       chainKicker: '1 つ目の確認から始まった 2 つ目の確認', chainTitle: '歩いて避難場所まで行けるか',
       cAlert: '避難場所の担当者に警報を送りました。', cReview: '迂回路を確認できなかったので、人が確認します。',
-      fFlood: function (c) { return '洪水浸水想定区域の中：想定される深さ ' + c; },
-      fNoFlood: '公開されている洪水浸水想定区域の外',
-      fShelter: function (n, m) { return '最寄りの指定緊急避難場所（洪水）：' + n + '、' + m + ' m'; },
-      fNoShelter: '5 km 以内に指定緊急避難場所（洪水）はない',
-      fWalk: function (m) { return '歩いて迂回すると ' + m + ' m 長くなる'; },
-      fMissing: function (n, r) { return n + '：調べられなかった（' + r + '）'; },
+      fQ: { flood: '洪水浸水想定区域の中か', shelter: '最寄りの指定緊急避難場所（洪水）はどこか', walk: 'この道を通れないと、歩く道のりはどれだけ長くなるか' },
+      fFlood: function (c) { return 'はい：想定される深さ ' + c; },
+      fNoFlood: 'いいえ（公開されている区域の外）',
+      fShelter: function (n, m) { return n + '、' + m + ' m 先'; },
+      fNoShelter: '5 km 以内にない',
+      fWalk: function (m) { return '歩くと ' + m + ' m 長くなる'; },
+      fNoWalk: '歩いて迂回できない',
+      fMissing: function (r) { return '調べられなかった（' + r + '）'; },
       fSource: '出典：',
+      fShelterMap: function (n, m) { return '避難場所：' + n + '・' + m + ' m'; },
+      // Pointsman's depth classes (from the hazard map portal's legend).
+      floodClass: {
+        'below 0.3 m': '0.3 m 未満', 'below 0.5 m': '0.5 m 未満', '0.5 to 1 m': '0.5〜1 m', '0.5 to 3 m': '0.5〜3 m',
+        '3 to 5 m': '3〜5 m', '5 to 10 m': '5〜10 m', '10 to 20 m': '10〜20 m', '20 m or more': '20 m 以上',
+      },
+      mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
       dutyTitle: 'あなたが担当者です',
       dutyText: '市では、チームのメンバーがこれを仕事として受け取ります。ここではあなたが決めてください。この報告を住民に見せますか。',
       doPublish: '公開する', doReject: '公開しない', deciding: '送信中…',
@@ -263,6 +277,7 @@
     renderPending();
     renderCaption();
     renderStats();
+    renderShelterLabel();
     if (current) renderCurrent();
   }
 
@@ -290,6 +305,7 @@
     $('view-res').setAttribute('aria-pressed', String(v === 'res'));
     $('legend-flood').hidden = v !== 'hq';
     if (map && map.demoReady) map.setLayoutProperty('flood', 'visibility', v === 'hq' ? 'visible' : 'none');
+    setShelterVisible();
     updateMap();
     renderCaption();
   }
@@ -365,18 +381,32 @@
       if (p.featured) {
         featured.appendChild(el('li', null, [el('button', { type: 'button', class: 'card', onclick: function () { send(p); } }, [
           el('span', { class: 'label', text: p.featured[lang] }),
-          el('strong', { class: 'road', text: p.roadName || t('noRoad') }),
+          el('strong', { class: 'road', text: titleOf(p) }),
+          placeOf(p) ? el('span', { class: 'place', text: placeOf(p) }) : null,
           el('span', { class: 'text', text: quote(p.description[lang]) }),
+          el('span', { class: 'checks-hint' }, [el('span', { text: t('mapChecks') })].concat(checksOf(p).map(function (c) {
+            return el('span', { class: 'chip-map', text: t('ch')[c] });
+          }))),
         ])]));
       } else {
         others += 1;
         more.appendChild(el('li', null, [el('button', { type: 'button', onclick: function () { send(p); } }, [
-          el('strong', { text: p.roadName || t('noRoad') }), ' — ', el('span', { text: p.description[lang] }),
+          el('strong', { text: titleOf(p) }), placeOf(p) ? ' · ' : '', el('span', { class: 'muted', text: placeOf(p) }),
         ])]));
       }
     });
     $('more-summary').textContent = t('moreTitle') + ' (' + others + ')';
     document.querySelectorAll('#step-pick button').forEach(function (b) { b.disabled = sending; });
+  }
+
+  // The map checks a prepared report gets: the profile's two facts, and the
+  // walk around (step 2 of the chain) for a closed section that goes to a
+  // person. An approximation of the server's routes: a Point gets no walk fact.
+  function titleOf(p) { return (p.title && p.title[lang]) || p.roadName || t('noRoad'); }
+  function placeOf(p) { return (p.place && p.place[lang]) || ''; }
+
+  function checksOf(p) {
+    return ['flood', 'shelter'].concat(p.location.type === 'LineString' && p.expected !== 'publish' ? ['walk'] : []);
   }
 
   function send(p) {
@@ -393,7 +423,7 @@
         if (!r.ok) { err.textContent = t('failed') + (r.body.error || r.status); err.hidden = false; return; }
         if (config) { config.today.used += 1; renderUsage(); }
         if (r.body.key) keepKey(r.body.id, r.body.key);
-        watch(r.body.id, { sentAt: sentAt, request: request, location: p.location });
+        watch(r.body.id, { sentAt: sentAt, request: request, location: p.location, prepared: p });
       })
       .catch(function (e) { err.textContent = t('failed') + e.message; err.hidden = false; })
       .finally(function () {
@@ -406,6 +436,7 @@
 
   function watch(id, info) {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
+    clearShelter();
     current = Object.assign({ id: id, key: keyOf(id), last: null, shown: 0 }, info || {});
     setView('hq');
     if (current.location) focus(current.location);
@@ -481,7 +512,9 @@
 
   function renderCurrent() {
     var r = current.last;
-    $('cur-kicker').textContent = (current.sentAt ? t('yourReport') : t('aReport')) + (r ? ' · ' + (r.roadName || t('noRoad')) : '');
+    var p = current.prepared;
+    var where = p ? [titleOf(p), placeOf(p)].filter(Boolean).join(' · ') : r ? r.roadName || t('noRoad') : '';
+    $('cur-kicker').textContent = (current.sentAt ? t('yourReport') : t('aReport')) + (where ? ' · ' + where : '');
     $('cur-text').textContent = r ? quote(r.description) : '';
     renderTimeline(r);
     renderAnswers(r);
@@ -546,6 +579,7 @@
     if (!r || !r.check || current.shown < 3) return;
     var facts = renderFacts(r.facts || []);
     if (facts) box.appendChild(facts);
+    showShelter(r.facts || []);
   }
 
   function renderRule(r) {
@@ -610,6 +644,7 @@
       var items = [el('span', { class: 'kicker', text: t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })];
       var facts = renderFactList(ev.facts || []);
       if (facts) items.push(facts);
+      showShelter(ev.facts || []);
       var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
       chain.appendChild(el('div', { class: 'box' }, items));
@@ -715,30 +750,31 @@
 
   // Facts come from the broker: shown only as text.
   function factText(f) {
-    if (f.missing) return t('fMissing')(f.name, f.reason);
-    if (f.name === 'flood') return f.values.inside ? t('fFlood')(String(f.values.class)) : t('fNoFlood');
+    if (f.missing) return t('fMissing')(f.reason);
+    if (f.name === 'flood') return f.values.inside ? t('fFlood')(t('floodClass')[f.values.class] || String(f.values.class)) : t('fNoFlood');
     if (f.name === 'shelter') return f.values.found ? t('fShelter')(String(f.values.name), f.values.distance_m) : t('fNoShelter');
-    if (f.name === 'walk' && typeof f.values.extra_m === 'number') return t('fWalk')(f.values.extra_m);
-    return f.name + ': ' + JSON.stringify(f.values);
+    if (f.name === 'walk') return typeof f.values.extra_m === 'number' ? t('fWalk')(f.values.extra_m) : t('fNoWalk');
+    return JSON.stringify(f.values);
   }
 
+  /** One row per map check: the question, the answer, and where the data comes from. */
   function renderFactList(facts) {
     if (!facts.length) return null;
     var list = el('ul', { class: 'facts' });
-    facts.forEach(function (f) { list.appendChild(el('li', { text: factText(f) })); });
+    facts.forEach(function (f) {
+      list.appendChild(el('li', { class: 'fact ' + f.name }, [
+        el('span', { class: 'fq', text: t('fQ')[f.name] || f.name }),
+        el('strong', { class: 'fa', text: factText(f) }),
+        f.missing ? null : el('span', { class: 'fs', text: t('fSource') + f.source }),
+      ]));
+    });
     return list;
   }
 
   function renderFacts(facts) {
     var list = renderFactList(facts);
     if (!list) return null;
-    var sources = [];
-    facts.forEach(function (f) { if (!f.missing && sources.indexOf(f.source) < 0) sources.push(f.source); });
-    return el('div', { class: 'box' }, [
-      el('span', { class: 'kicker', text: t('factsTitle') }),
-      list,
-      sources.length ? el('p', { class: 'muted small', text: t('fSource') + sources.join(' / ') }) : null,
-    ]);
+    return el('div', { class: 'box map-checks' }, [el('span', { class: 'kicker', text: t('factsTitle') }), list]);
   }
 
   // --- How it works: the live lists ------------------------------------------------------
@@ -830,7 +866,12 @@
         m.on('mouseenter', layer, function () { m.getCanvas().style.cursor = 'pointer'; });
         m.on('mouseleave', layer, function () { m.getCanvas().style.cursor = ''; });
       });
+      m.addSource('shelter', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      m.addLayer({ id: 'shelter-line', type: 'line', source: 'shelter', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#1E6B48', 'line-width': 3.5, 'line-dasharray': [0.5, 2] } });
       m.demoReady = true;
+      if (current && current.last && current.shown >= 3) {
+        showShelter((current.last.facts || []).concat(current.last.evacuation ? current.last.evacuation.facts || [] : []));
+      }
       m.setLayoutProperty('flood', 'visibility', view === 'hq' ? 'visible' : 'none');
       updateMap();
     });
@@ -848,6 +889,77 @@
       return { type: 'Feature', geometry: r.location, properties: { id: r.id, outcome: outcomeOf(src), published: outcomeOf(src) === 'publish', current: !!mine } };
     }).filter(function (f) { return view === 'hq' || f.properties.published; });
     map.getSource('reports').setData({ type: 'FeatureCollection', features: features });
+  }
+
+  // The evacuation site of a shelter fact, on the headquarters map. Pointsman
+  // gives its name and distance; the place comes from the same GSI data
+  // (published only at zoom 10), so the page loads that tile once.
+  var shelterTiles = {};
+  var shelterMarker = null;
+
+  function shelterTile(lonlat) {
+    var z = 10;
+    var x = Math.floor((lonlat[0] + 180) / 360 * Math.pow(2, z));
+    var lat = lonlat[1] * Math.PI / 180;
+    var y = Math.floor((1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2 * Math.pow(2, z));
+    var url = 'https://cyberjapandata.gsi.go.jp/xyz/skhb01/' + z + '/' + x + '/' + y + '.geojson';
+    if (!shelterTiles[url]) {
+      shelterTiles[url] = fetch(url).then(function (res) { if (!res.ok) throw new Error(String(res.status)); return res.json(); })
+        .catch(function (e) { delete shelterTiles[url]; throw e; });
+    }
+    return shelterTiles[url];
+  }
+
+  function clearShelter() {
+    if (shelterMarker) { shelterMarker.remove(); shelterMarker = null; }
+    if (map && map.demoReady) map.getSource('shelter').setData({ type: 'FeatureCollection', features: [] });
+  }
+
+  function showShelter(facts) {
+    // A site without a name cannot be found in the tile.
+    var f = facts.filter(function (x) { return x.name === 'shelter' && !x.missing && x.values.found && x.values.name; })[0];
+    // Before the map is ready: shown from its load handler.
+    if (!f || !map || !map.demoReady || !current || !current.last || !current.last.location) return;
+    var me = current;
+    var key = me.id + '|' + f.values.name;
+    if (me.shelterShown === key) return;
+    me.shelterShown = key;
+    var g = me.last.location;
+    var ps = g.type === 'Point' ? [g.coordinates] : g.coordinates;
+    var near = function (a, b) { var dx = (a[0] - b[0]) * Math.cos(b[1] * Math.PI / 180); var dy = a[1] - b[1]; return dx * dx + dy * dy; };
+    shelterTile(ps[0]).then(function (tile) {
+      if (current !== me) return;
+      var best = null;
+      (tile.features || []).forEach(function (s) {
+        if (!s.geometry || s.geometry.type !== 'Point' || !s.properties || s.properties.name !== f.values.name) return;
+        var from = ps.reduce(function (a, p) { return near(p, s.geometry.coordinates) < near(a, s.geometry.coordinates) ? p : a; });
+        var d = near(from, s.geometry.coordinates);
+        if (!best || d < best.d) best = { d: d, at: s.geometry.coordinates, from: from };
+      });
+      if (!best) return;
+      clearShelter();
+      map.getSource('shelter').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: [best.from, best.at] }, properties: {} }] });
+      var node = el('div', { class: 'shelter-pin' }, [el('span', { class: 'mark', 'aria-hidden': 'true' }), el('span', { class: 'name', text: t('fShelterMap')(String(f.values.name), f.values.distance_m) })]);
+      shelterMarker = new maplibregl.Marker({ element: node, anchor: 'bottom', offset: [0, 10] }).setLngLat(best.at).addTo(map);
+      shelterMarker.demoFact = f.values;
+      setShelterVisible();
+      if (view === 'hq') map.fitBounds([[Math.min(best.from[0], best.at[0]), Math.min(best.from[1], best.at[1])], [Math.max(best.from[0], best.at[0]), Math.max(best.from[1], best.at[1])]], { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 15.5 });
+    }).catch(function () {
+      // A failed tile load: the next render tries again.
+      if (me.shelterShown === key) me.shelterShown = null;
+    });
+  }
+
+  function renderShelterLabel() {
+    if (!shelterMarker) return;
+    var v = shelterMarker.demoFact;
+    shelterMarker.getElement().querySelector('.name').textContent = t('fShelterMap')(String(v.name), v.distance_m);
+  }
+
+  /** Like the flood zones, the evacuation site is for headquarters only. */
+  function setShelterVisible() {
+    if (shelterMarker) shelterMarker.getElement().hidden = view !== 'hq';
+    if (map && map.demoReady) map.setLayoutProperty('shelter-line', 'visibility', view === 'hq' ? 'visible' : 'none');
   }
 
   function focus(location) {
@@ -875,6 +987,7 @@
   $('again').addEventListener('click', function () {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
     current = null;
+    clearShelter();
     setView('hq');
     setStep('pick', true);
     updateMap();

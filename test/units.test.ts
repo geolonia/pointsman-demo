@@ -34,6 +34,15 @@ describe('reports', () => {
     for (const [x, y] of points) expect(x >= AREA.west && x <= AREA.east && y >= AREA.south && y <= AREA.north).toBe(true);
   });
 
+  it('gives every prepared report a title and a landmark in both languages', () => {
+    for (const p of PREPARED) {
+      for (const lang of ['ja', 'en'] as const) {
+        expect(p.title[lang].trim(), `${p.id} title ${lang}`).not.toBe('');
+        expect(p.place[lang].trim(), `${p.id} place ${lang}`).not.toBe('');
+      }
+    }
+  });
+
   it('makes a RoadRestriction entity in the datamodels.jp shape', () => {
     const { entity, prepared } = toEntity({ prepared: 'water-pipe-works', lang: 'ja' }, new Date('2026-10-07T00:00:00Z'));
     expect(prepared).toBe('water-pipe-works');

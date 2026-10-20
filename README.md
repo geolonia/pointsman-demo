@@ -90,10 +90,15 @@ a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
 
 1. **Pick a report.** Four examples, one for each outcome (a clear report, an
    unclear one, someone in danger, near an evacuation site); the others under
-   "More examples".
+   "More examples". Each card says what happened and where, by a landmark
+   (a station, park or river), since most streets in Japan have no name; it
+   also lists the map checks Pointsman will run.
 2. **Pointsman decides.** Each step with its time, the AI's answers as plain
-   questions with a confidence word, the facts about the place, and the
-   city's rule in one sentence. The real NGSI-LD data is behind "Show the data".
+   questions with a confidence word, the map checks (question, answer and
+   data source, apart from the AI's answers), and the city's rule in one
+   sentence. On the headquarters map, the nearest evacuation site is marked
+   with a dotted line to the report (its place from the same GSI data). The
+   real NGSI-LD data is behind "Show the data".
 3. **What happens next.** The outcome, the second check (evacuation site),
    and, for a report that waits for a person, Publish and Reject buttons: the
    visitor who sent it decides it, as the person on duty would. Below, the
