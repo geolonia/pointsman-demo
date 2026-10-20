@@ -48,7 +48,7 @@
       devWaiting: 'waiting…',
       devData: function (what) { return 'the data: ' + what; },
       devPoll: 'Meanwhile this page reads the report from the demo’s server, a Cloudflare Worker (GET /api/reports/{id}), about once a second.',
-      lane: { page: 'This page', platform: 'Data platform (GeonicDB)', bridge: 'Connector (FIWARE bridge)', pointsman: 'Pointsman', data: 'AI and map data' },
+      lane: { page: 'This page', platform: 'Data platform (GeonicDB)', bridge: 'Connector (FIWARE bridge, in the demo’s server)', pointsman: 'Pointsman', data: 'AI and map data' },
       ev: {
         save: ['POST /api/reports', 'The demo’s server saves the report as a RoadRestriction entity (NGSI-LD) in the data platform, as any city app would.'],
         notify: ['Notification: a new report', 'A subscription on RoadRestriction entities tells the demo’s server (NGSI-LD notification); it queues the message, and the connector handles it from the queue.'],
@@ -184,7 +184,7 @@
       devWaiting: '待機中…',
       devData: function (what) { return 'データ：' + what; },
       devPoll: 'その間、このページはデモのサーバー（Cloudflare Worker）から報告を約 1 秒ごとに読みます（GET /api/reports/{id}）。',
-      lane: { page: 'このページ', platform: 'データ基盤（GeonicDB）', bridge: 'つなぎ役（FIWARE ブリッジ）', pointsman: 'Pointsman', data: 'AI と地図データ' },
+      lane: { page: 'このページ', platform: 'データ基盤（GeonicDB）', bridge: 'つなぎ役（FIWARE ブリッジ、デモのサーバー内）', pointsman: 'Pointsman', data: 'AI と地図データ' },
       ev: {
         save: ['POST /api/reports', 'デモのサーバーが報告を RoadRestriction エンティティ（NGSI-LD）としてデータ基盤に保存します。市のアプリと同じ方法です。'],
         notify: ['通知：新しい報告', 'RoadRestriction エンティティのサブスクリプションがデモのサーバーに知らせます（NGSI-LD の通知）。サーバーはキューに入れ、つなぎ役がキューから処理します。'],

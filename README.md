@@ -121,7 +121,7 @@ greyed out. Pointing at a step on the page marks its events, and the other
 way round.
 
 Visitor-facing names: the page calls the FIWARE bridge the **connector**
-(つなぎ役) and this Worker **the demo's server** (デモのサーバー), because
+(つなぎ役) and the demo Worker **the demo's server** (デモのサーバー), because
 "bridge" reads as a road bridge in a demo about road closures; the
 developer view adds the technical names in brackets.
 
