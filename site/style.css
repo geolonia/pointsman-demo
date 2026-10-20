@@ -300,3 +300,5 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* The diagram's own boxes are SVG rects, not the page's .box. */
 #final-graph rect.box { display: inline; }
 #final-graph a { font-size: 0.85rem; }
+/* Five header buttons on one line on a phone. */
+@media (max-width: 420px) { nav { gap: 6px; } .chip { font-size: 13px; padding: 0 10px; } }

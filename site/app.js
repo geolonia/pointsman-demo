@@ -16,6 +16,7 @@
       lead: 'Send one, and watch Pointsman decide in seconds what happens to it. It reads the report, checks the place on public maps, and applies the city’s rules.',
       st1: 'Pick a report', st2: 'First check', st3: 'Additional check', st4: 'Final result',
       howTitle: 'How it works', close: 'Close',
+      activityTitle: 'Reports', activityLead: 'What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.',
       howLead: 'Pointsman is a small service that takes decisions for a city’s apps. The AI only answers questions. Public data gives facts about the place. The city’s own rules decide. People have the last word.',
       h1k: '1 · The report', h1t: 'A resident’s app saves it', h1d: 'in the city’s data platform. This demo uses GeonicDB, which follows the open FIWARE standard (NGSI-LD).',
       h2k: '2 · Passed on', h2t: 'The data platform tells Pointsman', h2d: 'A small connector passes each new report on. The apps do not change.',
@@ -181,6 +182,7 @@
       lead: '報告を 1 件送ってみてください。その報告をどうするかを、Pointsman が数秒で決めます。報告を読み、場所を公開の地図で調べ、市の規則を当てはめます。',
       st1: '報告を選ぶ', st2: '最初の確認', st3: '追加の確認', st4: '最終結果',
       howTitle: '仕組み', close: '閉じる',
+      activityTitle: '報告の一覧', activityLead: 'デモが判断したもの：この 1 日の報告すべて、人の確認待ちの報告、そして直近 7 日間の数字です。',
       howLead: 'Pointsman は、市のアプリに代わって判断する小さなサービスです。AI は質問に答えるだけです。場所の事実は公開データから調べます。行動を決めるのは市の規則です。最後に決めるのは人です。',
       h1k: '1・報告', h1t: '住民のアプリが保存する', h1d: '保存先は市のデータ基盤です。このデモでは、オープンな FIWARE の標準（NGSI-LD）に沿った GeonicDB を使います。',
       h2k: '2・受け渡し', h2t: 'データ基盤が Pointsman に知らせる', h2d: '小さなつなぎ役が、新しい報告を 1 件ずつ渡します。アプリは変えなくて済みます。',
@@ -1317,9 +1319,20 @@
     $('how-toggle').setAttribute('aria-expanded', String(open));
     $('how-open').setAttribute('aria-expanded', String(open));
     if (open) {
+      setActivity(false);
       renderHowGraph();
-      loadStats();
       $('how').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // The reports panel: recent reports, the ones waiting for a person, the week's numbers.
+  function setActivity(open) {
+    $('activity').hidden = !open;
+    $('activity-toggle').setAttribute('aria-expanded', String(open));
+    if (open) {
+      setHow(false);
+      loadStats();
+      $('activity').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
@@ -1630,6 +1643,8 @@
     try { localStorage.setItem('theme', next); } catch (e) {}
   });
   $('how-toggle').addEventListener('click', function () { setHow($('how').hidden); });
+  $('activity-toggle').addEventListener('click', function () { setActivity($('activity').hidden); });
+  $('activity-close').addEventListener('click', function () { setActivity(false); });
   $('how-close').addEventListener('click', function () { setHow(false); });
   $('how-open').addEventListener('click', function () { setHow(true); });
   $('again').addEventListener('click', function () {

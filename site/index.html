@@ -27,6 +27,7 @@
   <a class="brand" href="https://github.com/geolonia/pointsman"><img class="mark light" src="favicon.svg" alt="" width="22" height="22"><img class="mark dark" src="mark-on-dark.svg" alt="" width="22" height="22"><span>Pointsman</span><span class="tag" data-i18n="demo">demo</span></a>
   <nav>
     <button class="chip strong" id="how-toggle" type="button" aria-expanded="false" aria-controls="how" data-i18n="howTitle">How it works</button>
+    <button class="chip" id="activity-toggle" type="button" aria-expanded="false" aria-controls="activity" data-i18n="activityTitle">Reports</button>
     <button class="chip" id="dev-toggle" type="button" aria-pressed="false" aria-controls="dev"><span class="long" data-i18n="devTitle">Developer view</span><span class="short" data-i18n="devShort">Dev</span></button>
     <button class="chip" id="lang" type="button" lang="ja">日本語</button>
     <button class="chip" id="theme" type="button" aria-label="Switch theme">◐</button>
@@ -64,6 +65,16 @@
         <li data-i18n="why3">The city writes the rules, and can read every decision later.</li>
         <li data-i18n="why4">A person has the last word whenever it matters.</li>
       </ul>
+    </div>
+  </section>
+
+  <section id="activity" class="how" hidden aria-labelledby="activity-title">
+    <div class="how-head">
+      <div>
+        <h2 id="activity-title" data-i18n="activityTitle">Reports</h2>
+        <p data-i18n="activityLead">What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.</p>
+      </div>
+      <button class="btn ghost" id="activity-close" type="button" data-i18n="close">Close</button>
     </div>
     <div id="stats"></div>
     <div class="live">
