@@ -99,7 +99,10 @@
         'default': 'A person has not checked the first result yet. When they do, the final result is decided again.',
       },
       finalKicker: 'Final result', stage1: 'The first check said',
-      finalMissing: 'No final result', finalMissingText: function (a) { return 'The additional check did not come, so there is no final result. The first result stands: ' + a + '.'; },
+      finalMissing: 'No final result', missingSecond: 'The additional check did not come, so there is no final result.',
+      missingFinal: 'The final decision did not come.',
+      standsFirst: function (a) { return 'The first result stands: ' + a + '.'; },
+      standsPerson: function (a) { return 'The person’s answer stands: ' + a + '.'; },
       finalPending: 'The final result is being decided…', finalPendingText: 'Pointsman combines the first result and the additional check into one result.',
       fin: {
         publish: ['Published: residents see it now', 'The report is on the residents’ map.'],
@@ -265,7 +268,10 @@
         'default': '1 つ目の結果を、まだ人が確認していない。確認すると、最終結果をもう一度決める。',
       },
       finalKicker: '最終結果', stage1: '最初の確認の結果',
-      finalMissing: '最終結果はありません', finalMissingText: function (a) { return '追加の確認が届かなかったため、最終結果はありません。最初の結果のままです：' + a + '。'; },
+      finalMissing: '最終結果はありません', missingSecond: '追加の確認が届かなかったため、最終結果はありません。',
+      missingFinal: '最終判断が届きませんでした。',
+      standsFirst: function (a) { return '最初の結果のままです：' + a + '。'; },
+      standsPerson: function (a) { return '人の答えのままです：' + a + '。'; },
       finalPending: '最終結果を決めています…', finalPendingText: 'Pointsman が最初の結果と追加の確認を 1 つの結果にまとめます。',
       fin: {
         publish: ['公開：住民がすぐに見られます', '住民向けの地図に載りました。'],
@@ -699,7 +705,8 @@
     renderDecisionFacts(r);
     renderRule(r);
     renderData(r);
-    if (r && r.evacuation && current.shown >= 3) showRoute(r.evacuation.facts || []);
+    // The way around on foot is step 3's: drawn from there on.
+    if (r && r.evacuation && (step === 'check' || step === 'result')) showRoute(r.evacuation.facts || []);
     if (step === 'check') renderCheck(r);
     if (step === 'result') renderResult(r);
     renderDev();
@@ -823,6 +830,7 @@
       var facts = renderFactList(ev.facts || []);
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
+      showRoute(ev.facts || []);
       var rules2 = t('rules2');
       var key2 = ev.policyRule === undefined ? 'default' : ev.policyRule;
       if (Object.prototype.hasOwnProperty.call(rules2, key2)) items.push(el('span', { class: 'rule-text', text: rules2[key2] }));
@@ -907,10 +915,16 @@
     // there, "being decided" (not the old result next to the new answer).
     // No final result in the end (the additional check did not come): say so,
     // and that the first result stands.
-    if (!f && (finalLate(r) || (secondLate() && !r.evacuation))) {
-      box.appendChild(el('div', { class: 'box tint ' + r.check.action }, [
+    var chained = r.check.action !== 'publish';
+    if (!f && (finalLate(r) || (chained && secondLate() && !r.evacuation))) {
+      // Why: the additional check (when one was needed) or the final decision itself did not come.
+      var why = chained && !r.evacuation ? t('missingSecond') : t('missingFinal');
+      // What stands: a person's answer, if there is one, else the first result.
+      var answer = r.check.finalAction || r.visitorDecision;
+      var stands = answer ? t('standsPerson')(t('act')[answer] || answer) : t('standsFirst')(t('act')[r.check.action] || r.check.action);
+      box.appendChild(el('div', { class: 'box tint ' + (answer || r.check.action) }, [
         el('strong', { class: 'box-title', text: t('finalMissing') }),
-        el('span', { text: t('finalMissingText')(t('act')[r.check.action] || r.check.action) }),
+        el('span', { text: why + ' ' + stands }),
       ]));
       return;
     }
