@@ -159,8 +159,8 @@ No build step: plain HTML, CSS and JavaScript; MapLibre GL JS 5 from unpkg
 |---|---|
 | `GET /api/config` | Prepared reports, the demo area, whether free text is on, today's usage |
 | `GET /api/reports` | The reports with Pointsman's answers and the outcome (`published`) |
-| `GET /api/graph` | The chain of decisions as a diagram, from Pointsman (`GET /v1/profiles/road-closure-final/graph`): `format=svg` (default, `lang=en` or `ja`) for the page, `format=dmn` to download for DMN tools; cached 10 minutes |
 | `GET /api/reports/{id}` | One report, plus `prepared`, the review `issue` link, `evacuation` (step 2) and `final` (the final result, with its Decision entity), and the NGSI-LD data (`ngsi.entity`, `ngsi.decision`, `ngsi.task`) |
+| `GET /api/graph` | The chain of decisions as a diagram, from Pointsman (`GET /v1/profiles/road-closure-final/graph`): `format=svg` (default, `lang=en` or `ja`) for the page, `format=dmn` to download for DMN tools; cached 10 minutes |
 | `GET /api/stats` | The last 7 days from Pointsman's decision log (`GET /v1/stats/{profile}?days=7`): reports, published at once, sent to a person (urgent), what people decided on unclear reports, corrections. Counts only; browsers keep it for a minute |
 | `GET /api/decisions` | `Decision` entities waiting for a person (`reviewStatus` "pending"), newest first, with the NGSI-LD request that found them |
 | `POST /api/reports` | `{"prepared": "<id>", "lang": "ja"}`, or free text: `{"roadName", "status", "description", "location", "turnstile"}`. Answers `{"id", "key"}` |

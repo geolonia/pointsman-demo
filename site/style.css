@@ -297,4 +297,6 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* The chain as a diagram (Pointsman's SVG): in the page's colours, light and dark. */
 #final-graph .pm-graph { --pm-bg: var(--panel); --pm-line: var(--line); --pm-brand: var(--green); --pm-text: var(--fg); --pm-text2: var(--muted); --pm-text3: var(--grey); font-family: var(--sans); }
 #final-graph .graph-svg svg { display: block; width: 100%; max-width: 520px; margin: 8px auto; }
+/* The diagram's own boxes are SVG rects, not the page's .box. */
+#final-graph rect.box { display: inline; }
 #final-graph a { font-size: 0.85rem; }

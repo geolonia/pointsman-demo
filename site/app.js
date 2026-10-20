@@ -899,42 +899,63 @@
   }
 
   // The chain as a diagram (Pointsman's GET /v1/profiles/{id}/graph, through
-  // the demo's server), once per language.
+  // the demo's server), fetched once per language; a failed fetch is tried
+  // again on the next redraw, and the box is left out until it works.
   var graphSvg = {};
   function renderGraph() {
     var l = lang;
-    var holder = el('div', { class: 'box graph', id: 'final-graph' }, [
+    var holder = el('div', { class: 'box graph', id: 'final-graph', 'data-lang': l }, [
       el('span', { class: 'kicker', text: t('graphKicker') }),
       el('span', { text: t('graphText') }),
     ]);
     var place = el('div', { class: 'graph-svg' });
     holder.appendChild(place);
     holder.appendChild(el('a', { href: '/api/graph?format=dmn&lang=' + l, download: 'road-closure-final.dmn', text: t('graphDmn') }));
-    var show = function (svg) { if (svg) place.appendChild(svg.cloneNode(true)); };
-    if (graphSvg[l] !== undefined) show(graphSvg[l]);
-    else {
-      graphSvg[l] = null;
-      fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).then(function (text) {
-        graphSvg[l] = cleanSvg(text);
-        // The page may have been redrawn meanwhile: fill the box that is shown now.
-        var now = document.querySelector('#final-graph .graph-svg');
-        if (now && !now.firstChild && graphSvg[l]) now.appendChild(graphSvg[l].cloneNode(true));
-      }).catch(function () {});
+    if (graphSvg[l]) {
+      place.appendChild(graphSvg[l].cloneNode(true));
+      return holder;
+    }
+    holder.hidden = true;
+    if (graphSvg[l] === undefined) {
+      graphSvg[l] = null; // fetching
+      fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; }).then(function (text) {
+        var svg = cleanSvg(text);
+        if (!svg) { delete graphSvg[l]; return; }
+        graphSvg[l] = svg;
+        // The page may have been redrawn meanwhile: fill the box shown now, if it is in this language.
+        var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
+        var spot = now && now.querySelector('.graph-svg');
+        if (spot && !spot.firstChild) { spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
+      });
     }
     return holder;
   }
 
-  /** The SVG as a node, without anything that could run: no scripts, no event handlers, no outside links. */
+  // Only what Pointsman's diagram uses (src/graph.ts toSvg): SVG elements and
+  // attributes on these lists; everything else is dropped, so nothing in it
+  // can run or load anything.
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var SVG_ELEMENTS = ['svg', 'style', 'defs', 'marker', 'path', 'line', 'rect', 'text', 'tspan', 'title', 'g'];
+  var SVG_ATTRS = ['class', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'rx', 'd', 'viewBox', 'refX', 'refY', 'markerWidth',
+    'markerHeight', 'orient', 'marker-end', 'textLength', 'lengthAdjust', 'id', 'role', 'aria-label'];
   function cleanSvg(text) {
     if (!text) return null;
     var doc = new DOMParser().parseFromString(text, 'image/svg+xml');
     var svg = doc.documentElement;
-    if (!svg || svg.nodeName !== 'svg' || doc.getElementsByTagName('parsererror').length) return null;
-    Array.prototype.slice.call(svg.querySelectorAll('script, foreignObject, a, image, use')).forEach(function (n) { n.remove(); });
-    Array.prototype.slice.call(svg.querySelectorAll('*')).concat([svg]).forEach(function (n) {
+    if (!svg || svg.namespaceURI !== SVG_NS || svg.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) return null;
+    var keep = function (n) { return n.namespaceURI === SVG_NS && SVG_ELEMENTS.indexOf(n.localName) >= 0; };
+    Array.prototype.slice.call(svg.getElementsByTagName('*')).forEach(function (n) { if (!keep(n) && n.parentNode) n.parentNode.removeChild(n); });
+    [svg].concat(Array.prototype.slice.call(svg.getElementsByTagName('*'))).forEach(function (n) {
       Array.prototype.slice.call(n.attributes).forEach(function (a) {
-        if (/^on/i.test(a.name) || (/href$/i.test(a.name) && !/^#/.test(a.value))) n.removeAttribute(a.name);
+        var ok = SVG_ATTRS.indexOf(a.localName) >= 0 && !a.namespaceURI
+          // A marker is referenced only within the diagram.
+          && !(a.localName === 'marker-end' && !/^url\(#[A-Za-z0-9_.-]+\)$/.test(a.value));
+        if (!ok && !(n === svg && a.name === 'xmlns')) n.removeAttribute(a.name);
       });
+    });
+    // The style element: Pointsman's own rules, but no outside resources.
+    Array.prototype.slice.call(svg.getElementsByTagName('style')).forEach(function (st) {
+      if (/@import|url\(/i.test(st.textContent)) st.parentNode.removeChild(st);
     });
     return document.importNode(svg, true);
   }
