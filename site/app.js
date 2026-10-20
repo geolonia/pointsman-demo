@@ -59,9 +59,8 @@
       },
       // evacuation-access-check (pointsman-config): its rules, by index.
       rules2: {
-        '0': 'Near an evacuation site (within 1 km), people on foot cannot pass, and the way around is 200 m or more longer: the site’s staff get an alert.',
+        '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
         '1': 'Near an evacuation site, but the way around could not be checked: a person looks.',
-        'default': 'No alert: no site within 1 km, the way around is short, or people can still pass on foot.',
       },
       usedTitle: 'Based on', usedAI: 'AI', usedMap: 'map',
       act: { publish: 'publish', review: 'review', urgent: 'urgent', reject: 'rejected', pending: 'being checked', alert: 'alert', none: 'no alert' },
@@ -171,9 +170,8 @@
         'default': '公開の規則に当てはまらないので、人が確認する。',
       },
       rules2: {
-        '0': '避難場所（1 km 以内）の近くで、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
+        '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
         '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
-        'default': '警報なし：1 km 以内に避難場所がない、迂回が短い、または歩いて通れる。',
       },
       usedTitle: '判断に使ったもの', usedAI: 'AI', usedMap: '地図',
       act: { publish: '公開', review: '確認', urgent: '緊急', reject: '非公開', pending: '判定中', alert: '警報', none: '警報なし' },
@@ -685,7 +683,9 @@
       if (facts) items.push(facts);
       showShelter(ev.facts || []);
       var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
-      items.push(el('span', { class: 'rule-text', text: t('rules2')[ev.policyRule === undefined ? 'default' : ev.policyRule] || t('rules2')['default'] }));
+      // The box shows only alert and review; a rule index it does not know gets no sentence.
+      var rule2 = ev.policyRule !== undefined && Object.prototype.hasOwnProperty.call(t('rules2'), ev.policyRule) ? t('rules2')[ev.policyRule] : null;
+      if (rule2) items.push(el('span', { class: 'rule-text', text: rule2 }));
       var used = renderUsed('evacuation', ev.policyRule, ev.answers, ev.facts);
       if (used) items.push(used);
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
@@ -830,13 +830,17 @@
       '0': ['danger'], '1': ['flood', 'danger'], '2': ['flood', 'danger'],
       '3': ['danger', 'category', 'status_matches', 'clarity'], 'default': ['danger', 'category', 'status_matches', 'clarity'],
     },
-    evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'], 'default': ['shelter', 'walk', 'foot_passable'] },
+    // Its default (none) is never shown: the page shows the second check only for alert and review.
+    evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'] },
   };
 
   /** "Based on": the AI answers and map checks the rule used, with their values. */
   function renderUsed(profile, rule, answers, facts) {
     var uses = RULE_USES[profile];
-    var names = uses[rule === undefined ? 'default' : rule] || uses['default'];
+    var key = rule === undefined ? 'default' : String(rule);
+    // A rule this page does not know (a newer profile): say nothing rather than something wrong.
+    if (!Object.prototype.hasOwnProperty.call(uses, key)) return null;
+    var names = uses[key];
     var chips = [];
     names.forEach(function (name) {
       var f = (facts || []).filter(function (x) { return x.name === name; })[0];

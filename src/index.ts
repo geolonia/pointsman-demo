@@ -720,8 +720,11 @@ function answersOf(c: Attr): Record<string, { value: unknown; p?: number }> {
   const answers: Record<string, { value: unknown; p?: number }> = {};
   for (const [k, v] of Object.entries(c)) {
     if (CHECK_META.has(k) || k.endsWith('Probability')) continue;
+    // A sub-attribute without a value (a Relationship, for example) is not an answer.
+    const value = val(v);
+    if (value === undefined) continue;
     const p = val(c[`${k}Probability`]);
-    answers[k] = { value: val(v), ...(typeof p === 'number' && { p }) };
+    answers[k] = { value, ...(typeof p === 'number' && { p }) };
   }
   return answers;
 }
