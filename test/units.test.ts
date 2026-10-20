@@ -152,7 +152,13 @@ describe('summary for the page', () => {
     expect(summarize({ ...entity, final: final('publish') })).toMatchObject({ published: true, final: { action: 'publish', policyRule: '3', decidedAt: '2026-10-07T01:06:00Z' } });
     expect(summarize({ ...entity, final: final('urgent') }).published).toBe(false);
     expect(summarize({ ...entity, check: { ...entity.check, finalAction: P('publish') }, final: final('urgent') }).published).toBe(true);
-    expect(summarize({ ...entity, check: { ...entity.check, finalAction: P('publish') }, final: final('reject') }).published).toBe(false);
+    // A person's answer: the final result counts once it was made after it (reviewedAt).
+    const answered = (action: string, at: string) => ({ ...entity.check, finalAction: P(action), reviewedAt: P(at) });
+    expect(summarize({ ...entity, check: answered('reject', '2026-10-07T01:05:00Z'), final: final('reject') }).published).toBe(false);
+    expect(summarize({ ...entity, check: answered('publish', '2026-10-07T01:05:00Z'), final: final('urgent') }).published).toBe(true);
+    // Made before the answer (the rerun has not come yet): the answer counts.
+    expect(summarize({ ...entity, check: answered('publish', '2026-10-07T01:07:00Z'), final: final('review') }).published).toBe(true);
+    expect(summarize({ ...entity, check: { ...entity.check, finalAction: P('publish') }, final: final('review') }).published).toBe(true);
   });
 });
 

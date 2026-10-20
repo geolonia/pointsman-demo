@@ -156,7 +156,7 @@
       stats1: function (n, pub, person, urgent) {
         return plural(n, 'report', 'reports') + ': ' + pub + ' published at once, ' + person + ' sent to a person' + (urgent ? ' (' + urgent + ' urgent).' : '.');
       },
-      stats2: function (u, p, r, w) { return 'Of the ' + plural(u, 'unclear report', 'unclear reports') + ', people published ' + p + ' and rejected ' + r + '; ' + w + ' still waiting.'; },
+      stats2: function (u, p, r, w) { return 'Of the ' + plural(u, 'report that went to a person', 'reports that went to a person') + ', people published ' + p + ' and rejected ' + r + '; ' + w + ' still waiting.'; },
       statsCorrected: function (c) { return 'In ' + plural(c, 'report', 'reports') + ', a person corrected at least one of the AI’s answers.'; },
       statsNone: 'No reports in the last 7 days. Yours will be the first.',
       statsSource: 'From Pointsman’s decision log: every decision is recorded.',
@@ -318,7 +318,7 @@
       stats1: function (n, pub, person, urgent) {
         return '報告は ' + n + ' 件です。' + pub + ' 件はすぐに公開され、' + person + ' 件は人の確認に回りました' + (urgent ? '（うち緊急 ' + urgent + ' 件）。' : '。');
       },
-      stats2: function (u, p, r, w) { return 'はっきりしない報告 ' + u + ' 件のうち、人が公開したのは ' + p + ' 件、公開しなかったのは ' + r + ' 件です。' + w + ' 件はまだ確認待ちです。'; },
+      stats2: function (u, p, r, w) { return '人に回った報告 ' + u + ' 件のうち、人が公開したのは ' + p + ' 件、公開しなかったのは ' + r + ' 件です。' + w + ' 件はまだ確認待ちです。'; },
       statsCorrected: function (c) { return '人が AI の答えを 1 つ以上直した報告は ' + c + ' 件です。'; },
       statsNone: 'この 7 日間の報告はまだありません。あなたの報告が最初になります。',
       statsSource: 'Pointsman の判断記録から集計しています。判断はすべて記録されます。',
@@ -408,8 +408,12 @@
     else renderDev();
   }
 
+  // The final result once it is there and made after a person's answer;
+  // before, the person's answer or the first result. The residents' map
+  // shows what the server says is published.
   function outcomeOf(r) {
     if (!r.check) return 'pending';
+    if (r.final && finalFresh(r)) return r.final.action;
     return r.check.finalAction || r.check.action;
   }
 
@@ -443,7 +447,7 @@
     var c;
     if (!current) c = view === 'hq' ? t('capNone') : t('capRes');
     else if (view === 'hq') c = t('capHq');
-    else c = current.last && outcomeOf(current.last) === 'publish' ? t('capResYes') : t('capResNo');
+    else c = current.last && current.last.published ? t('capResYes') : t('capResNo');
     $('map-caption').textContent = c;
   }
 
@@ -760,7 +764,7 @@
           renderResult(current.last);
           loadStats();
           // A published report: show it where residents see it.
-          if (outcomeOf(current.last) === 'publish') setView('res');
+          if (current.last.published) setView('res');
         } }),
       ]),
     ]));
@@ -1253,7 +1257,7 @@
     var features = list.filter(function (r) { return r.location; }).map(function (r) {
       var mine = current && r.id === current.id;
       var src = mine && current.last ? current.last : r;
-      return { type: 'Feature', geometry: r.location, properties: { id: r.id, outcome: outcomeOf(src), published: outcomeOf(src) === 'publish', current: !!mine } };
+      return { type: 'Feature', geometry: r.location, properties: { id: r.id, outcome: outcomeOf(src), published: src.published === true, current: !!mine } };
     }).filter(function (f) { return view === 'hq' || f.properties.published; });
     map.getSource('reports').setData({ type: 'FeatureCollection', features: features });
   }

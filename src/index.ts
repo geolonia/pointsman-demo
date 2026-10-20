@@ -519,9 +519,9 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       published: s.actions.publish ?? 0,
       toPerson: (s.actions.review ?? 0) + (s.actions.urgent ?? 0),
       urgent: s.actions.urgent ?? 0,
-      // Pointsman's review queue holds the unclear reports (`review`); a
-      // person's decision on an urgent report is recorded in the broker only.
-      unclear: s.actions.review ?? 0,
+      // Pointsman's review queue holds the reports a person checks (review
+      // and urgent, the profile's people_check), so the numbers below add up.
+      unclear: (s.actions.review ?? 0) + (s.actions.urgent ?? 0),
       decided: { published: s.reviews.final_actions.publish ?? 0, rejected: s.reviews.final_actions.reject ?? 0, waiting: s.reviews.pending },
       corrected: s.corrected,
     }, 200, { 'cache-control': 'max-age=60' });
@@ -821,7 +821,12 @@ export function summarize(e: Entity): Summary {
   const final = f && typeof f.value === 'string'
     ? { action: f.value, ...(typeof f.observedAt === 'string' && { decidedAt: f.observedAt }), ...(val(f.policyRule) !== undefined && { policyRule: String(val(f.policyRule)) }) }
     : undefined;
-  const outcome = final ? final.action : check?.finalAction ?? check?.action;
+  // After a person's answer the final result counts once it was made again
+  // (the bridge writes reviewedAt with the answer); until then their answer.
+  const reviewedAt = check?.reviewedAt ? Date.parse(check.reviewedAt) : NaN;
+  const decidedAt = final?.decidedAt ? Date.parse(final.decidedAt) : NaN;
+  const finalFresh = !check?.finalAction || (Number.isFinite(reviewedAt) && Number.isFinite(decidedAt) && decidedAt >= reviewedAt);
+  const outcome = final && finalFresh ? final.action : check?.finalAction ?? check?.action;
   return {
     id: e.id,
     roadName: String(val(e.roadName) ?? ''),

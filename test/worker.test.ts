@@ -850,7 +850,7 @@ describe('the week in numbers (/api/stats)', () => {
       : undefined);
     const res = await worker('/api/stats', { headers: { origin: PAGE } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ days: 7, reports: 12, published: 5, toPerson: 7, urgent: 3, unclear: 4, decided: { published: 2, rejected: 1, waiting: 1 }, corrected: 1 });
+    expect(await res.json()).toEqual({ days: 7, reports: 12, published: 5, toPerson: 7, urgent: 3, unclear: 7, decided: { published: 2, rejected: 1, waiting: 1 }, corrected: 1 });
     const call = calls.find((c) => c.url.includes('/v1/stats/'))!;
     expect(call.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
   });
