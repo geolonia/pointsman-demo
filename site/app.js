@@ -34,7 +34,7 @@
       decideTitle: 'Pointsman decides', yourReport: 'Your report', aReport: 'A report', noRoad: '(no road name)',
       s1: 'Saved in the city’s data platform', s1d: 'The way any city app would save it.',
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
-      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data.',
+      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…',
       answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
@@ -79,7 +79,8 @@
       floodClass: {},
       mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
       fRouteMap: function (m) { return 'Way around on foot: +' + m + ' m'; },
-      fShelterNote: 'No rule of this check uses it: it is context for the person who checks. The second check uses it.',
+      fShelterNote: 'No rule of this check uses it: it is context for the person who checks. For reports that go to a person, the second check uses it.',
+      fSecond: 'second check',
       dutyTitle: 'You are the person on duty',
       dutyText: 'In the city, a team member gets this as a task. Here, you decide: should residents see this report?',
       doPublish: 'Publish it', doReject: 'Reject it', deciding: 'Sending…',
@@ -139,7 +140,7 @@
       decideTitle: 'Pointsman が決める', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
       s1: '市のデータ基盤に保存', s1d: '市のアプリが保存するのと同じ方法です。',
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
-      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。',
+      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…',
       answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
@@ -188,7 +189,8 @@
       },
       mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
       fRouteMap: function (m) { return '歩いて迂回：+' + m + ' m'; },
-      fShelterNote: 'この確認の規則では使いません。確認する人のための参考情報です。2 つ目の確認で使います。',
+      fShelterNote: 'この確認の規則では使いません。確認する人のための参考情報です。人に回る報告では、2 つ目の確認で使います。',
+      fSecond: '2 つ目の確認',
       dutyTitle: 'あなたが担当者です',
       dutyText: '市では、チームのメンバーがこれを仕事として受け取ります。ここではあなたが決めてください。この報告を住民に見せますか。',
       doPublish: '公開する', doReject: '公開しない', deciding: '送信中…',
@@ -260,6 +262,17 @@
     return e;
   }
   function $(id) { return document.getElementById(id); }
+
+  // The page redraws parts of itself when new data comes (a poll, the second
+  // check, the 8-second list update). A <details> the visitor opened stays
+  // open across those redraws: its state is kept by key.
+  var openDetails = {};
+  function details(key, props, children) {
+    var e = el('details', props, children);
+    if (openDetails[key]) e.open = true;
+    e.addEventListener('toggle', function () { openDetails[key] = e.open; });
+    return e;
+  }
 
   // The key that lets this visitor decide their own report (sent with it).
   function keyOf(id) { try { return sessionStorage.getItem('key:' + id); } catch (e) { return null; } }
@@ -510,8 +523,8 @@
     return isFinite(a) && isFinite(b) ? ((b - a) / 1000).toFixed(1) + ' s' : '';
   }
 
-  function json(label, value) {
-    return el('details', null, [el('summary', { text: label }), el('pre', { text: JSON.stringify(value, null, 2) })]);
+  function json(key, label, value) {
+    return details(current.id + ':' + key, null, [el('summary', { text: label }), el('pre', { text: JSON.stringify(value, null, 2) })]);
   }
 
   function renderCurrent() {
@@ -582,7 +595,9 @@
     var box = $('facts');
     box.textContent = '';
     if (!r || !r.check || current.shown < 3) return;
-    var facts = renderFacts(r.facts || []);
+    // The way around on foot comes from the second check, a few seconds later.
+    var walk = r.evacuation ? (r.evacuation.facts || []).filter(function (f) { return f.name === 'walk'; }) : [];
+    var facts = renderFacts((r.facts || []).concat(walk.map(function (f) { return Object.assign({ second: true }, f); })));
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
   }
@@ -613,14 +628,14 @@
     var box = $('data');
     box.textContent = '';
     if (!r || !r.ngsi || current.shown < 4) return;
-    box.appendChild(el('details', { class: 'data' }, [
+    box.appendChild(details(current.id + ':data', { class: 'data' }, [
       el('summary', { text: t('showData') }),
-      current.request ? json(t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
-      json(t('showEntity'), r.ngsi.entity),
-      r.ngsi.decision ? json(t('showDecision'), r.ngsi.decision) : null,
-      r.ngsi.task ? json(t('showTask'), r.ngsi.task) : null,
-      r.evacuation ? json(t('showDecision2'), r.evacuation.ngsi.decision) : null,
-      r.evacuation && r.evacuation.ngsi.alert ? json(t('showAlert'), r.evacuation.ngsi.alert) : null,
+      current.request ? json('request', t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
+      json('entity', t('showEntity'), r.ngsi.entity),
+      r.ngsi.decision ? json('decision', t('showDecision'), r.ngsi.decision) : null,
+      r.ngsi.task ? json('task', t('showTask'), r.ngsi.task) : null,
+      r.evacuation ? json('decision2', t('showDecision2'), r.evacuation.ngsi.decision) : null,
+      r.evacuation && r.evacuation.ngsi.alert ? json('alert', t('showAlert'), r.evacuation.ngsi.alert) : null,
     ]));
   }
 
@@ -652,7 +667,7 @@
       showShelter(ev.facts || []);
       var c = { alert: 'cAlert', review: 'cReview' }[ev.action];
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
-      chain.appendChild(el('div', { class: 'box' }, items));
+      chain.appendChild(el('div', { class: 'box map-checks' }, items));
     }
 
     if (a === 'publish') return;
@@ -769,10 +784,11 @@
     var list = el('ul', { class: 'facts' });
     facts.forEach(function (f) {
       list.appendChild(el('li', { class: 'fact ' + f.name }, [
+        f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null,
         el('span', { class: 'fq', text: t('fQ')[f.name] || f.name }),
         el('strong', { class: 'fa', text: factText(f) }),
         f.missing ? null : el('span', { class: 'fs', text: t('fSource') + f.source }),
-        firstCheck && f.name === 'shelter' && !f.missing ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
+        firstCheck && f.name === 'shelter' && !f.missing && !f.second ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
       ]));
     });
     return list;
@@ -828,7 +844,7 @@
     var q = pending.request;
     var url = q.url;
     try { url = decodeURIComponent(q.url); } catch (e) {}
-    info.appendChild(el('details', null, [el('summary', { text: t('showQuery') }),
+    info.appendChild(details('pending-query', null, [el('summary', { text: t('showQuery') }),
       el('pre', { text: q.method + ' ' + url + '\nNGSILD-Tenant: ' + q.tenant + '\nLink: <' + q.link + '>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"' })]));
   }
 
@@ -969,6 +985,8 @@
           result |= (b & 31) << shift;
           shift += 5;
         } while (b >= 32 && shift < 35);
+        // A number that does not end is not an encoded polyline.
+        if (b >= 32) return null;
         d[k] = result & 1 ? ~(result >> 1) : result >> 1;
       }
       lat += d[0];
@@ -983,10 +1001,14 @@
     if (!f || !map || !map.demoReady || !current) return;
     var key = current.id + '|' + f.values.route;
     if (current.routeShown === key) return;
-    var line = decodePolyline(f.values.route, 6);
-    // A route far from Tokyo is not this one: drawn only inside the demo area, with a margin.
-    if (!line || !line.every(function (p) { return p[0] > 139.6 && p[0] < 139.9 && p[1] > 35.6 && p[1] < 35.8; })) return;
+    // Decoded once per value, also when it is refused; Pointsman keeps at most 6,000 characters.
     current.routeShown = key;
+    var line = f.values.route.length <= 20000 ? decodePolyline(f.values.route, 6) : null;
+    // A route far from Tokyo is not this one: drawn only inside the demo area, with a margin.
+    if (!line || !line.every(function (p) { return p[0] > 139.6 && p[0] < 139.9 && p[1] > 35.6 && p[1] < 35.8; })) {
+      clearRoute();
+      return;
+    }
     map.getSource('route').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} }] });
     if (routeMarker) routeMarker.remove();
     var node = el('div', { class: 'route-pin' }, [el('span', { class: 'name', text: t('fRouteMap')(f.values.extra_m) })]);

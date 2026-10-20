@@ -165,6 +165,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .facts .fact { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line); }
 .facts .fact:first-child { padding-top: 0; border-top: none; }
 .facts .fq { color: var(--fg-2); font-size: 0.9rem; }
+.facts .ftag { justify-self: start; font: 0.7rem var(--mono); color: var(--i-map); border: 1px solid var(--line-map); border-radius: 999px; padding: 1px 8px; }
 .facts .fn { font-size: 0.8rem; color: var(--fg-2); font-style: italic; }
 .facts .fs { font: 0.72rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .box.map-checks { background: var(--t-map); border-color: var(--line-map); }
