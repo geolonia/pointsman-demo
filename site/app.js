@@ -1202,21 +1202,69 @@
 
   // --- Map ---------------------------------------------------------------------------------
 
-  // A grayscale base map (GSI pale map, without colour), so that only the
-  // reports and the flood zones are in colour; the flood zones the facts come
-  // from are for headquarters only.
+  // The base map: GSI vector tiles (地理院地図Vector, optimal_bvmap), drawn
+  // in quiet colours of the page's theme, so that the reports and the flood
+  // zones stand out. The flood zones exist only as raster tiles.
+  var PALETTE = {
+    light: { bg: '#F2EEE6', water: '#D9E1E6', minor: '#FFFFFF', major: '#E3DCCF', rail: '#C9C2B5', building: '#E7E1D6', label: '#8F8A82', halo: '#F2EEE6', flood: 0.62 },
+    dark: { bg: '#171717', water: '#1E2830', minor: '#262626', major: '#333333', rail: '#3D3D3D', building: '#1F1F1F', label: '#8A857D', halo: '#171717', flood: 0.75 },
+  };
+  // The place names GSI's own style writes horizontally (its 注記 layer filter).
+  var LABEL_FILTER = ["step", ["zoom"], ["all", ["==", ["geometry-type"], "Point"], ["in", ["get", "vt_code"], ["literal", [110, 120, 130, 140, 210, 220, 311, 312, 314, 315, 316, 321, 322, 323, 331, 332, 333, 334, 341, 342, 343, 344, 345, 346, 347, 348, 351, 352, 411, 412, 421, 422, 431, 432, 441, 511, 521, 531, 532, 634, 651, 800, 810, 820, 822, 830, 831, 832, 840, 841, 842, 843, 850, 880, 881, 885, 889, 2943, 2944]]], ["any", ["any", ["==", ["get", "vt_arrng"], 1], ["==", ["get", "vt_arrng"], 3]], ["!", ["has", "vt_arrng"]]]], 16, ["all", ["==", ["geometry-type"], "Point"], ["in", ["get", "vt_flag17"], ["literal", [0, 1]]], ["in", ["get", "vt_code"], ["literal", [110, 120, 130, 140, 210, 220, 311, 312, 314, 315, 316, 321, 322, 323, 331, 332, 333, 334, 341, 342, 343, 344, 345, 346, 347, 348, 351, 352, 411, 412, 421, 422, 431, 432, 441, 511, 521, 531, 532, 634, 651, 800, 810, 820, 822, 830, 831, 832, 840, 841, 842, 843, 850, 880, 881, 885, 889, 2943, 2944]]], ["any", ["any", ["==", ["get", "vt_arrng"], 1], ["==", ["get", "vt_arrng"], 3]], ["!", ["has", "vt_arrng"]]]], 17, ["all", ["==", ["geometry-type"], "Point"], ["in", ["get", "vt_flag17"], ["literal", [1, 2]]], ["in", ["get", "vt_code"], ["literal", [110, 120, 130, 140, 210, 220, 311, 312, 314, 315, 316, 321, 322, 323, 331, 332, 333, 334, 341, 342, 343, 344, 345, 346, 347, 348, 351, 352, 411, 412, 421, 422, 431, 432, 441, 511, 521, 531, 532, 634, 651, 800, 810, 820, 822, 830, 831, 832, 840, 841, 842, 843, 850, 880, 881, 885, 889, 2943, 2944]]], ["any", ["any", ["==", ["get", "vt_arrng"], 1], ["==", ["get", "vt_arrng"], 3]], ["!", ["has", "vt_arrng"]]]]];
+  function themeNow() {
+    var t = document.documentElement.dataset.theme;
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  var MAJOR = ['match', ['get', 'vt_rdctg'], ['国道', '都道府県道', '高速自動車国道等'], true, false];
+  function basePaint(c) {
+    return {
+      bg: { 'background-color': c.bg },
+      water: { 'fill-color': c.water },
+      buildings: { 'fill-color': c.building },
+      'roads-minor': { 'line-color': c.minor },
+      'roads-major': { 'line-color': c.major },
+      rail: { 'line-color': c.rail },
+      flood: { 'raster-opacity': c.flood },
+      labels: { 'text-color': c.label, 'text-halo-color': c.halo },
+    };
+  }
   function style() {
+    var c = PALETTE[themeNow()];
+    var paint = basePaint(c);
+    var width = function (minor, major) {
+      return ['interpolate', ['exponential', 1.6], ['zoom'], 12, ['case', MAJOR, major[0], minor[0]], 18, ['case', MAJOR, major[1], minor[1]]];
+    };
     return {
       version: 8,
+      glyphs: 'https://gsi-cyberjapan.github.io/optimal_bvmap/glyphs/{fontstack}/{range}.pbf',
       sources: {
-        gsi: { type: 'raster', tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'], tileSize: 256, attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>', maxzoom: 18 },
+        gsi: { type: 'vector', tiles: ['https://cyberjapandata.gsi.go.jp/xyz/optimal_bvmap-v1/{z}/{x}/{y}.pbf'], minzoom: 4, maxzoom: 16, attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院地図Vector</a>' },
         flood: { type: 'raster', tiles: ['https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png'], tileSize: 256, minzoom: 2, maxzoom: 17, attribution: '<a href="https://disaportal.gsi.go.jp/hazardmap/copyright/opendata.html">「ハザードマップポータルサイト」</a>洪水浸水想定区域' },
       },
       layers: [
-        { id: 'gsi', type: 'raster', source: 'gsi', paint: { 'raster-saturation': -1, 'raster-contrast': -0.1 } },
-        { id: 'flood', type: 'raster', source: 'flood', paint: { 'raster-opacity': 0.3 } },
+        { id: 'bg', type: 'background', paint: paint.bg },
+        { id: 'water', type: 'fill', source: 'gsi', 'source-layer': 'WA', paint: paint.water },
+        { id: 'buildings', type: 'fill', source: 'gsi', 'source-layer': 'BldA', minzoom: 14, paint: paint.buildings },
+        { id: 'roads-minor', type: 'line', source: 'gsi', 'source-layer': 'RdCL', filter: ['!', MAJOR], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: Object.assign({ 'line-width': width([0.5, 6], [1, 10]) }, paint['roads-minor']) },
+        { id: 'roads-major', type: 'line', source: 'gsi', 'source-layer': 'RdCL', filter: MAJOR, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: Object.assign({ 'line-width': width([0.5, 6], [1.5, 14]) }, paint['roads-major']) },
+        { id: 'rail', type: 'line', source: 'gsi', 'source-layer': 'RailCL', paint: Object.assign({ 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 18, 3] }, paint.rail) },
+        // The flood zones over the streets, under the place names and the reports.
+        { id: 'flood', type: 'raster', source: 'flood', paint: paint.flood },
+        { id: 'labels', type: 'symbol', source: 'gsi', 'source-layer': 'Anno', filter: LABEL_FILTER, layout: { 'text-field': ['get', 'vt_text'], 'text-font': ['NotoSansJP-Regular'], 'text-size': 11, 'text-max-width': 8 }, paint: Object.assign({ 'text-halo-width': 1.4 }, paint.labels) },
       ],
     };
+  }
+  // The base map follows the page's theme switch (and the system's, without one).
+  function applyTheme(m) {
+    if (!m) return;
+    // Before the style is there (the first moments), once it is.
+    if (!m.getLayer('bg')) { m.once('styledata', function () { applyTheme(m); }); return; }
+    var paint = basePaint(PALETTE[themeNow()]);
+    Object.keys(paint).forEach(function (id) {
+      if (!m.getLayer(id)) return;
+      Object.keys(paint[id]).forEach(function (k) { m.setPaintProperty(id, k, paint[id][k]); });
+    });
   }
 
   function makeMap() {
@@ -1436,6 +1484,7 @@
     var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     document.querySelector('meta[name="theme-color"]').setAttribute('content', next === 'dark' ? '#141414' : '#F5F2EC');
+    applyTheme(map);
     try { localStorage.setItem('theme', next); } catch (e) {}
   });
   $('how-toggle').addEventListener('click', function () { setHow($('how').hidden); });
@@ -1477,6 +1526,10 @@
   setDev(devOn && window.matchMedia('(min-width: 1100px)').matches, false);
   setStep('pick');
   if (window.maplibregl) map = makeMap();
+  if (window.matchMedia) {
+    var scheme = window.matchMedia('(prefers-color-scheme: dark)');
+    if (scheme.addEventListener) scheme.addEventListener('change', function () { applyTheme(map); });
+  }
   loadConfig();
   loadReports();
   loadPending();
