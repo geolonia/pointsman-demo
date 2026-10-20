@@ -380,7 +380,11 @@ describe('cleanup', () => {
       if (c.method === 'GET' && c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-old'))) {
         return Response.json({ id: 'urn:ngsi-ld:Decision:e-old', type: 'Decision', 'http://purl.org/dc/terms/replaces': { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-older' } });
       }
-      if (c.method === 'GET' && c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-older'))) return new Response(null, { status: 404 });
+      // e-older has no entity (the bridge skipped it: a newer one was there);
+      // Pointsman's log says it replaced e-oldest, so the walk goes on.
+      if (c.method === 'GET' && c.url.includes('/entities/') && c.url.includes(encodeURIComponent('urn:ngsi-ld:Decision:e-old')) && !c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-old'))) return new Response(null, { status: 404 });
+      if (c.method === 'GET' && c.url.endsWith('/v1/decisions/e-older')) return Response.json({ decision_id: 'e-older', replaces: 'e-oldest' });
+      if (c.method === 'GET' && c.url.endsWith('/v1/decisions/e-oldest')) return new Response(null, { status: 404 });
       if (c.method === 'DELETE') return new Response(null, { status: 204 });
       return undefined;
     };
@@ -391,7 +395,7 @@ describe('cleanup', () => {
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
     // The first check's Decision and Task, the additional check's Decisions
     // and Alerts (also the one it replaced), then the report.
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:Decision:e-older', 'urn:ngsi-ld:Alert:demo-e-older', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:Decision:e-older', 'urn:ngsi-ld:Alert:demo-e-older', 'urn:ngsi-ld:Decision:e-oldest', 'urn:ngsi-ld:Alert:demo-e-oldest', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });

@@ -708,6 +708,28 @@ async function taskIdOf(e: Entity): Promise<string | null> {
   return typeof hash === 'string' ? taskEntityId(e.id, ROUTE.attribute, hash) : null;
 }
 
+/**
+ * The Decision entity this one replaced (dcterms:replaces). A decision the
+ * bridge skipped (a newer one was already on the report) has no entity, but
+ * a later one can still replace it: then Pointsman's log says what it
+ * replaced, so the walk goes on past it.
+ */
+async function replacedBy(env: Env, broker: Broker, decisionEntity: string): Promise<string | undefined> {
+  const entity = await broker.getDecision(decisionEntity);
+  if (entity) {
+    const next = (entity[REPLACES_IRI] as Attr | undefined)?.object;
+    return typeof next === 'string' ? next : undefined;
+  }
+  try {
+    const got = await fetchWithAgent(`${trimUrl(env.POINTSMAN_URL)}/v1/decisions/${encodeURIComponent(decisionEntity.split(':').pop()!)}`, { headers: { authorization: `Bearer ${env.POINTSMAN_TOKEN}` } });
+    if (!got.ok) return undefined;
+    const replaces = ((await got.json()) as { replaces?: unknown }).replaces;
+    return typeof replaces === 'string' ? `urn:ngsi-ld:Decision:${replaces}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 type PointsmanReview = { status?: string; resolved_by?: string; final_action?: string };
 
 /** The decision's review in Pointsman: null when it has none, 'unavailable' when Pointsman cannot say. */
@@ -891,7 +913,7 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     // the earlier one), through their replaces links.
     let second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
     for (let i = 0; typeof second === 'string' && i < 50; i += 1) {
-      const replaced = ((await broker.getDecision(second))?.[REPLACES_IRI] as Attr | undefined)?.object;
+      const replaced = await replacedBy(env, broker, second);
       await broker.delete(second);
       await broker.delete(alertId(second.split(':').pop()!));
       second = replaced;
@@ -902,7 +924,7 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     // Read the next link before deleting, so a failed delete leaves the rest
     // reachable from the report on the next run (the report stays then).
     for (let i = 0; typeof third === 'string' && i < 50; i += 1) {
-      const replaced = ((await broker.getDecision(third))?.[REPLACES_IRI] as Attr | undefined)?.object;
+      const replaced = await replacedBy(env, broker, third);
       await broker.delete(third);
       third = replaced;
     }
