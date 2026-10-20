@@ -104,6 +104,8 @@
       },
       basedOn: 'Made from', bFirst: 'first result', bPerson: 'person’s answer', bSecond: 'additional check', bNoSecond: 'no additional check needed',
       showDecision3: 'Decision entity of the final result',
+      graphKicker: 'How the city decides', graphText: 'The final result is made from the decisions below it. Each box is a profile with its own rules.',
+      graphDmn: 'Download for DMN tools (.dmn)',
       // evacuation-access-check (pointsman-config): its rules, by index.
       rules2: {
         '0': 'An evacuation site within 1 km, people on foot cannot pass, and the way around is at least 200 m longer: the site’s staff get an alert.',
@@ -263,6 +265,8 @@
       },
       basedOn: 'もとにしたもの', bFirst: '最初の結果', bPerson: '人の答え', bSecond: '追加の確認', bNoSecond: '追加の確認は不要',
       showDecision3: '最終結果の Decision エンティティ',
+      graphKicker: '市の判断の流れ', graphText: '最終結果は、その下にある判断からつくられます。箱 1 つが、それぞれの規則をもつ 1 つのプロファイルです。',
+      graphDmn: 'DMN ツール用にダウンロード（.dmn）',
       rules2: {
         '0': '1 km 以内に避難場所があり、歩いて通れず、迂回すると 200 m 以上長くなる：避難場所の担当者に警報を送る。',
         '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
@@ -891,6 +895,48 @@
       rule ? el('span', { class: 'rule-text', text: rule }) : null,
       el('div', { class: 'used' }, from),
     ]));
+    box.appendChild(renderGraph());
+  }
+
+  // The chain as a diagram (Pointsman's GET /v1/profiles/{id}/graph, through
+  // the demo's server), once per language.
+  var graphSvg = {};
+  function renderGraph() {
+    var l = lang;
+    var holder = el('div', { class: 'box graph', id: 'final-graph' }, [
+      el('span', { class: 'kicker', text: t('graphKicker') }),
+      el('span', { text: t('graphText') }),
+    ]);
+    var place = el('div', { class: 'graph-svg' });
+    holder.appendChild(place);
+    holder.appendChild(el('a', { href: '/api/graph?format=dmn&lang=' + l, download: 'road-closure-final.dmn', text: t('graphDmn') }));
+    var show = function (svg) { if (svg) place.appendChild(svg.cloneNode(true)); };
+    if (graphSvg[l] !== undefined) show(graphSvg[l]);
+    else {
+      graphSvg[l] = null;
+      fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).then(function (text) {
+        graphSvg[l] = cleanSvg(text);
+        // The page may have been redrawn meanwhile: fill the box that is shown now.
+        var now = document.querySelector('#final-graph .graph-svg');
+        if (now && !now.firstChild && graphSvg[l]) now.appendChild(graphSvg[l].cloneNode(true));
+      }).catch(function () {});
+    }
+    return holder;
+  }
+
+  /** The SVG as a node, without anything that could run: no scripts, no event handlers, no outside links. */
+  function cleanSvg(text) {
+    if (!text) return null;
+    var doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    var svg = doc.documentElement;
+    if (!svg || svg.nodeName !== 'svg' || doc.getElementsByTagName('parsererror').length) return null;
+    Array.prototype.slice.call(svg.querySelectorAll('script, foreignObject, a, image, use')).forEach(function (n) { n.remove(); });
+    Array.prototype.slice.call(svg.querySelectorAll('*')).concat([svg]).forEach(function (n) {
+      Array.prototype.slice.call(n.attributes).forEach(function (a) {
+        if (/^on/i.test(a.name) || (/href$/i.test(a.name) && !/^#/.test(a.value))) n.removeAttribute(a.name);
+      });
+    });
+    return document.importNode(svg, true);
   }
 
   // --- The week's numbers (step 3) -------------------------------------------------------
