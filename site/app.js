@@ -975,7 +975,8 @@
       el('span', { class: 'kicker', text: t('graphKicker') }),
       el('span', { text: t('graphText') }),
     ]);
-    var place = el('div', { class: 'graph-svg' });
+    // It may scroll sideways on narrow screens: focusable, so keyboards can scroll it too.
+    var place = el('div', { class: 'graph-svg', tabindex: '0', role: 'region', 'aria-label': t('graphKicker') });
     holder.appendChild(place);
     holder.appendChild(el('a', { href: '/api/graph?format=dmn&lang=' + l, download: 'road-closure-final.dmn', text: t('graphDmn') }));
     if (graphSvg[l]) {

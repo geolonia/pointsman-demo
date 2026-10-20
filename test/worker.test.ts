@@ -376,6 +376,11 @@ describe('cleanup', () => {
           { id: 'urn:ngsi-ld:RoadRestriction:demo-new', type: 'RoadRestriction', createdAt: new Date().toISOString() },
         ]);
       }
+      // The additional check replaced an earlier one (it requires the first check).
+      if (c.method === 'GET' && c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-old'))) {
+        return Response.json({ id: 'urn:ngsi-ld:Decision:e-old', type: 'Decision', 'http://purl.org/dc/terms/replaces': { type: 'Relationship', object: 'urn:ngsi-ld:Decision:e-older' } });
+      }
+      if (c.method === 'GET' && c.url.endsWith(encodeURIComponent('urn:ngsi-ld:Decision:e-older'))) return new Response(null, { status: 404 });
       if (c.method === 'DELETE') return new Response(null, { status: 204 });
       return undefined;
     };
@@ -384,8 +389,9 @@ describe('cleanup', () => {
     await env.DEMO.put('issue:9', JSON.stringify({ decision: 'd-old', entity: 'urn:ngsi-ld:RoadRestriction:demo-old', action: 'review', corrections: [], createdAt: old }));
     await env.DEMO.put('issue:10', JSON.stringify({ decision: 'd-new', entity: 'urn:ngsi-ld:RoadRestriction:demo-new', action: 'review', corrections: [], createdAt: new Date().toISOString() }));
     expect(await cleanup(env)).toEqual({ deleted: 1, closed: 1 });
-    // Step 1's Decision and Task, step 2's Decision and Alert, then the report.
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:RoadRestriction:demo-old']);
+    // The first check's Decision and Task, the additional check's Decisions
+    // and Alerts (also the one it replaced), then the report.
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => decodeURIComponent(c.url.split('/entities/')[1]!))).toEqual(['urn:ngsi-ld:Decision:d-old', await taskEntityId('urn:ngsi-ld:RoadRestriction:demo-old', 'check', 'h-old'), 'urn:ngsi-ld:Decision:e-old', 'urn:ngsi-ld:Alert:demo-e-old', 'urn:ngsi-ld:Decision:e-older', 'urn:ngsi-ld:Alert:demo-e-older', 'urn:ngsi-ld:RoadRestriction:demo-old']);
     expect(await env.DEMO.get('issue:9')).toBeNull();
     expect(await env.DEMO.get('issue:10')).not.toBeNull();
   });

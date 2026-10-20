@@ -193,7 +193,9 @@ function afterDecisions(env: Env, route: string | undefined, handled: EntityResu
   if (route === FINAL_ROUTE.name) return [];
   if (route === EVACUATION_ROUTE.name) {
     // Step 2: alerts for the evacuation sites' staff, nothing for GitHub.
-    return decided.filter((h) => h.action === 'alert')
+    // write 0: a newer decision was already on the report (nothing written,
+    // no Decision entity), so there is no Alert to raise for this one.
+    return decided.filter((h) => h.action === 'alert' && h.write !== 0)
       .map((h) => createAlert(env, h.id, h.decision).catch((err) => console.error(`alert for ${h.decision}: ${(err as Error).message}`)));
   }
   return decided.filter((h) => PERSON_ACTIONS.includes(h.action))
@@ -884,11 +886,15 @@ export async function cleanup(env: Env, now = Date.now()): Promise<{ deleted: nu
     // Extra data: a Task that cannot be deleted must not keep the report.
     const taskId = await taskIdOf(e);
     if (taskId) await broker.delete(taskId).catch((err) => console.error(`task cleanup: ${(err as Error).message}`));
-    // Step 2: its Decision entity and the Alert it raised.
-    const second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
-    if (typeof second === 'string') {
+    // The additional check: its Decision entity and the Alert it raised, and
+    // the ones it replaced (it requires the first check, so a rerun replaces
+    // the earlier one), through their replaces links.
+    let second = ((e.evacuation as Attr | undefined)?.decision as Attr | undefined)?.object;
+    for (let i = 0; typeof second === 'string' && i < 50; i += 1) {
+      const replaced = ((await broker.getDecision(second))?.[REPLACES_IRI] as Attr | undefined)?.object;
       await broker.delete(second);
       await broker.delete(alertId(second.split(':').pop()!));
+      second = replaced;
     }
     // Step 3: its Decision entity, and the ones it replaced (a rerun after a
     // person answered step 1), through their replaces links.
