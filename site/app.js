@@ -42,7 +42,7 @@
       showRequest: 'request', showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp)',
       showDecision2: 'Decision entity of the second check', showAlert: 'Alert entity (Smart Data Models)',
       showAnswers: 'answers', showFacts: 'map checks',
-      devTitle: 'Developer view',
+      devTitle: 'Developer view', devShort: 'Dev',
       devLead: 'What happens to the report, part by part, with the real data. Point at a step on the page to see its part here.',
       devEmpty: 'Send a report: every part it goes through shows up here.',
       devWaiting: 'waiting…',
@@ -51,17 +51,18 @@
       lane: { page: 'This page', platform: 'Data platform (GeonicDB)', bridge: 'Bridge (demo Worker)', pointsman: 'Pointsman', data: 'AI and map data' },
       ev: {
         save: ['POST /api/reports', 'The Worker saves the report as a RoadRestriction entity (NGSI-LD) in the data platform, as any city app would.'],
-        notify: ['Notification: a new report', 'A subscription on RoadRestriction entities tells the bridge (NGSI-LD notification).'],
+        notify: ['Notification: a new report', 'A subscription on RoadRestriction entities tells the Worker (NGSI-LD notification); it queues the message, and the bridge handles it from the queue.'],
         decide: ['POST /v1/decide/road-restriction-check', 'The bridge sends the entity’s attributes to Pointsman as the state.'],
-        model: ['The model answers four questions', 'clef-flash reads only the text and gives typed answers, each with a probability.'],
+        model: ['The model answers four questions', 'The model reads the report’s text fields (not the place) and gives typed answers, each with a probability.'],
         maps: ['Map checks: flood zone, evacuation site', 'Pointsman looks up the place in public GSI data. The model never sees these facts.'],
-        decision: ['Decision: {action} (rule {rule})', 'The profile’s rules turn the answers and map checks into one action.'],
-        write: ['PATCH check; create Decision (and Task)', 'The bridge writes the result back: the check attribute on the report, a Decision entity linked to it, and a Task when a person is needed.'],
+        decision: ['Decision: {action} (policy.{rule})', 'The profile’s rules turn the answers and map checks into one action.'],
+        write: ['Create Decision (and Task); PATCH check', 'The bridge writes the result back: a Decision entity, a Task when a person is needed, and last the check attribute on the report, which links to the Decision.'],
         publishEnd: ['No second check', 'The second subscription matches only reports that go to a person (urgent or review).'],
+        secondLate: ['The second check did not come', 'No result within a minute: the queue may still retry, or the check failed. The first result stands.'],
         notify2: ['Notification: check is urgent or review', 'A second subscription, on the check attribute, starts the second check.'],
         decide2: ['POST /v1/decide/evacuation-access-check', 'The same bridge, another profile; its Decision is linked to the first one (prov:wasInformedBy).'],
         maps2: ['Map checks: evacuation site, way around on foot', 'GSI evacuation sites, and Valhalla routing on OpenStreetMap with and without the closed section.'],
-        write2: ['PATCH evacuation; create Decision (and Alert)', 'The result goes back to the data platform; an alert becomes an Alert entity (Smart Data Models) for the site’s staff.'],
+        write2: ['Create Decision; PATCH evacuation (and Alert)', 'The bridge writes the second result back; for an alert, the Worker then creates an Alert entity (Smart Data Models) for the site’s staff.'],
       },
       q: { category: 'Why is the road closed?', status_matches: 'Does the status match the text?', danger: 'Is someone in danger?', clarity: 'How clear is the report?', foot_passable: 'Can people pass on foot?' },
       cat: {
@@ -177,7 +178,7 @@
       showRequest: 'リクエスト', showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp）',
       showDecision2: '2 つ目の確認の Decision エンティティ', showAlert: 'Alert エンティティ（Smart Data Models）',
       showAnswers: '答え', showFacts: '地図での確認',
-      devTitle: '開発者向け表示',
+      devTitle: '開発者向け表示', devShort: '開発',
       devLead: '報告がどこを通るかを、実際のデータとともに順に示します。ページの手順を指すと、対応する部分がここで強調されます。',
       devEmpty: '報告を送ると、通る部分がここに順に表示されます。',
       devWaiting: '待機中…',
@@ -186,17 +187,18 @@
       lane: { page: 'このページ', platform: 'データ基盤（GeonicDB）', bridge: 'ブリッジ（デモの Worker）', pointsman: 'Pointsman', data: 'AI と地図データ' },
       ev: {
         save: ['POST /api/reports', 'Worker が報告を RoadRestriction エンティティ（NGSI-LD）としてデータ基盤に保存します。市のアプリと同じ方法です。'],
-        notify: ['通知：新しい報告', 'RoadRestriction エンティティのサブスクリプションがブリッジに知らせます（NGSI-LD の通知）。'],
+        notify: ['通知：新しい報告', 'RoadRestriction エンティティのサブスクリプションが Worker に知らせます（NGSI-LD の通知）。Worker はキューに入れ、ブリッジがキューから処理します。'],
         decide: ['POST /v1/decide/road-restriction-check', 'ブリッジがエンティティの属性を状態として Pointsman に送ります。'],
-        model: ['モデルが 4 つの質問に答える', 'clef-flash は本文だけを読み、型の決まった答えを確率とともに返します。'],
+        model: ['モデルが 4 つの質問に答える', 'モデルは報告の文字の項目（場所ではなく）を読み、型の決まった答えを確率とともに返します。'],
         maps: ['地図での確認：浸水想定区域、避難場所', 'Pointsman が場所を国土地理院の公開データで調べます。モデルはこの事実を見ません。'],
-        decision: ['判断：{action}（規則 {rule}）', 'プロファイルの規則が、答えと地図での確認から行動を 1 つ決めます。'],
-        write: ['check を PATCH、Decision（と Task）を作成', 'ブリッジが結果を書き戻します。報告の check 属性、それにつながる Decision エンティティ、人が必要なときは Task です。'],
+        decision: ['判断：{action}（policy.{rule}）', 'プロファイルの規則が、答えと地図での確認から行動を 1 つ決めます。'],
+        write: ['Decision（と Task）を作成、check を PATCH', 'ブリッジが結果を書き戻します。Decision エンティティ、人が必要なときは Task、最後に Decision につながる報告の check 属性です。'],
         publishEnd: ['2 つ目の確認はなし', '2 つ目のサブスクリプションは、人に回る報告（緊急・確認）にだけ合います。'],
+        secondLate: ['2 つ目の確認が届かない', '1 分以内に結果がありません。キューが再試行しているか、確認が失敗しました。1 つ目の結果はそのままです。'],
         notify2: ['通知：check が緊急または確認', 'check 属性の 2 つ目のサブスクリプションが、2 つ目の確認を始めます。'],
         decide2: ['POST /v1/decide/evacuation-access-check', '同じブリッジ、別のプロファイルです。その Decision は 1 つ目につながります（prov:wasInformedBy）。'],
         maps2: ['地図での確認：避難場所、歩いて迂回', '国土地理院の避難場所と、OpenStreetMap 上の Valhalla 経路（区間を閉じた場合と閉じない場合）。'],
-        write2: ['evacuation を PATCH、Decision（と Alert）を作成', '結果をデータ基盤に戻します。警報は避難場所の担当者向けの Alert エンティティ（Smart Data Models）になります。'],
+        write2: ['Decision を作成、evacuation を PATCH（と Alert）', 'ブリッジが 2 つ目の結果を書き戻します。警報のときは、Worker が避難場所の担当者向けの Alert エンティティ（Smart Data Models）を作ります。'],
       },
       q: { category: 'なぜ通れないのか', status_matches: '状態と本文は合っているか', danger: '人に危険があるか', clarity: '報告はどのくらいはっきりしているか', foot_passable: '歩いて通れるか' },
       cat: {
@@ -546,7 +548,11 @@
         startReveal();
         // Redraw only when something changed: open details and focus stay.
         var b0 = r.body;
-        var sig = JSON.stringify([b0.createdAt, b0.check && [b0.check.action, b0.check.finalAction, b0.check.policyRule], !!(b0.ngsi && b0.ngsi.decision), b0.evacuation && b0.evacuation.action, b0.visitorDecision, b0.issue]);
+        // The Task and the Alert come a moment after their decisions; the second
+        // check may not come at all (then the developer view says so after a minute).
+        var late = !!(me.chainSince && !b0.evacuation && Date.now() - me.chainSince > 60000);
+        var sig = JSON.stringify([b0.createdAt, b0.check && [b0.check.action, b0.check.finalAction, b0.check.policyRule], !!(b0.ngsi && b0.ngsi.decision), !!(b0.ngsi && b0.ngsi.task),
+          b0.evacuation && b0.evacuation.action, !!(b0.evacuation && b0.evacuation.ngsi && b0.evacuation.ngsi.alert), b0.visitorDecision, b0.issue, late]);
         if (sig !== me.sig) {
           me.sig = sig;
           renderCurrent();
@@ -601,6 +607,7 @@
     if (r && r.evacuation && current.shown >= 3) showRoute(r.evacuation.facts || []);
     if (step === 'result') renderResult(r);
     renderDev();
+    if (devTag) devHighlight(devTag);
   }
 
   function renderTimeline(r) {
@@ -907,26 +914,34 @@
   var DEV_TAGS = ['save', 'ai', 'maps', 'rule', 'second'];
 
   function devEvents(r) {
-    var c = r && r.check;
-    var decided = !!(r && r.ngsi && r.ngsi.decision);
+    // In step with the page, which shows the first check's parts one after the other.
+    var shown = current.shown;
+    var c = shown >= 2 && r && r.check;
+    var c3 = shown >= 3 && c;
+    var c4 = shown >= 4 && c;
     var data = function (label, value) { return value === undefined || value === null ? null : [label, value]; };
     var ev = [
-      { key: 'save', tag: 'save', from: 0, to: 1, done: !!(r && r.createdAt), data: [
+      { key: 'save', tag: 'save', from: 0, to: 1, done: !!(r && r.createdAt) && shown >= 1, data: [
         current.request ? data(t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
         data(t('showEntity'), r && r.ngsi && r.ngsi.entity),
       ] },
       { key: 'notify', tag: 'save', from: 1, to: 2, done: !!c },
       { key: 'decide', tag: 'ai', from: 2, to: 3, done: !!c },
       { key: 'model', tag: 'ai', from: 3, to: 4, done: !!c, data: [data(t('showAnswers'), c && c.answers)] },
-      { key: 'maps', tag: 'maps', from: 3, to: 4, done: !!c, data: [data(t('showFacts'), r && r.facts && r.facts.length ? r.facts : null)] },
-      { key: 'decision', tag: 'rule', from: 3, to: 2, done: !!c, vars: c ? { action: t('act')[c.action] || c.action, rule: c.policyRule === undefined ? '–' : c.policyRule } : null },
-      { key: 'write', tag: 'rule', from: 2, to: 1, done: decided, data: [
+      { key: 'maps', tag: 'maps', from: 3, to: 4, done: !!c3, data: [data(t('showFacts'), r && r.facts && r.facts.length ? r.facts : null)] },
+      { key: 'decision', tag: 'rule', from: 3, to: 2, done: !!c4, vars: c4 ? { action: t('act')[c4.action] || c4.action, rule: c4.policyRule === undefined ? 'default' : 'rules[' + c4.policyRule + ']' } : null },
+      // The bridge writes check last, so once check is there the entities are too.
+      { key: 'write', tag: 'rule', from: 2, to: 1, done: !!c4, data: [
         data(t('showDecision'), r && r.ngsi && r.ngsi.decision),
         data(t('showTask'), r && r.ngsi && r.ngsi.task),
       ] },
     ];
-    if (c && c.action === 'publish') return ev.concat([{ key: 'publishEnd', tag: 'second', done: true }]);
-    var e2 = r && r.evacuation;
+    if (c4 && c4.action === 'publish') return ev.concat([{ key: 'publishEnd', tag: 'second', done: true }]);
+    var e2 = c4 && r.evacuation;
+    // The page stops waiting for the second check after a minute; so does this view.
+    if (c4 && !e2 && current.chainSince && Date.now() - current.chainSince > 60000) {
+      return ev.concat([{ key: 'secondLate', tag: 'second', done: true }]);
+    }
     return ev.concat([
       { key: 'notify2', tag: 'second', from: 1, to: 2, done: !!e2 },
       { key: 'decide2', tag: 'second', from: 2, to: 3, done: !!e2, data: [data(t('showAnswers'), e2 && e2.answers)] },
@@ -938,13 +953,20 @@
     ]);
   }
 
+  var devSig = null;
+  var devTag = null; // the step marked now
   function renderDev() {
     var body = $('dev-body');
+    var events = devOn && current ? devEvents(current.last) : null;
+    // Rebuilt only when something changed: focus, selection and the marks stay.
+    var sig = JSON.stringify([devOn, lang, current && current.id, events && events.map(function (e) { return [e.key, e.done, e.vars, (e.data || []).filter(Boolean).length]; })]);
+    if (sig === devSig) return;
+    devSig = sig;
     body.textContent = '';
     if (!devOn) return;
     if (!current) { body.appendChild(el('p', { class: 'muted small', text: t('devEmpty') })); return; }
     var seq = el('div', { class: 'seq' }, [el('div', { class: 'seq-lanes' }, LANES.map(function (l) { return el('span', { text: t('lane')[l] }); }))]);
-    devEvents(current.last).forEach(function (e) {
+    events.forEach(function (e) {
       var words = t('ev')[e.key];
       var title = words[0].replace(/\{(\w+)\}/g, function (_, k) { return e.vars && e.vars[k] !== undefined ? String(e.vars[k]) : ''; });
       var row = el('div', { class: 'ev' + (e.done ? '' : ' pending'), 'data-dev': e.tag });
@@ -968,14 +990,16 @@
     });
     body.appendChild(seq);
     body.appendChild(el('p', { class: 'muted small', text: t('devPoll') }));
+    devHighlight(devTag);
   }
 
-  function setDev(on) {
+  function setDev(on, remember) {
     devOn = on;
-    try { localStorage.setItem('dev', on ? '1' : '0'); } catch (e) {}
+    if (remember !== false) try { localStorage.setItem('dev', on ? '1' : '0'); } catch (e) {}
     $('dev').hidden = !on;
     document.body.classList.toggle('dev-open', on);
     $('dev-toggle').setAttribute('aria-pressed', String(on));
+    devTag = null;
     devHighlight(null);
     renderDev();
     if (current && current.last) renderData(current.last);
@@ -983,6 +1007,7 @@
 
   /** The page parts and the events of one step, marked together. */
   function devHighlight(tag) {
+    devTag = tag;
     document.querySelectorAll('.dev-hl').forEach(function (n) { n.classList.remove('dev-hl'); });
     if (!devOn || DEV_TAGS.indexOf(tag) < 0) return;
     document.querySelectorAll('[data-dev="' + tag + '"]').forEach(function (n) { n.classList.add('dev-hl'); });
@@ -991,7 +1016,8 @@
   function devPoint(e) {
     if (!devOn) return;
     var n = e.target && e.target.closest ? e.target.closest('[data-dev]') : null;
-    devHighlight(n ? n.getAttribute('data-dev') : null);
+    var tag = n ? n.getAttribute('data-dev') : null;
+    if (tag !== devTag) devHighlight(tag);
   }
 
   // --- How it works: the live lists ------------------------------------------------------
@@ -1300,7 +1326,7 @@
     updateMap();
   });
   $('dev-toggle').addEventListener('click', function () { setDev(!devOn); });
-  $('dev-close').addEventListener('click', function () { setDev(false); });
+  $('dev-close').addEventListener('click', function () { setDev(false); $('dev-toggle').focus(); });
   document.addEventListener('mouseover', devPoint);
   document.addEventListener('focusin', devPoint);
   // A click on a step on the page scrolls its first event into view.
@@ -1315,8 +1341,13 @@
   $('view-hq').addEventListener('click', function () { setView('hq'); });
   $('view-res').addEventListener('click', function () { setView('res'); });
 
+  // The developer view starts below the sticky header, whatever its height.
+  function headerHeight() { document.documentElement.style.setProperty('--top-h', document.querySelector('.top').offsetHeight + 'px'); }
+  window.addEventListener('resize', headerHeight);
   applyLang();
-  setDev(devOn);
+  headerHeight();
+  // On narrow screens the drawer covers the page: it opens only when asked.
+  setDev(devOn && window.matchMedia('(min-width: 1100px)').matches, false);
   setStep('pick');
   if (window.maplibregl) map = makeMap();
   loadConfig();

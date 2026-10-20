@@ -249,16 +249,17 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* Developer view: beside the page on wide screens, a drawer at the bottom on
    narrow ones. A sequence diagram: one column per part, an arrow per event. */
 .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.dev { position: fixed; z-index: 4; top: 0; right: 0; bottom: 0; width: 440px; box-sizing: border-box; overflow: auto;
-  padding: 76px 18px 24px; background: var(--panel); border-left: 1px solid var(--line); display: grid; align-content: start; gap: 10px; }
+.dev { position: fixed; z-index: 4; top: var(--top-h, 62px); right: 0; bottom: 0; width: 440px; box-sizing: border-box; overflow: auto;
+  --dev-pad: 16px; padding: var(--dev-pad) 18px 24px; background: var(--panel); border-left: 1px solid var(--line); display: grid; align-content: start; gap: 10px; }
 .dev-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .dev p { margin: 0; }
 @media (min-width: 1100px) {
   body.dev-open main, body.dev-open footer { margin-right: 456px; margin-left: 16px; }
 }
 @media (max-width: 1099px) {
-  .dev { top: auto; left: 0; width: auto; height: 55vh; padding-top: 14px; border-left: 0; border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18); }
-  body.dev-open { padding-bottom: 56vh; }
+  .dev { top: auto; left: 0; width: auto; height: 42vh; height: 42dvh; --dev-pad: 12px; border-left: 0; border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18); }
+  body.dev-open { padding-bottom: 43vh; padding-bottom: 43dvh; }
+  html:has(body.dev-open) { scroll-padding-bottom: 43dvh; }
 }
 .seq { display: grid; gap: 2px; --lane: var(--line);
   background-image: linear-gradient(to right, transparent calc(10% - 1px), var(--lane) calc(10% - 1px), var(--lane) 10%, transparent 10%,
@@ -266,7 +267,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
     transparent calc(50% - 1px), var(--lane) calc(50% - 1px), var(--lane) 50%, transparent 50%,
     transparent calc(70% - 1px), var(--lane) calc(70% - 1px), var(--lane) 70%, transparent 70%,
     transparent calc(90% - 1px), var(--lane) calc(90% - 1px), var(--lane) 90%, transparent 90%); }
-.seq-lanes { position: sticky; top: -76px; z-index: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 6px 0;
+.seq-lanes { position: sticky; top: calc(-1 * var(--dev-pad)); z-index: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 6px 0;
   background: var(--panel); border-bottom: 1px solid var(--line); }
 .seq-lanes span { font: 600 0.68rem var(--mono); text-align: center; color: var(--fg-2); overflow-wrap: anywhere; }
 .ev { padding: 4px 0 8px; border-radius: 8px; }
@@ -285,3 +286,6 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* One step marked on the page and in the developer view. */
 .dev-hl { outline: 2px solid var(--i-map); outline-offset: 3px; border-radius: 10px; }
 .ev.dev-hl { outline-offset: 1px; background: var(--t-map); }
+/* The header button: a short label on phones, so the header does not wrap. */
+.short { display: none; }
+@media (max-width: 600px) { .long { display: none; } .short { display: inline; } }
