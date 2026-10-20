@@ -651,7 +651,9 @@ async function evacuationOf(broker: Broker, entity: Entity) {
   return {
     action: attr.value,
     ...(typeof attr.observedAt === 'string' && { decidedAt: attr.observedAt }),
-    ...(typeof val(attr.policyRule) === 'string' && { policyRule: val(attr.policyRule) as string }),
+    // As for check: the rule's index, as text (the bridge may write a number).
+    ...(val(attr.policyRule) !== undefined && { policyRule: String(val(attr.policyRule)) }),
+    answers: answersOf(attr),
     facts: factsOf(decisionEntity),
     ngsi: { decision: decisionEntity, alert },
   };
@@ -713,16 +715,25 @@ export interface Summary {
 
 const CHECK_META = new Set(['type', 'value', 'observedAt', 'createdAt', 'modifiedAt', 'decisionId', 'decision', 'profile', 'profileVersion', 'policyRule', 'model', 'inputHash', 'finalAction', 'reviewedAt']);
 
+/** The model's answers on a decision attribute (check or evacuation), with their probabilities. */
+function answersOf(c: Attr): Record<string, { value: unknown; p?: number }> {
+  const answers: Record<string, { value: unknown; p?: number }> = {};
+  for (const [k, v] of Object.entries(c)) {
+    if (CHECK_META.has(k) || k.endsWith('Probability')) continue;
+    // A sub-attribute without a value (a Relationship, for example) is not an answer.
+    const value = val(v);
+    if (value === undefined) continue;
+    const p = val(c[`${k}Probability`]);
+    answers[k] = { value, ...(typeof p === 'number' && { p }) };
+  }
+  return answers;
+}
+
 export function summarize(e: Entity): Summary {
   const c = e.check as Attr | undefined;
   let check: Summary['check'];
   if (c && typeof c.value === 'string') {
-    const answers: Record<string, { value: unknown; p?: number }> = {};
-    for (const [k, v] of Object.entries(c)) {
-      if (CHECK_META.has(k) || k.endsWith('Probability')) continue;
-      const p = val(c[`${k}Probability`]);
-      answers[k] = { value: val(v), ...(typeof p === 'number' && { p }) };
-    }
+    const answers = answersOf(c);
     check = {
       action: c.value,
       ...(typeof c.observedAt === 'string' && { decidedAt: c.observedAt }),

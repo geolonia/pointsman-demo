@@ -475,7 +475,7 @@ describe('the chain (step 2)', () => {
   });
 
   it('shows step 2 with the report: action, facts and the Alert', async () => {
-    const decided = { ...report, evacuation: { type: 'Property', value: 'alert', observedAt: '2026-10-07T01:00:05Z', policyRule: P('0'), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333' } } };
+    const decided = { ...report, evacuation: { type: 'Property', value: 'alert', observedAt: '2026-10-07T01:00:05Z', policyRule: P(0), foot_passable: P(false), foot_passableProbability: P(0.97), decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:33333333-3333-4333-8333-333333333333' } } };
     answer = (c) => {
       if (c.method !== 'GET') return undefined;
       if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(report.id)}`)) return Response.json(decided);
@@ -487,7 +487,7 @@ describe('the chain (step 2)', () => {
       return undefined;
     };
     const r = await (await worker(`/api/reports/${encodeURIComponent(report.id)}`, { headers: { origin: PAGE } })).json<any>();
-    expect(r.evacuation).toMatchObject({ action: 'alert', decidedAt: '2026-10-07T01:00:05Z', policyRule: '0', facts: [{ name: 'walk', values: { extra_m: 316 } }] });
+    expect(r.evacuation).toMatchObject({ action: 'alert', decidedAt: '2026-10-07T01:00:05Z', policyRule: '0', answers: { foot_passable: { value: false, p: 0.97 } }, facts: [{ name: 'walk', values: { extra_m: 316 } }] });
     expect(r.evacuation.ngsi.alert.type).toBe('Alert');
   });
 });
