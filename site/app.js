@@ -900,7 +900,7 @@
 
   // The chain as a diagram (Pointsman's GET /v1/profiles/{id}/graph, through
   // the demo's server), fetched once per language; a failed fetch is tried
-  // again on the next redraw, and the box is left out until it works.
+  // again later (fetchGraph), and the box is left out until it works.
   var graphSvg = {};
   function renderGraph() {
     var l = lang;
@@ -916,19 +916,26 @@
       return holder;
     }
     holder.hidden = true;
-    if (graphSvg[l] === undefined) {
-      graphSvg[l] = null; // fetching
-      fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; }).then(function (text) {
-        var svg = cleanSvg(text);
-        if (!svg) { delete graphSvg[l]; return; }
-        graphSvg[l] = svg;
-        // The page may have been redrawn meanwhile: fill the box shown now, if it is in this language.
-        var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
-        var spot = now && now.querySelector('.graph-svg');
-        if (spot && !spot.firstChild) { spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
-      });
-    }
+    if (graphSvg[l] === undefined) fetchGraph(l, 0);
     return holder;
+  }
+
+  /** Fetches the diagram; after a failure it tries again by itself (20 s, 40 s, …; five tries). */
+  function fetchGraph(l, tries) {
+    graphSvg[l] = null; // fetching
+    fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; }).then(function (text) {
+      var svg = cleanSvg(text);
+      if (!svg) {
+        delete graphSvg[l];
+        if (tries < 4) setTimeout(function () { if (graphSvg[l] === undefined) fetchGraph(l, tries + 1); }, 20000 * (tries + 1));
+        return;
+      }
+      graphSvg[l] = svg;
+      // The page may have been redrawn meanwhile: fill the box shown now, if it is in this language.
+      var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
+      var spot = now && now.querySelector('.graph-svg');
+      if (spot && !spot.firstChild) { spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
+    });
   }
 
   // Only what Pointsman's diagram uses (src/graph.ts toSvg): SVG elements and
