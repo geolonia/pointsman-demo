@@ -27,9 +27,12 @@ const ROUTE: Route = {
   task: { actions: PERSON_ACTIONS, name: 'roadName', priority: { urgent: 1, review: 5 } },
 };
 /**
- * Step 2 of the chain (pointsman#66): for reports that step 1 decided
- * urgent or review (the subscription's q), does the closure cut people off
- * from their evacuation site? An alert creates an Alert entity.
+ * The additional check (pointsman#66): for reports that the first check
+ * decided urgent or review (the subscription's q), does the closure cut
+ * people off from their evacuation site? An alert creates an Alert entity.
+ * The profile requires the first check (evacuation-access-check v4), so
+ * Pointsman knows the order; a person's answer on the first check does not
+ * run it again (no rerunOnReview), so the alert is not sent twice.
  */
 const EVACUATION_ROUTE: Route = {
   type: 'RoadRestriction',
@@ -39,7 +42,7 @@ const EVACUATION_ROUTE: Route = {
   decisionEntity: true,
   reviewActions: ['review'],
   name: 'evacuation',
-  informedBy: 'check',
+  requires: { check: { attribute: 'check' } },
 };
 /**
  * Step 3, the final decision (pointsman#101, docs/decision-chains.md): from
