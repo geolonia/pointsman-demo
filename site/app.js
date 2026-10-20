@@ -99,6 +99,7 @@
         'default': 'A person has not checked the first result yet. When they do, the final result is decided again.',
       },
       finalKicker: 'Final result', stage1: 'The first check said',
+      finalMissing: 'No final result', finalMissingText: function (a) { return 'The additional check did not come, so there is no final result. The first result stands: ' + a + '.'; },
       finalPending: 'The final result is being decided…', finalPendingText: 'Pointsman combines the first result and the additional check into one result.',
       fin: {
         publish: ['Published: residents see it now', 'The report is on the residents’ map.'],
@@ -264,6 +265,7 @@
         'default': '1 つ目の結果を、まだ人が確認していない。確認すると、最終結果をもう一度決める。',
       },
       finalKicker: '最終結果', stage1: '最初の確認の結果',
+      finalMissing: '最終結果はありません', finalMissingText: function (a) { return '追加の確認が届かなかったため、最終結果はありません。最初の結果のままです：' + a + '。'; },
       finalPending: '最終結果を決めています…', finalPendingText: 'Pointsman が最初の結果と追加の確認を 1 つの結果にまとめます。',
       fin: {
         publish: ['公開：住民がすぐに見られます', '住民向けの地図に載りました。'],
@@ -757,9 +759,8 @@
     var box = $('facts');
     box.textContent = '';
     if (!r || !r.check || current.shown < 3) return;
-    // The way around on foot comes from the second check, a few seconds later.
-    var walk = r.evacuation ? (r.evacuation.facts || []).filter(function (f) { return f.name === 'walk'; }) : [];
-    var facts = renderFacts((r.facts || []).concat(walk.map(function (f) { return Object.assign({ second: true }, f); })));
+    // Only this step's map checks; the way around on foot is step 3's.
+    var facts = renderFacts(r.facts || []);
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
   }
@@ -831,6 +832,10 @@
       if (c) items.push(el('strong', { class: 'chain-result ' + ev.action, text: t(c) }));
     }
     chain.appendChild(el('div', { class: 'box map-checks' }, items));
+    // For screen readers: one short line when the state changes, not the whole box.
+    var status = a === 'publish' ? t('secondNotNeeded') : !ev ? (secondLate() ? t('ev').secondLate[0] : t('secondRunning'))
+      : t({ alert: 'cAlert', review: 'cReview', none: 'cNone' }[ev.action] || 'cNone');
+    if ($('check-status').textContent !== status) $('check-status').textContent = status;
     // On to the final result once the additional check is there (or not needed, or late).
     if (a === 'publish' || ev || secondLate()) {
       chain.appendChild(el('div', { class: 'actions' }, [el('button', { class: 'btn', type: 'button', text: t('next2'), onclick: function () {
@@ -900,6 +905,15 @@
     var f = r.final;
     // After a person's answer the final result is made again: until it is
     // there, "being decided" (not the old result next to the new answer).
+    // No final result in the end (the additional check did not come): say so,
+    // and that the first result stands.
+    if (!f && (finalLate(r) || (secondLate() && !r.evacuation))) {
+      box.appendChild(el('div', { class: 'box tint ' + r.check.action }, [
+        el('strong', { class: 'box-title', text: t('finalMissing') }),
+        el('span', { text: t('finalMissingText')(t('act')[r.check.action] || r.check.action) }),
+      ]));
+      return;
+    }
     if (!f || (!finalFresh(r) && !finalLate(r))) {
       box.appendChild(el('div', { class: 'box' }, [
         el('strong', { class: 'box-title', text: t('finalPending') }),
