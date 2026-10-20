@@ -902,6 +902,8 @@
   // the demo's server), fetched once per language; a failed fetch is tried
   // again later (fetchGraph), and the box is left out until it works.
   var graphSvg = {};
+  var graphAt = {};
+  var GRAPH_TTL = 600000; // 10 minutes, as the server's cache
   function renderGraph() {
     var l = lang;
     var holder = el('div', { class: 'box graph', id: 'final-graph', 'data-lang': l }, [
@@ -913,6 +915,8 @@
     holder.appendChild(el('a', { href: '/api/graph?format=dmn&lang=' + l, download: 'road-closure-final.dmn', text: t('graphDmn') }));
     if (graphSvg[l]) {
       place.appendChild(graphSvg[l].cloneNode(true));
+      // Older than the server's cache: fetch the current one, keep this one meanwhile.
+      if (Date.now() - graphAt[l] > GRAPH_TTL && !graphAt[l + ':fetching']) fetchGraph(l, 0);
       return holder;
     }
     holder.hidden = true;
@@ -922,19 +926,25 @@
 
   /** Fetches the diagram; after a failure it tries again by itself (20 s, 40 s, …; five tries). */
   function fetchGraph(l, tries) {
-    graphSvg[l] = null; // fetching
+    var had = !!graphSvg[l];
+    if (!had) graphSvg[l] = null; // fetching
+    graphAt[l + ':fetching'] = true;
     fetch('/api/graph?format=svg&lang=' + l).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; }).then(function (text) {
+      graphAt[l + ':fetching'] = false;
       var svg = cleanSvg(text);
       if (!svg) {
+        // A diagram shown already stays; it is tried again at the next redraw after the TTL.
+        if (had) { graphAt[l] = Date.now(); return; }
         delete graphSvg[l];
         if (tries < 4) setTimeout(function () { if (graphSvg[l] === undefined) fetchGraph(l, tries + 1); }, 20000 * (tries + 1));
         return;
       }
       graphSvg[l] = svg;
-      // The page may have been redrawn meanwhile: fill the box shown now, if it is in this language.
+      graphAt[l] = Date.now();
+      // The page may have been redrawn meanwhile: put it in the box shown now, if it is in this language.
       var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
       var spot = now && now.querySelector('.graph-svg');
-      if (spot && !spot.firstChild) { spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
+      if (spot) { spot.textContent = ''; spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
     });
   }
 
