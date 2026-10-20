@@ -266,14 +266,25 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* Developer view: beside the page on wide screens, a drawer at the bottom on
    narrow ones. A sequence diagram: one column per part, an arrow per event. */
 .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.dev { position: fixed; z-index: 4; top: var(--top-h, 62px); right: 0; bottom: 0; width: 440px; box-sizing: border-box; overflow: auto;
+.dev { position: fixed; z-index: 4; top: var(--top-h, 62px); right: 0; bottom: 0; width: var(--side-w, 440px); box-sizing: border-box; overflow: auto;
   --dev-pad: 16px; padding: var(--dev-pad) 18px 24px; background: var(--panel); border-left: 1px solid var(--line); display: grid; align-content: start; gap: 10px; }
 .dev-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .dev p { margin: 0; }
+/* The left edge of a side panel: drag it (or use the arrow keys) to resize. */
+.side-grip { position: fixed; z-index: 5; top: var(--top-h, 62px); bottom: 0; right: calc(var(--side-w, 440px) - 5px); width: 10px; cursor: col-resize; touch-action: none; }
+.side-grip::after { content: ""; position: absolute; top: 50%; left: 3px; width: 4px; height: 44px; margin-top: -22px; border-radius: 4px; background: var(--line); }
+.side-grip:hover::after, .side-grip:focus-visible::after, body.resizing .side-grip::after { background: var(--muted); }
+.side-grip:focus-visible { outline: 2px solid var(--i-map); outline-offset: -2px; }
+body.resizing { cursor: col-resize; user-select: none; }
+/* The reports panel: each list scrolls by itself, so one long list does not push the other away. */
+.side-reports section { display: grid; gap: 6px; }
+.side-reports h3 { margin: 6px 0 0; font-size: 1rem; }
+.side-reports .reports { max-height: 34vh; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
 @media (min-width: 1100px) {
-  body.dev-open main, body.dev-open footer { margin-right: 456px; margin-left: 16px; }
+  body.dev-open main, body.dev-open footer { margin-right: calc(var(--side-w, 440px) + 16px); margin-left: 16px; }
 }
 @media (max-width: 1099px) {
+  .side-grip { display: none; }
   .dev { top: auto; left: 0; width: auto; height: 42vh; height: 42dvh; --dev-pad: 12px; border-left: 0; border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18); }
   body.dev-open { padding-bottom: 43vh; padding-bottom: 43dvh; }
   html:has(body.dev-open) { scroll-padding-bottom: 43dvh; }
