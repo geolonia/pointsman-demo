@@ -109,12 +109,16 @@ export default {
         continue;
       }
       const result = await handleMessage(body, config, { fresh: true });
-      if ('retry' in result && result.retry) {
-        console.error(`bridge queue: ${result.id} (attempt ${message.attempts}): ${result.error}`);
+      const decision = 'decision' in result && result.decision ? ` (decision ${result.decision})` : '';
+      // As in the engine's queue loop: a redirect (pointsman#105) is retried
+      // too, so the message ends in the dead-letter queue and can be replayed
+      // once the URL is fixed.
+      if ('retry' in result && (result.retry || ('redirect' in result && result.redirect))) {
+        console.error(`bridge queue: ${result.id}${decision} (attempt ${message.attempts}): ${result.error}`);
         message.retry({ delaySeconds: retryDelay(message.attempts) });
         continue;
       }
-      if ('error' in result) console.error(`bridge queue: ${result.id}: ${result.error}`);
+      if ('error' in result) console.error(`bridge queue: ${result.id}${decision}: ${result.error}`);
       // A failure here is logged, not retried: a second try would find the
       // decision written (inputs unchanged) and do nothing.
       if (body.path === '/notify') await Promise.all(afterDecisions(env, body.route, [result]));
