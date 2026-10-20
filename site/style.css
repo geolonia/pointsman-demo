@@ -245,3 +245,43 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
   .map { height: 300px; }
   .stepper li { padding-right: 12px; font-size: 0.88rem; }
 }
+
+/* Developer view: beside the page on wide screens, a drawer at the bottom on
+   narrow ones. A sequence diagram: one column per part, an arrow per event. */
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.dev { position: fixed; z-index: 4; top: 0; right: 0; bottom: 0; width: 440px; box-sizing: border-box; overflow: auto;
+  padding: 76px 18px 24px; background: var(--panel); border-left: 1px solid var(--line); display: grid; align-content: start; gap: 10px; }
+.dev-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.dev p { margin: 0; }
+@media (min-width: 1100px) {
+  body.dev-open main, body.dev-open footer { margin-right: 456px; margin-left: 16px; }
+}
+@media (max-width: 1099px) {
+  .dev { top: auto; left: 0; width: auto; height: 55vh; padding-top: 14px; border-left: 0; border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18); }
+  body.dev-open { padding-bottom: 56vh; }
+}
+.seq { display: grid; gap: 2px; --lane: var(--line);
+  background-image: linear-gradient(to right, transparent calc(10% - 1px), var(--lane) calc(10% - 1px), var(--lane) 10%, transparent 10%,
+    transparent calc(30% - 1px), var(--lane) calc(30% - 1px), var(--lane) 30%, transparent 30%,
+    transparent calc(50% - 1px), var(--lane) calc(50% - 1px), var(--lane) 50%, transparent 50%,
+    transparent calc(70% - 1px), var(--lane) calc(70% - 1px), var(--lane) 70%, transparent 70%,
+    transparent calc(90% - 1px), var(--lane) calc(90% - 1px), var(--lane) 90%, transparent 90%); }
+.seq-lanes { position: sticky; top: -76px; z-index: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 6px 0;
+  background: var(--panel); border-bottom: 1px solid var(--line); }
+.seq-lanes span { font: 600 0.68rem var(--mono); text-align: center; color: var(--fg-2); overflow-wrap: anywhere; }
+.ev { padding: 4px 0 8px; border-radius: 8px; }
+.ev.pending { opacity: 0.45; }
+.ev-line { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: 14px; }
+.arrow { position: relative; }
+.arrow::before { content: ''; position: absolute; top: 6px; left: calc(50% / var(--k)); right: calc(50% / var(--k)); border-top: 2px solid var(--fg-2); }
+.arrow::after { content: ''; position: absolute; top: 2px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.arrow.ltr::after { right: calc(50% / var(--k)); border-left: 8px solid var(--fg-2); }
+.arrow.rtl::after { left: calc(50% / var(--k)); border-right: 8px solid var(--fg-2); }
+.ev-text { background: var(--panel); margin: 2px 6px 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 0.85rem; display: grid; gap: 4px; }
+.ev-text p { color: var(--fg-2); }
+.ev-data { display: grid; gap: 4px; }
+.ev-data summary { cursor: pointer; font: 0.75rem var(--mono); color: var(--i-map); }
+.ev-data pre { margin: 0; max-height: 260px; overflow: auto; background: var(--code-bg); padding: 8px; border-radius: 8px; font-size: 0.72rem; }
+/* One step marked on the page and in the developer view. */
+.dev-hl { outline: 2px solid var(--i-map); outline-offset: 3px; border-radius: 10px; }
+.ev.dev-hl { outline-offset: 1px; background: var(--t-map); }

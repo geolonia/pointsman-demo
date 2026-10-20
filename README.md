@@ -104,13 +104,21 @@ a guided flow in three steps, for visitors who know nothing about FIWARE or AI:
    check", and the map draws it from the `route` of Pointsman's detour fact
    (the evacuation profile asks for it with `route: true`). Each rule box
    says what the rule was based on: the AI answers and the map checks it
-   used, with their values. The real NGSI-LD
-   data is behind "Show the data"; open sections stay open when the page
-   updates.
+   used, with their values. Open sections stay open when the page updates.
 3. **What happens next.** The outcome, the second check (evacuation site),
    and, for a report that waits for a person, Publish and Reject buttons: the
    visitor who sent it decides it, as the person on duty would. Below, the
    numbers of the last 7 days from Pointsman's decision log.
+
+**Developer view** (button in the header, remembered in the browser): a
+panel beside the page (a drawer at the bottom on narrow screens) shows the
+report's way as a sequence diagram: this page, the data platform, the
+bridge, Pointsman, and the AI and map data, one arrow per event (POST
+/api/reports, the subscriptions' notifications, the decide calls, the map
+checks, the PATCHes and new entities), each with a plain sentence and the
+real data (request, entities, answers, facts). Events still to come are
+greyed out. Pointing at a step on the page marks its events, and the other
+way round.
 
 One map, switched between headquarters (every report) and residents (only
 what is published), on GSI tiles (地理院タイル). "How it works" opens the

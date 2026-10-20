@@ -38,9 +38,31 @@
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…',
       answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
-      ruleTitle: 'The city’s rule', next: 'What happens next →', showData: 'Show the data in the data platform (for developers)',
+      ruleTitle: 'The city’s rule', next: 'What happens next →', devOpen: 'Show the data (developer view)',
       showRequest: 'request', showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp)',
       showDecision2: 'Decision entity of the second check', showAlert: 'Alert entity (Smart Data Models)',
+      showAnswers: 'answers', showFacts: 'map checks',
+      devTitle: 'Developer view',
+      devLead: 'What happens to the report, part by part, with the real data. Point at a step on the page to see its part here.',
+      devEmpty: 'Send a report: every part it goes through shows up here.',
+      devWaiting: 'waiting…',
+      devData: function (what) { return 'the data: ' + what; },
+      devPoll: 'Meanwhile this page reads the report from the Worker (GET /api/reports/{id}) about once a second.',
+      lane: { page: 'This page', platform: 'Data platform (GeonicDB)', bridge: 'Bridge (demo Worker)', pointsman: 'Pointsman', data: 'AI and map data' },
+      ev: {
+        save: ['POST /api/reports', 'The Worker saves the report as a RoadRestriction entity (NGSI-LD) in the data platform, as any city app would.'],
+        notify: ['Notification: a new report', 'A subscription on RoadRestriction entities tells the bridge (NGSI-LD notification).'],
+        decide: ['POST /v1/decide/road-restriction-check', 'The bridge sends the entity’s attributes to Pointsman as the state.'],
+        model: ['The model answers four questions', 'clef-flash reads only the text and gives typed answers, each with a probability.'],
+        maps: ['Map checks: flood zone, evacuation site', 'Pointsman looks up the place in public GSI data. The model never sees these facts.'],
+        decision: ['Decision: {action} (rule {rule})', 'The profile’s rules turn the answers and map checks into one action.'],
+        write: ['PATCH check; create Decision (and Task)', 'The bridge writes the result back: the check attribute on the report, a Decision entity linked to it, and a Task when a person is needed.'],
+        publishEnd: ['No second check', 'The second subscription matches only reports that go to a person (urgent or review).'],
+        notify2: ['Notification: check is urgent or review', 'A second subscription, on the check attribute, starts the second check.'],
+        decide2: ['POST /v1/decide/evacuation-access-check', 'The same bridge, another profile; its Decision is linked to the first one (prov:wasInformedBy).'],
+        maps2: ['Map checks: evacuation site, way around on foot', 'GSI evacuation sites, and Valhalla routing on OpenStreetMap with and without the closed section.'],
+        write2: ['PATCH evacuation; create Decision (and Alert)', 'The result goes back to the data platform; an alert becomes an Alert entity (Smart Data Models) for the site’s staff.'],
+      },
       q: { category: 'Why is the road closed?', status_matches: 'Does the status match the text?', danger: 'Is someone in danger?', clarity: 'How clear is the report?', foot_passable: 'Can people pass on foot?' },
       cat: {
         closedWeather: 'Weather or disaster', closedConstruction: 'Roadworks', closedHeavyVehicle: 'Closed to large vehicles', closedWinter: 'Closed for winter',
@@ -151,9 +173,31 @@
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…',
       answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
-      ruleTitle: '市の規則', next: 'その後どうなるか →', showData: 'データ基盤のデータを見る（開発者向け）',
+      ruleTitle: '市の規則', next: 'その後どうなるか →', devOpen: 'データを見る（開発者向け表示）',
       showRequest: 'リクエスト', showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp）',
       showDecision2: '2 つ目の確認の Decision エンティティ', showAlert: 'Alert エンティティ（Smart Data Models）',
+      showAnswers: '答え', showFacts: '地図での確認',
+      devTitle: '開発者向け表示',
+      devLead: '報告がどこを通るかを、実際のデータとともに順に示します。ページの手順を指すと、対応する部分がここで強調されます。',
+      devEmpty: '報告を送ると、通る部分がここに順に表示されます。',
+      devWaiting: '待機中…',
+      devData: function (what) { return 'データ：' + what; },
+      devPoll: 'その間、このページは Worker から報告を約 1 秒ごとに読みます（GET /api/reports/{id}）。',
+      lane: { page: 'このページ', platform: 'データ基盤（GeonicDB）', bridge: 'ブリッジ（デモの Worker）', pointsman: 'Pointsman', data: 'AI と地図データ' },
+      ev: {
+        save: ['POST /api/reports', 'Worker が報告を RoadRestriction エンティティ（NGSI-LD）としてデータ基盤に保存します。市のアプリと同じ方法です。'],
+        notify: ['通知：新しい報告', 'RoadRestriction エンティティのサブスクリプションがブリッジに知らせます（NGSI-LD の通知）。'],
+        decide: ['POST /v1/decide/road-restriction-check', 'ブリッジがエンティティの属性を状態として Pointsman に送ります。'],
+        model: ['モデルが 4 つの質問に答える', 'clef-flash は本文だけを読み、型の決まった答えを確率とともに返します。'],
+        maps: ['地図での確認：浸水想定区域、避難場所', 'Pointsman が場所を国土地理院の公開データで調べます。モデルはこの事実を見ません。'],
+        decision: ['判断：{action}（規則 {rule}）', 'プロファイルの規則が、答えと地図での確認から行動を 1 つ決めます。'],
+        write: ['check を PATCH、Decision（と Task）を作成', 'ブリッジが結果を書き戻します。報告の check 属性、それにつながる Decision エンティティ、人が必要なときは Task です。'],
+        publishEnd: ['2 つ目の確認はなし', '2 つ目のサブスクリプションは、人に回る報告（緊急・確認）にだけ合います。'],
+        notify2: ['通知：check が緊急または確認', 'check 属性の 2 つ目のサブスクリプションが、2 つ目の確認を始めます。'],
+        decide2: ['POST /v1/decide/evacuation-access-check', '同じブリッジ、別のプロファイルです。その Decision は 1 つ目につながります（prov:wasInformedBy）。'],
+        maps2: ['地図での確認：避難場所、歩いて迂回', '国土地理院の避難場所と、OpenStreetMap 上の Valhalla 経路（区間を閉じた場合と閉じない場合）。'],
+        write2: ['evacuation を PATCH、Decision（と Alert）を作成', '結果をデータ基盤に戻します。警報は避難場所の担当者向けの Alert エンティティ（Smart Data Models）になります。'],
+      },
       q: { category: 'なぜ通れないのか', status_matches: '状態と本文は合っているか', danger: '人に危険があるか', clarity: '報告はどのくらいはっきりしているか', foot_passable: '歩いて通れるか' },
       cat: {
         closedWeather: '天候・災害', closedConstruction: '工事', closedHeavyVehicle: '大型車のみ通行止め', closedWinter: '冬期通行止め',
@@ -312,6 +356,7 @@
     renderStats();
     renderShelterLabel();
     if (current) renderCurrent();
+    else renderDev();
   }
 
   function outcomeOf(r) {
@@ -541,9 +586,6 @@
     return isFinite(a) && isFinite(b) ? ((b - a) / 1000).toFixed(1) + ' s' : '';
   }
 
-  function json(key, label, value) {
-    return details(current.id + ':' + key, null, [el('summary', { text: label }), el('pre', { text: JSON.stringify(value, null, 2) })]);
-  }
 
   function renderCurrent() {
     var r = current.last;
@@ -558,6 +600,7 @@
     renderData(r);
     if (r && r.evacuation && current.shown >= 3) showRoute(r.evacuation.facts || []);
     if (step === 'result') renderResult(r);
+    renderDev();
   }
 
   function renderTimeline(r) {
@@ -572,7 +615,7 @@
     ['s1', 's2', 's3', 's4'].forEach(function (k, i) {
       var done = i < shown;
       var active = i === shown;
-      tl.appendChild(el('li', { class: done ? 'done' : active ? 'active' : '' }, [
+      tl.appendChild(el('li', { class: done ? 'done' : active ? 'active' : '', 'data-dev': ['save', 'ai', 'maps', 'rule'][i] }, [
         el('span', { class: 'mark', 'aria-hidden': 'true' }),
         el('span', { class: 'what' }, [el('strong', { text: t(k) }), el('span', { text: done ? t(k + 'd') : active ? t('working') : '' })]),
         el('span', { class: 'time', text: done ? times[i] : '' }),
@@ -645,19 +688,12 @@
     ]));
   }
 
+  // The data itself is in the developer view, next to the steps.
   function renderData(r) {
     var box = $('data');
     box.textContent = '';
-    if (!r || !r.ngsi || current.shown < 4) return;
-    box.appendChild(details(current.id + ':data', { class: 'data' }, [
-      el('summary', { text: t('showData') }),
-      current.request ? json('request', t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
-      json('entity', t('showEntity'), r.ngsi.entity),
-      r.ngsi.decision ? json('decision', t('showDecision'), r.ngsi.decision) : null,
-      r.ngsi.task ? json('task', t('showTask'), r.ngsi.task) : null,
-      r.evacuation ? json('decision2', t('showDecision2'), r.evacuation.ngsi.decision) : null,
-      r.evacuation && r.evacuation.ngsi.alert ? json('alert', t('showAlert'), r.evacuation.ngsi.alert) : null,
-    ]));
+    if (!r || !r.ngsi || current.shown < 4 || devOn) return;
+    box.appendChild(el('button', { class: 'chip', type: 'button', text: t('devOpen'), onclick: function () { setDev(true); } }));
   }
 
   // --- Step 3: what happens next -------------------------------------------------------
@@ -857,6 +893,105 @@
     });
     if (!chips.length) return null;
     return el('div', { class: 'used' }, [el('span', { class: 'kicker', text: t('usedTitle') })].concat(chips));
+  }
+
+  // --- Developer view ------------------------------------------------------------------
+
+  // A sequence diagram of the report's way: one column per part, one arrow
+  // per event, each with a sentence and the real data. Events that have not
+  // happened yet are greyed out. Each event has the tag of the page step it
+  // belongs to (data-dev), so pointing at one shows the other.
+  var devOn = false;
+  try { devOn = localStorage.getItem('dev') === '1'; } catch (e) {}
+  var LANES = ['page', 'platform', 'bridge', 'pointsman', 'data'];
+  var DEV_TAGS = ['save', 'ai', 'maps', 'rule', 'second'];
+
+  function devEvents(r) {
+    var c = r && r.check;
+    var decided = !!(r && r.ngsi && r.ngsi.decision);
+    var data = function (label, value) { return value === undefined || value === null ? null : [label, value]; };
+    var ev = [
+      { key: 'save', tag: 'save', from: 0, to: 1, done: !!(r && r.createdAt), data: [
+        current.request ? data(t('showRequest'), { method: 'POST', path: '/api/reports', body: current.request }) : null,
+        data(t('showEntity'), r && r.ngsi && r.ngsi.entity),
+      ] },
+      { key: 'notify', tag: 'save', from: 1, to: 2, done: !!c },
+      { key: 'decide', tag: 'ai', from: 2, to: 3, done: !!c },
+      { key: 'model', tag: 'ai', from: 3, to: 4, done: !!c, data: [data(t('showAnswers'), c && c.answers)] },
+      { key: 'maps', tag: 'maps', from: 3, to: 4, done: !!c, data: [data(t('showFacts'), r && r.facts && r.facts.length ? r.facts : null)] },
+      { key: 'decision', tag: 'rule', from: 3, to: 2, done: !!c, vars: c ? { action: t('act')[c.action] || c.action, rule: c.policyRule === undefined ? '–' : c.policyRule } : null },
+      { key: 'write', tag: 'rule', from: 2, to: 1, done: decided, data: [
+        data(t('showDecision'), r && r.ngsi && r.ngsi.decision),
+        data(t('showTask'), r && r.ngsi && r.ngsi.task),
+      ] },
+    ];
+    if (c && c.action === 'publish') return ev.concat([{ key: 'publishEnd', tag: 'second', done: true }]);
+    var e2 = r && r.evacuation;
+    return ev.concat([
+      { key: 'notify2', tag: 'second', from: 1, to: 2, done: !!e2 },
+      { key: 'decide2', tag: 'second', from: 2, to: 3, done: !!e2, data: [data(t('showAnswers'), e2 && e2.answers)] },
+      { key: 'maps2', tag: 'second', from: 3, to: 4, done: !!e2, data: [data(t('showFacts'), e2 && e2.facts && e2.facts.length ? e2.facts : null)] },
+      { key: 'write2', tag: 'second', from: 2, to: 1, done: !!(e2 && e2.ngsi && e2.ngsi.decision), data: [
+        data(t('showDecision2'), e2 && e2.ngsi && e2.ngsi.decision),
+        data(t('showAlert'), e2 && e2.ngsi && e2.ngsi.alert),
+      ] },
+    ]);
+  }
+
+  function renderDev() {
+    var body = $('dev-body');
+    body.textContent = '';
+    if (!devOn) return;
+    if (!current) { body.appendChild(el('p', { class: 'muted small', text: t('devEmpty') })); return; }
+    var seq = el('div', { class: 'seq' }, [el('div', { class: 'seq-lanes' }, LANES.map(function (l) { return el('span', { text: t('lane')[l] }); }))]);
+    devEvents(current.last).forEach(function (e) {
+      var words = t('ev')[e.key];
+      var title = words[0].replace(/\{(\w+)\}/g, function (_, k) { return e.vars && e.vars[k] !== undefined ? String(e.vars[k]) : ''; });
+      var row = el('div', { class: 'ev' + (e.done ? '' : ' pending'), 'data-dev': e.tag });
+      if (e.from !== undefined) {
+        var a = Math.min(e.from, e.to);
+        var b = Math.max(e.from, e.to);
+        row.appendChild(el('div', { class: 'ev-line', 'aria-hidden': 'true' }, [
+          el('span', { class: 'arrow ' + (e.to > e.from ? 'ltr' : 'rtl'), style: 'grid-column: ' + (a + 1) + ' / ' + (b + 2) + '; --k: ' + (b - a + 1) }),
+        ]));
+      }
+      var parts = e.done ? (e.data || []).filter(Boolean) : [];
+      row.appendChild(el('div', { class: 'ev-text' }, [
+        el('div', null, [el('strong', { text: title }), e.done ? null : el('span', { class: 'muted', text: ' · ' + t('devWaiting') })]),
+        el('p', { text: words[1] }),
+        // The data, behind one click; it stays open when the page updates.
+        parts.length ? details(current.id + ':dev:' + e.key, { class: 'ev-data' }, [el('summary', { text: t('devData')(parts.map(function (d) { return d[0]; }).join(', ')) })].concat(parts.map(function (d) {
+          return el('div', null, [el('span', { class: 'kicker', text: d[0] }), el('pre', { text: JSON.stringify(d[1], null, 2) })]);
+        }))) : null,
+      ]));
+      seq.appendChild(row);
+    });
+    body.appendChild(seq);
+    body.appendChild(el('p', { class: 'muted small', text: t('devPoll') }));
+  }
+
+  function setDev(on) {
+    devOn = on;
+    try { localStorage.setItem('dev', on ? '1' : '0'); } catch (e) {}
+    $('dev').hidden = !on;
+    document.body.classList.toggle('dev-open', on);
+    $('dev-toggle').setAttribute('aria-pressed', String(on));
+    devHighlight(null);
+    renderDev();
+    if (current && current.last) renderData(current.last);
+  }
+
+  /** The page parts and the events of one step, marked together. */
+  function devHighlight(tag) {
+    document.querySelectorAll('.dev-hl').forEach(function (n) { n.classList.remove('dev-hl'); });
+    if (!devOn || DEV_TAGS.indexOf(tag) < 0) return;
+    document.querySelectorAll('[data-dev="' + tag + '"]').forEach(function (n) { n.classList.add('dev-hl'); });
+  }
+
+  function devPoint(e) {
+    if (!devOn) return;
+    var n = e.target && e.target.closest ? e.target.closest('[data-dev]') : null;
+    devHighlight(n ? n.getAttribute('data-dev') : null);
   }
 
   // --- How it works: the live lists ------------------------------------------------------
@@ -1159,14 +1294,29 @@
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
     current = null;
     clearMapChecks();
+    renderDev();
     setView('hq');
     setStep('pick', true);
     updateMap();
   });
+  $('dev-toggle').addEventListener('click', function () { setDev(!devOn); });
+  $('dev-close').addEventListener('click', function () { setDev(false); });
+  document.addEventListener('mouseover', devPoint);
+  document.addEventListener('focusin', devPoint);
+  // A click on a step on the page scrolls its first event into view.
+  $('step-decide').addEventListener('click', devScroll);
+  $('step-result').addEventListener('click', devScroll);
+  function devScroll(e) {
+    if (!devOn) return;
+    var n = e.target.closest('[data-dev]');
+    var row = n && document.querySelector('#dev .ev[data-dev="' + n.getAttribute('data-dev') + '"]');
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
   $('view-hq').addEventListener('click', function () { setView('hq'); });
   $('view-res').addEventListener('click', function () { setView('res'); });
 
   applyLang();
+  setDev(devOn);
   setStep('pick');
   if (window.maplibregl) map = makeMap();
   loadConfig();
