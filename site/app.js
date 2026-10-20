@@ -63,6 +63,7 @@
         '1': 'Near an evacuation site, but the way around could not be checked: a person looks.',
       },
       usedTitle: 'Based on', usedAI: 'AI', usedMap: 'map',
+      ruleUnknown: function (n) { return 'Rule ' + n + ' of the profile (this page does not describe it yet).'; },
       act: { publish: 'publish', review: 'review', urgent: 'urgent', reject: 'rejected', pending: 'being checked', alert: 'alert', none: 'no alert' },
       resultTitle: 'What happens next',
       oPublish: 'Published: residents see it now', ePublish: 'No person was needed. The report is on the residents’ map, seconds after it was sent.',
@@ -174,6 +175,7 @@
         '1': '避難場所の近くだが、迂回路を調べられなかった：人が確認する。',
       },
       usedTitle: '判断に使ったもの', usedAI: 'AI', usedMap: '地図',
+      ruleUnknown: function (n) { return 'プロファイルの規則 ' + n + '（このページではまだ説明していません）。'; },
       act: { publish: '公開', review: '確認', urgent: '緊急', reject: '非公開', pending: '判定中', alert: '警報', none: '警報なし' },
       resultTitle: 'その後どうなるか',
       oPublish: '公開：住民がすぐに見られます', ePublish: '人の確認は不要でした。送ってから数秒で、住民向けの地図に載りました。',
@@ -623,7 +625,9 @@
     box.textContent = '';
     if (!r || !r.check || current.shown < 4) return;
     var a = r.check.action;
-    var text = t('rules')[r.check.policyRule === undefined ? 'default' : r.check.policyRule] || t('rules')['default'];
+    // A rule index this page does not know (a newer profile) is said so, not guessed.
+    var key = r.check.policyRule === undefined ? 'default' : r.check.policyRule;
+    var text = Object.prototype.hasOwnProperty.call(t('rules'), key) ? t('rules')[key] : t('ruleUnknown')(key);
     box.appendChild(el('div', { class: 'box tint ' + a }, [
       el('span', { class: 'kicker', text: t('ruleTitle') }),
       el('span', { class: 'rule-text', text: text }),
