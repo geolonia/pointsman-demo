@@ -1365,10 +1365,13 @@
     $('activity').hidden = !open;
     $('activity-toggle').setAttribute('aria-expanded', String(open));
     if (open) {
-      if (devOn) setDev(false);
+      // The developer view closes, but stays the remembered choice.
+      if (devOn) setDev(false, false);
       loadStats();
     }
     sideOpen();
+    // Keyboards land in the panel when it opens (it comes after the page), and back on the button when it closes.
+    if (open) $('activity-title').focus();
   }
 
   /** The page makes room for the open side panel (body class, wide screens). */
@@ -1382,12 +1385,14 @@
   function sideWidth() {
     return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--side-w'), 10) || 440;
   }
+  var sideWanted = 440;
   function setSideWidth(w) {
-    var max = Math.max(SIDE_MIN, Math.min(900, window.innerWidth - 480));
+    var max = Math.max(SIDE_MIN, Math.min(900, document.documentElement.clientWidth - 480));
     w = Math.round(Math.min(max, Math.max(SIDE_MIN, w)));
     document.documentElement.style.setProperty('--side-w', w + 'px');
     document.querySelectorAll('.side-grip').forEach(function (g) {
       g.setAttribute('aria-valuenow', String(w));
+      g.setAttribute('aria-valuetext', w + ' px');
       g.setAttribute('aria-valuemin', String(SIDE_MIN));
       g.setAttribute('aria-valuemax', String(max));
     });
@@ -1396,14 +1401,17 @@
   (function () {
     var saved = 0;
     try { saved = Number(localStorage.getItem('sideW')) || 0; } catch (e) {}
-    setSideWidth(saved || 440);
-    var save = function (w) { try { localStorage.setItem('sideW', String(w)); } catch (e) {} };
+    sideWanted = saved || 440;
+    setSideWidth(sideWanted);
+    var save = function (w) { sideWanted = w; try { localStorage.setItem('sideW', String(w)); } catch (e) {} };
+    // A smaller window narrows the panel; a larger one gives back the chosen width.
+    window.addEventListener('resize', function () { setSideWidth(sideWanted); });
     document.querySelectorAll('.side-grip').forEach(function (g) {
       g.addEventListener('pointerdown', function (e) {
         e.preventDefault();
         g.setPointerCapture(e.pointerId);
         document.body.classList.add('resizing');
-        var move = function (ev) { setSideWidth(window.innerWidth - ev.clientX); };
+        var move = function (ev) { setSideWidth(document.documentElement.clientWidth - ev.clientX); };
         var up = function () {
           g.removeEventListener('pointermove', move);
           g.removeEventListener('pointerup', up);
@@ -1732,7 +1740,7 @@
   });
   $('how-toggle').addEventListener('click', function () { setHow($('how').hidden); });
   $('activity-toggle').addEventListener('click', function () { setActivity($('activity').hidden); });
-  $('activity-close').addEventListener('click', function () { setActivity(false); });
+  $('activity-close').addEventListener('click', function () { setActivity(false); $('activity-toggle').focus(); });
   $('how-close').addEventListener('click', function () { setHow(false); });
   $('how-open').addEventListener('click', function () { setHow(true); });
   $('again').addEventListener('click', function () {

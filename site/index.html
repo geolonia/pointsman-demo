@@ -146,7 +146,7 @@
 </main>
 
 <aside id="dev" class="dev" hidden aria-labelledby="dev-title">
-  <div class="side-grip" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-label="resize"></div>
+  <div class="side-grip" role="separator" aria-orientation="vertical" aria-controls="dev" tabindex="0" data-i18n-label="resize"></div>
   <div class="dev-head">
     <h2 id="dev-title" data-i18n="devTitle">Developer view</h2>
     <button class="chip" id="dev-close" type="button" data-i18n="close">Close</button>
@@ -156,9 +156,9 @@
 </aside>
 
 <aside id="activity" class="dev side-reports" hidden aria-labelledby="activity-title">
-  <div class="side-grip" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-label="resize"></div>
+  <div class="side-grip" role="separator" aria-orientation="vertical" aria-controls="activity" tabindex="0" data-i18n-label="resize"></div>
   <div class="dev-head">
-    <h2 id="activity-title" data-i18n="activityTitle">Reports</h2>
+    <h2 id="activity-title" tabindex="-1" data-i18n="activityTitle">Reports</h2>
     <button class="chip" id="activity-close" type="button" data-i18n="close">Close</button>
   </div>
   <p class="muted small" data-i18n="activityLead">What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.</p>
