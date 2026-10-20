@@ -113,9 +113,9 @@ export const PREPARED: Prepared[] = [
     expected: 'urgent',
   },
   {
-    // The chain (pointsman#66), same text at two places. Step 1: urgent
-    // (Clef-flash danger about 0.92 in both languages, 2026-10-20).
-    // Step 2: no way through on foot. From Koishikawa Bridge along the river
+    // The chain (pointsman#66) at two places near Iidabashi. Step 1: urgent
+    // (Clef-flash danger 0.94 here, 0.81 for the truck below, in both
+    // languages, 2026-10-21). Step 2: no way through on foot (p >= 0.95). From Koishikawa Bridge along the river
     // (under the expressway), the way around on foot
     // is about 316 m longer, with an evacuation site 443 m away: an Alert
     // for its staff. In the street grid it is about 143 m: no alert.

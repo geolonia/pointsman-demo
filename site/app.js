@@ -1,4 +1,4 @@
-// The demo page, as a guided flow in three steps: pick a report, watch
+// The demo page, as a guided flow in four steps: pick a report, watch
 // Pointsman decide, see what happens next (and decide it yourself when a
 // person is needed). The technical layer is behind "How it works".
 // Report texts come from the API (anyone can send one): they are only ever set
@@ -41,7 +41,7 @@
       answersTitle: 'What the AI answered', factsTitle: 'Map checks · from public map data; the AI never sees them',
       ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
       checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
-      secondRunning: 'The additional check is running…', cNone: 'Nobody is cut off from the evacuation site: no alert.',
+      secondRunning: 'The additional check is running…', cNone: 'The rules found no reason for an alert.',
       fNotForPoint: 'Not checked: the report marks a point, not a road section, so there is no way around to work out.',
       showRequest: 'request', showEntity: 'RoadRestriction entity (NGSI-LD)', showDecision: 'Decision entity (NGSI-LD, full IRIs)', showTask: 'Task entity for a person (datamodels.jp)',
       showDecision2: 'Decision entity of the second check', showAlert: 'Alert entity (Smart Data Models)',
@@ -98,7 +98,7 @@
         '3': 'The first check, or the person who checked it, published it.',
         'default': 'A person has not checked the first result yet. When they do, the final result is decided again.',
       },
-      finalKicker: 'Final result', stage1: 'The first check said', stage2: 'Additional check',
+      finalKicker: 'Final result', stage1: 'The first check said',
       finalPending: 'The final result is being decided…', finalPendingText: 'Pointsman combines the first result and the additional check into one result.',
       fin: {
         publish: ['Published: residents see it now', 'The report is on the residents’ map.'],
@@ -207,7 +207,7 @@
       answersTitle: 'AI の答え', factsTitle: '地図での確認・公開の地図データから。AI はこれを見ません',
       ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
       checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
-      secondRunning: '追加の確認をしています…', cNone: '歩いて避難場所に行けなくなる人はいません：警報は出しません。',
+      secondRunning: '追加の確認をしています…', cNone: '規則では、警報を出す理由はありませんでした。',
       fNotForPoint: '確認しません：報告は区間ではなく地点なので、迂回路は計算できません。',
       showRequest: 'リクエスト', showEntity: 'RoadRestriction エンティティ（NGSI-LD）', showDecision: 'Decision エンティティ（NGSI-LD、完全な IRI）', showTask: '担当者向けの Task エンティティ（datamodels.jp）',
       showDecision2: '2 つ目の確認の Decision エンティティ', showAlert: 'Alert エンティティ（Smart Data Models）',
@@ -263,7 +263,7 @@
         '3': '1 つ目の確認、またはそれを確認した人が公開とした。',
         'default': '1 つ目の結果を、まだ人が確認していない。確認すると、最終結果をもう一度決める。',
       },
-      finalKicker: '最終結果', stage1: '最初の確認の結果', stage2: '追加の確認',
+      finalKicker: '最終結果', stage1: '最初の確認の結果',
       finalPending: '最終結果を決めています…', finalPendingText: 'Pointsman が最初の結果と追加の確認を 1 つの結果にまとめます。',
       fin: {
         publish: ['公開：住民がすぐに見られます', '住民向けの地図に載りました。'],
@@ -578,7 +578,7 @@
       });
   }
 
-  // --- Step 2 and 3: one report ------------------------------------------------------
+  // --- Steps 2 to 4: one report ------------------------------------------------------
 
   function watch(id, info) {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
@@ -632,7 +632,7 @@
       // The second check comes a few seconds later; if it does not come within
       // a minute, poll slowly instead of fast forever.
       var done = decidedNow && (!chained || b.evacuation || Date.now() - me.chainSince > 60000);
-      // Then the final result (step 3); it is made again after a person's answer.
+      // Then the final result (step 4); it is made again after a person's answer.
       // It counts as late a minute after the earlier checks (or after a
       // person's answer, for the rerun), so the page never polls fast forever.
       if (done && !finalFresh(b) && !me.finalSince) me.finalSince = Date.now();
@@ -654,6 +654,11 @@
     if (!answered) return true;
     if (!b.check.reviewedAt || !b.final.decidedAt) return false;
     return Date.parse(b.final.decidedAt) >= Date.parse(b.check.reviewedAt);
+  }
+
+  /** The additional check did not come within a minute of the first check (as the developer view says). */
+  function secondLate() {
+    return !!(current && current.chainSince && Date.now() - current.chainSince > 60000);
   }
 
   /** No (new) final result within a minute of the earlier checks or of a person's answer. */
@@ -789,8 +794,6 @@
     box.appendChild(el('button', { class: 'chip', type: 'button', text: t('devOpen'), onclick: function () { setDev(true); } }));
   }
 
-  // --- Step 3: what happens next -------------------------------------------------------
-
   // --- Step 3: the additional check ---------------------------------------------------
 
   /**
@@ -810,11 +813,11 @@
       el('strong', { class: 'headline', text: t('o' + o) }),
     ]));
     var ev = r.evacuation;
-    var items = [el('span', { class: 'kicker', text: t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })];
+    var items = [a === 'publish' ? null : el('span', { class: 'kicker', text: t('chainKicker') }), el('strong', { class: 'box-title', text: t('chainTitle') })].filter(Boolean);
     if (a === 'publish') {
       items.push(el('span', { text: t('secondNotNeeded') }));
     } else if (!ev) {
-      items.push(el('span', { text: finalLate(r) ? t('ev').secondLate[1] : t('secondRunning') }));
+      items.push(el('span', { text: secondLate() ? t('ev').secondLate[1] : t('secondRunning') }));
     } else {
       var facts = renderFactList(ev.facts || []);
       if (facts) items.push(facts);
@@ -829,7 +832,7 @@
     }
     chain.appendChild(el('div', { class: 'box map-checks' }, items));
     // On to the final result once the additional check is there (or not needed, or late).
-    if (a === 'publish' || ev || finalLate(r)) {
+    if (a === 'publish' || ev || secondLate()) {
       chain.appendChild(el('div', { class: 'actions' }, [el('button', { class: 'btn', type: 'button', text: t('next2'), onclick: function () {
         setStep('result', true);
         renderResult(current.last);
@@ -899,7 +902,6 @@
     // there, "being decided" (not the old result next to the new answer).
     if (!f || (!finalFresh(r) && !finalLate(r))) {
       box.appendChild(el('div', { class: 'box' }, [
-        el('span', { class: 'kicker', text: t('finalKicker') }),
         el('strong', { class: 'box-title', text: t('finalPending') }),
         el('span', { text: t('finalPendingText') }),
       ]));
@@ -941,7 +943,7 @@
   var GRAPH_TTL = 600000; // 10 minutes, as the server's cache
   function renderGraph() {
     var l = lang;
-    var holder = el('div', { class: 'box graph', id: 'final-graph', 'data-lang': l }, [
+    var holder = el('div', { class: 'box graph', id: 'graph-box', 'data-lang': l }, [
       el('span', { class: 'kicker', text: t('graphKicker') }),
       el('span', { text: t('graphText') }),
     ]);
@@ -977,7 +979,7 @@
       graphSvg[l] = svg;
       graphAt[l] = Date.now();
       // The page may have been redrawn meanwhile: put it in the box shown now, if it is in this language.
-      var now = document.querySelector('#final-graph[data-lang="' + l + '"]');
+      var now = document.querySelector('#graph-box[data-lang="' + l + '"]');
       var spot = now && now.querySelector('.graph-svg');
       if (spot) { spot.textContent = ''; spot.appendChild(svg.cloneNode(true)); now.hidden = false; }
     });
@@ -1012,7 +1014,7 @@
     return document.importNode(svg, true);
   }
 
-  // --- The week's numbers (step 3) -------------------------------------------------------
+  // --- The week's numbers (the Reports panel) ------------------------------------------
 
   var stats = null;
   function loadStats() {
@@ -1116,7 +1118,7 @@
       '0': ['danger'], '1': ['flood', 'danger'], '2': ['flood', 'danger'], '3': ['flood'], '4': ['flood'],
       '5': ['danger', 'category', 'status_matches', 'clarity'], 'default': ['danger', 'category', 'status_matches', 'clarity'],
     },
-    // Its default (none) is never shown: the page shows the second check only for alert and review.
+    // Its default (none) reads nothing: no 'Based on' line for it.
     evacuation: { '0': ['shelter', 'walk', 'foot_passable'], '1': ['shelter', 'walk'] },
   };
 

@@ -289,16 +289,16 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 /* The header button: a short label on phones, so the header does not wrap. */
 .short { display: none; }
 @media (max-width: 600px) { .long { display: none; } .short { display: inline; } }
-/* The final result (step 3 of the chain) is the headline of "What happens next". */
+/* The final result (step 4) is its headline. */
 .box.final .headline { font-size: 1.45rem; }
 .box.final .rule-text { display: block; margin-top: 4px; }
 /* The first two results are steps on the way: smaller than the final one. */
 #outcome .headline { font-size: 1.05rem; }
 /* The chain as a diagram (Pointsman's SVG): in the page's colours, light and dark. */
-#final-graph .pm-graph { --pm-bg: var(--panel); --pm-line: var(--line); --pm-brand: var(--green); --pm-text: var(--fg); --pm-text2: var(--muted); --pm-text3: var(--grey); font-family: var(--sans); }
-#final-graph .graph-svg svg { display: block; width: 100%; max-width: 520px; margin: 8px auto; }
+#graph-box .pm-graph { --pm-bg: var(--panel); --pm-line: var(--line); --pm-brand: var(--green); --pm-text: var(--fg); --pm-text2: var(--muted); --pm-text3: var(--grey); font-family: var(--sans); }
+#graph-box .graph-svg svg { display: block; width: 100%; max-width: 520px; margin: 8px auto; }
 /* The diagram's own boxes are SVG rects, not the page's .box. */
-#final-graph rect.box { display: inline; }
-#final-graph a { font-size: 0.85rem; }
+#graph-box rect.box { display: inline; }
+#graph-box a { font-size: 0.85rem; }
 /* Five header buttons on one line on a phone. */
 @media (max-width: 420px) { nav { gap: 6px; } .chip { font-size: 13px; padding: 0 10px; } }
