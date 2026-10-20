@@ -440,7 +440,7 @@
 
   function watch(id, info) {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
-    clearShelter();
+    clearMapChecks();
     current = Object.assign({ id: id, key: keyOf(id), last: null, shown: 0 }, info || {});
     setView('hq');
     if (current.location) focus(current.location);
@@ -922,11 +922,30 @@
 
   function clearShelter() {
     if (shelterMarker) { shelterMarker.remove(); shelterMarker = null; }
+    if (map && map.demoReady) map.getSource('shelter').setData({ type: 'FeatureCollection', features: [] });
+  }
+
+  function clearRoute() {
     if (routeMarker) { routeMarker.remove(); routeMarker = null; }
-    if (map && map.demoReady) {
-      map.getSource('shelter').setData({ type: 'FeatureCollection', features: [] });
-      map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
-    }
+    if (map && map.demoReady) map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+  }
+
+  /** Headquarters sees the report, its evacuation site and the way around at once. */
+  function fitMapChecks() {
+    if (view !== 'hq') return;
+    var ps = [];
+    [shelterMarker, routeMarker].forEach(function (m) { if (m && m.demoLine) ps = ps.concat(m.demoLine); });
+    if (!ps.length) return;
+    var b = ps.reduce(function (acc, p) { return [[Math.min(acc[0][0], p[0]), Math.min(acc[0][1], p[1])], [Math.max(acc[1][0], p[0]), Math.max(acc[1][1], p[1])]]; }, [ps[0], ps[0]]);
+    // Room at the sides for the labels (centred on their points); a small map keeps a third of its width for the checks.
+    var side = Math.min(125, Math.round(map.getContainer().clientWidth / 3));
+    map.fitBounds(b, { padding: { top: 60, bottom: 40, left: side, right: side }, maxZoom: 15.5 });
+  }
+
+  /** A new report, or none: its map checks go. */
+  function clearMapChecks() {
+    clearShelter();
+    clearRoute();
   }
 
   // The way around on foot (step 2 of the chain): Pointsman's detour fact
@@ -974,10 +993,8 @@
     routeMarker = new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat(line[Math.floor(line.length / 2)]).addTo(map);
     routeMarker.demoFact = f.values;
     setShelterVisible();
-    if (view === 'hq') {
-      var b = line.reduce(function (acc, p) { return [[Math.min(acc[0][0], p[0]), Math.min(acc[0][1], p[1])], [Math.max(acc[1][0], p[0]), Math.max(acc[1][1], p[1])]]; }, [line[0], line[0]]);
-      map.fitBounds(b, { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 16.5 });
-    }
+    routeMarker.demoLine = line;
+    fitMapChecks();
   }
 
   function showShelter(facts) {
@@ -1008,7 +1025,8 @@
       shelterMarker = new maplibregl.Marker({ element: node, anchor: 'bottom', offset: [0, 10] }).setLngLat(best.at).addTo(map);
       shelterMarker.demoFact = f.values;
       setShelterVisible();
-      if (view === 'hq') map.fitBounds([[Math.min(best.from[0], best.at[0]), Math.min(best.from[1], best.at[1])], [Math.max(best.from[0], best.at[0]), Math.max(best.from[1], best.at[1])]], { padding: { top: 90, bottom: 50, left: 70, right: 70 }, maxZoom: 15.5 });
+      shelterMarker.demoLine = [best.from, best.at];
+      fitMapChecks();
     }).catch(function () {
       // A failed tile load: the next render tries again.
       if (me.shelterShown === key) me.shelterShown = null;
@@ -1058,7 +1076,7 @@
   $('again').addEventListener('click', function () {
     if (current) { clearTimeout(current.poll); clearInterval(current.reveal); }
     current = null;
-    clearShelter();
+    clearMapChecks();
     setView('hq');
     setStep('pick', true);
     updateMap();
