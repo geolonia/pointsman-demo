@@ -140,6 +140,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 .rule-text { font-size: 1.05rem; }
 .rule-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
 .box.duty { border: 2px solid var(--fg); }
+.why-more { margin: 0; color: var(--muted); font-size: 0.92rem; }
 .why { margin: 0; padding-left: 1.2rem; display: grid; gap: 4px; color: var(--fg-2); }
 .chain-result.alert { color: var(--i-urgent); }
 
