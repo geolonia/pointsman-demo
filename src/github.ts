@@ -45,6 +45,8 @@ export interface Issue {
 export interface ListedIssue {
   number: number;
   body: string | null;
+  state?: string;
+  user?: { type?: string } | null;
   pull_request?: unknown;
 }
 
@@ -93,6 +95,12 @@ export class GitHub {
     const res = await this.request(`/repos/${this.env.GITHUB_REPOSITORY}/issues?state=open&labels=${encodeURIComponent(label)}&per_page=100`);
     // The issues API lists pull requests too.
     return ((await res.json()) as ListedIssue[]).filter((i) => !i.pull_request);
+  }
+
+  /** One issue (for its state). */
+  async issue(issue: number): Promise<ListedIssue> {
+    const res = await this.request(`/repos/${this.env.GITHUB_REPOSITORY}/issues/${issue}`);
+    return (await res.json()) as ListedIssue;
   }
 
   async close(issue: number, labels?: string[]): Promise<void> {

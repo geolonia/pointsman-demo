@@ -255,12 +255,13 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // the final record are different keys, each written once.
   const [opened, inFlight] = await Promise.all([env.DEMO.get(`decision-issue:${decision}`), env.DEMO.get(`decision-pending:${decision}`)]);
   if (opened || inFlight) return;
-  // Already decided (a visitor can answer within seconds): no issue. Pointsman
-  // is asked, not KV, because KV can show another location's write up to a
-  // minute late. If Pointsman cannot say, the issue is opened.
-  if (await decidedIn(env, decision)) return;
   // Short-lived (60 s is the KV minimum): only guards against parallel retries.
   await env.DEMO.put(`decision-pending:${decision}`, '1', { expirationTtl: 60 });
+  // Already decided (a visitor can answer within seconds): no issue. Pointsman
+  // is asked, not KV, because KV can show another location's write up to a
+  // minute late. If Pointsman cannot say, the issue is opened. The marker
+  // stays: it expires within a minute.
+  if (await decidedIn(env, decision, 'before opening')) return;
   let issue: Issue;
   try {
     issue = await createIssueFor(env, entityId, decision, action);
@@ -273,18 +274,25 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // The issue exists now: keep the marker even if a write below fails, so a
   // retry never opens a second issue for the same decision.
   const record: IssueRecord = { decision, entity: entityId, action, corrections: [], createdAt: new Date().toISOString() };
-  await env.DEMO.put(`decision-issue:${decision}`, String(issue.number), { expirationTtl: KV_TTL });
-  await env.DEMO.put(`issue:${issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
-  // Answered while the issue was being opened: the visitor's request found no
-  // issue to close then, so it is closed here.
-  const review = await decidedIn(env, decision);
-  if (review?.final_action) await closeDecided(env, issue.number, action, review.final_action, review.resolved_by);
+  try {
+    await env.DEMO.put(`decision-issue:${decision}`, String(issue.number), { expirationTtl: KV_TTL });
+    await env.DEMO.put(`issue:${issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
+  } finally {
+    // Answered while the issue was being opened: the visitor's request found
+    // no issue to close then, so it is closed here (also when a KV write failed).
+    const review = await decidedIn(env, decision, 'after opening');
+    if (review?.final_action) await closeDecided(new GitHub(env), issue.number, action, review.final_action, review.resolved_by);
+  }
 }
 
-/** The review in Pointsman when a person has answered it; null when not, or when Pointsman cannot say. */
-async function decidedIn(env: Env, decision: string): Promise<PointsmanReview | null> {
+/** The review in Pointsman when a person has answered it; null when not, or when Pointsman cannot say (logged). */
+async function decidedIn(env: Env, decision: string, when: string): Promise<PointsmanReview | null> {
   const review = await reviewOf(env, decision);
-  return review && review !== 'unavailable' && review.status === 'resolved' ? review : null;
+  if (review === 'unavailable') {
+    console.warn(`issue for ${decision}: Pointsman could not say ${when} whether the review was answered`);
+    return null;
+  }
+  return review?.status === 'resolved' ? review : null;
 }
 
 /** The marker createIssueFor puts in each issue body, to find an issue by its decision. */
@@ -478,26 +486,34 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
 async function closeIssueFor(env: Env, decision: string, action: string, final: string): Promise<void> {
   const n = await env.DEMO.get(`decision-issue:${decision}`);
   let number = n && /^\d+$/.test(n) ? Number(n) : undefined;
+  const github = new GitHub(env);
   // KV can miss a link written moments ago at another location (it shows
   // writes up to a minute late, and caches a miss as long): GitHub has the
-  // issue, with the decision in its body.
+  // issue, with the decision in its body. Only the demo's own issues (opened
+  // by its GitHub App) count, not one that quotes such a body.
   if (number === undefined) {
     const marker = issueMarker(decision);
-    number = (await new GitHub(env).openIssues('demo')).find((i) => i.body?.includes(marker))?.number;
+    number = (await github.openIssues('demo')).find((i) => i.user?.type === 'Bot' && i.body?.includes(marker))?.number;
   }
   // None yet: openIssue closes it when it finds the decision answered.
   if (number === undefined) {
     console.warn(`issue for ${decision}: not found to close (openIssue closes it if it opens one)`);
     return;
   }
-  await closeDecided(env, number, action, final, 'demo:visitor');
+  await closeDecided(github, number, action, final, 'demo:visitor');
 }
 
-async function closeDecided(env: Env, number: number, action: string, final: string, by: string | undefined): Promise<void> {
-  const github = new GitHub(env);
-  const sent = PERSON_ACTIONS.includes(action) ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.';
-  const who = by === 'demo:visitor' ? 'on the demo page by the visitor who sent it' : `by ${by ?? 'a person'}`;
-  await github.comment(number, `Decided ${who}: **${final}**. ${sent}`);
+/**
+ * Comment and close, unless the issue is closed already: the visitor's
+ * request and openIssue's check after opening can both get here for one
+ * fast answer.
+ */
+async function closeDecided(github: GitHub, number: number, action: string, final: string, by: string | undefined): Promise<void> {
+  if ((await github.issue(number)).state === 'closed') return;
+  const text = by === 'demo:visitor'
+    ? `Decided on the demo page by the visitor who sent it: **${final}**. ${PERSON_ACTIONS.includes(action) ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.'}`
+    : `Decided in Pointsman by ${by ?? 'a person'}: **${final}**.`;
+  await github.comment(number, text);
   await github.close(number, ['demo', action, final]);
 }
 
