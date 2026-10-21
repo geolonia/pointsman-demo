@@ -281,7 +281,7 @@
       },
       finalKicker: '最終結果', stage1: '最初の確認の結果',
       finalMissing: '最終結果はありません', missingSecond: '追加の確認が届かなかったため、最終結果はありません。',
-      missingFinal: '最終の判定が 1 分以内に届きませんでした。',
+      missingFinal: '最終結果が 1 分以内に届きませんでした。',
       standsFirst: function (a) { return '最初の結果のままです：' + a + '。'; },
       standsPerson: function (a) { return '人の答えのままです：' + a + '。'; },
       finalPending: '最終結果を決めています…', finalPendingText: 'Pointsman が最初の結果と追加の確認を 1 つの結果にまとめます。',
