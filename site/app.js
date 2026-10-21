@@ -348,7 +348,7 @@
       why2: '事実は公開データから調べるので、誰でも確かめられます。',
       why3: '規則は市が書き、どの判定も後から読めます。',
       why4: '大事なところでは、最後に人が決めます。',
-      whyMore: 'ほかの質問と短い答えは、<a href="https://geolonia.github.io/pointsman/ja/#faq">Pointsman のサイトのよくある質問</a>にあります。',
+      whyMore: 'ほかの質問と答えは、Pointsman のサイトの<a href="https://geolonia.github.io/pointsman/ja/#faq">よくある質問</a>にまとめています。',
       again: 'ほかの報告を試す',
       statsTitle: 'この 7 日間の数字',
       stats1: function (n, pub, person, urgent) {
