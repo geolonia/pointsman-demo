@@ -24,7 +24,7 @@
       h3k: '3 · Pointsman', h3t: 'Questions, facts, rules', h3d: 'An AI answers fixed questions. Public map data gives facts. The city’s rules turn both into one action.',
       h4k: '4 · The result', h4t: 'Saved back, open to every app', h4d: 'Unclear or urgent reports go to a person. Their answer tells Pointsman how often the AI was right.',
       forDevs: 'For developers', lProfile: 'The questions and rules (profile)', lBridge: 'The connector (FIWARE bridge)', lStory: 'Why it works this way', lSource: 'Source of this demo', lQueue: 'The review queue',
-      recent: 'Recent reports', recentNote: 'Everyone sees the same reports. Demo data is deleted after a day.',
+      listsLabel: 'Lists of reports', recent: 'Recent reports', recentNote: 'Everyone sees the same reports. Demo data is deleted after a day.',
       waitingTitle: 'Waiting for a person',
       waitingNote: 'One search in the data platform finds them: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can do the same search.',
       waitingNone: 'Nothing is waiting right now.', showQuery: 'the query', more: function (n) { return n + ' more'; },
@@ -39,10 +39,10 @@
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…', together: 'Passed on to Pointsman; these two run at the same time', inAll: function (s) { return s + ' in all'; },
-      useTag: 'rule', srSource: 'source', usesMarked: 'The rule read the answers and map checks marked like this above.',
+      useTag: 'rule', srcShow: 'Where the data comes from', usesMarked: 'The rule read the answers and map checks marked like this above.',
       lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
       answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
-      ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
+      ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →',
       checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
       secondRunning: 'The additional check is running…', cNone: 'The rules found no reason for an alert.',
       fNotForPoint: 'Not checked: the report marks a point, not a road section, so there is no way around to work out.',
@@ -196,7 +196,7 @@
       h3k: '3・Pointsman', h3t: '質問、事実、規則', h3d: 'AI が決まった質問に答えます。場所の事実は公開の地図データから調べます。市の規則が、答えと事実から行動を 1 つ決めます。',
       h4k: '4・結果', h4t: 'データ基盤に戻し、どのアプリでも使える', h4d: 'はっきりしない報告と緊急の報告は人に回ります。人の答えから、AI がどのくらい正しかったかが分かります。',
       forDevs: '開発者向け', lProfile: '質問と規則（プロファイル）', lBridge: 'つなぎ役（FIWARE ブリッジ）', lStory: 'この仕組みの理由', lSource: 'このデモのソース', lQueue: '確認待ちの一覧',
-      recent: '最近の報告', recentNote: '全員が同じ報告を見ています。デモのデータは 1 日で消えます。',
+      listsLabel: '報告の一覧', recent: '最近の報告', recentNote: '全員が同じ報告を見ています。デモのデータは 1 日で消えます。',
       waitingTitle: '人の確認待ち',
       waitingNote: 'データ基盤での検索 1 回で見つけています。<code>reviewStatus</code> が "pending" の <code>Decision</code> エンティティを探します。ほかの FIWARE アプリも同じ検索ができます。',
       waitingNone: '今は確認待ちはありません。', showQuery: 'クエリ', more: function (n) { return 'ほか ' + n + ' 件'; },
@@ -211,10 +211,10 @@
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…', together: 'Pointsman に渡され、この 2 つは同時に進みます', inAll: function (s) { return '合計 ' + s; },
-      useTag: '規則', srSource: '出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
+      useTag: '規則', srcShow: 'データの出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
       lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
       answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
-      ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
+      ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →',
       checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
       secondRunning: '追加の確認をしています…', cNone: '規則では、警報を出す理由はありませんでした。',
       fNotForPoint: '確認しません：報告は区間ではなく地点なので、迂回路は計算できません。',
@@ -457,12 +457,24 @@
     renderMapReport();
   }
 
+  // The source popovers: one open at a time; Escape or a click elsewhere closes it.
+  function closeSources(except) {
+    document.querySelectorAll('details.src[open]').forEach(function (d) { if (d !== except) { d.open = false; } });
+  }
+  document.addEventListener('toggle', function (e) { if (e.target.matches && e.target.matches('details.src') && e.target.open) closeSources(e.target); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSources(null); });
+  document.addEventListener('click', function (e) { if (!e.target.closest('details.src')) closeSources(null); });
+
   /** Steps 3 and 4 no longer show the report: it stays above the map. */
   function renderMapReport() {
     var r = current && current.last;
     var keep = !!r && (step === 'check' || step === 'result');
     $('map-report').hidden = !keep;
-    $('map-report-kicker').textContent = keep ? $('cur-kicker').textContent : '';
+    var p = current && current.prepared;
+    $('map-report-kicker').textContent = keep ? (current.sentAt ? t('yourReport') : t('aReport')) : '';
+    // Free text may have no road name: then only the report itself.
+    $('map-report-title').textContent = keep ? (p ? titleOf(p) : r.roadName || '') : '';
+    $('map-report-place').textContent = keep && p ? placeOf(p) : '';
     $('map-report-text').textContent = keep ? quote(r.description) : '';
   }
 
@@ -708,7 +720,6 @@
     return isFinite(a) && isFinite(b) ? ((b - a) / 1000).toFixed(1) + ' s' : '';
   }
 
-
   function renderCurrent() {
     var r = current.last;
     var p = current.prepared;
@@ -720,7 +731,6 @@
     renderAnswers(r);
     renderDecisionFacts(r);
     renderRule(r);
-    renderData(r);
     // The way around on foot is step 3's: drawn from there on.
     if (r && r.evacuation && (step === 'check' || step === 'result')) showRoute(r.evacuation.facts || []);
     if (step === 'check') renderCheck(r);
@@ -807,10 +817,11 @@
       var c = confidence(a.p);
       var on = used.indexOf(name) >= 0;
       list.appendChild(el('div', { class: 'row' + (on ? ' used-row' : '') }, [
-        el('span', { class: 'q', text: (t('q')[name] || name) }),
-        on ? usedTag() : null,
-        el('strong', { text: answerText(name, a.value) }),
-        c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
+        el('span', { class: 'qcol' }, [el('span', { class: 'q', text: (t('q')[name] || name) }), on ? usedTag() : null]),
+        el('span', { class: 'acol' }, [
+          el('strong', { text: answerText(name, a.value) }),
+          c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
+        ]),
       ]));
     });
     return list;
@@ -858,14 +869,6 @@
         } }),
       ]),
     ]));
-  }
-
-  // The data itself is in the developer view, next to the steps.
-  function renderData(r) {
-    var box = $('data');
-    box.textContent = '';
-    if (!r || !r.ngsi || current.shown < 4 || devOn) return;
-    box.appendChild(el('button', { class: 'chip', type: 'button', text: t('devOpen'), onclick: function () { setDev(true); } }));
   }
 
   // --- Step 3: the additional check ---------------------------------------------------
@@ -1203,36 +1206,37 @@
   /**
    * One row per map check, laid out like the AI's answers: the question, the
    * answer and its level; the rows the rule used are tagged. Where the data
-   * comes from is one numbered note under the list.
+   * comes from is behind an (i) at the end of the row.
    */
   // `firstCheck`: the facts of the first check, where no rule uses the evacuation site.
   function renderFactList(facts, firstCheck, used) {
     if (!facts.length) return null;
     used = used || [];
-    var sources = [];
     var rows = el('div', { class: 'qa facts' });
     facts.forEach(function (f) {
       var on = used.indexOf(f.name) >= 0;
       var level = factLevel(f);
       // In the first check no rule reads the evacuation site: no colour for it there.
       if (level && firstCheck && !on && f.name === 'shelter') level = ['ctx', level[1]];
-      var n = 0;
-      if (!f.missing && f.source) {
-        n = sources.indexOf(f.source) + 1 || sources.push(f.source);
-      }
+      // Where the data comes from: behind an (i), shown on hover (title) or a click.
+      var src = !f.missing && f.source ? details(current.id + ':src-' + (firstCheck ? '1-' : '2-') + f.name, { class: 'src' }, [
+        el('summary', { class: 'src-btn', title: t('fSource') + f.source, 'aria-label': t('srcShow') }, ['i']),
+        el('span', { class: 'src-pop', text: t('fSource') + f.source }),
+      ]) : null;
       rows.appendChild(el('div', { class: 'row fact ' + f.name + (on ? ' used-row' : '') }, [
-        el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
-        on ? usedTag() : null,
-        el('strong', { class: 'fa' }, [factText(f), n ? el('sup', { class: 'fnum' }, [el('span', { class: 'sr-only', text: ' ' + t('srSource') + ' ' }), String(n)]) : null]),
-        level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
+        el('span', { class: 'qcol' }, [
+          el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
+          on ? usedTag() : null,
+        ]),
+        el('span', { class: 'acol' }, [
+          el('strong', { class: 'fa', text: factText(f) }),
+          level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
+          src,
+        ]),
         firstCheck && f.name === 'shelter' && !f.missing && !f.second && !on ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
       ]));
     });
-    var wrap = el('div', { class: 'fact-wrap' }, [rows]);
-    if (sources.length) {
-      wrap.appendChild(el('ol', { class: 'sources', 'aria-label': t('fSource').replace(/[：:\s]+$/, '') }, sources.map(function (src) { return el('li', { text: src }); })));
-    }
-    return wrap;
+    return rows;
   }
 
   function renderFacts(facts, used) {
@@ -1362,7 +1366,6 @@
     devTag = null;
     devHighlight(null);
     renderDev();
-    if (current && current.last) renderData(current.last);
   }
 
   /** The page parts and the events of one step, marked together. */
@@ -1385,6 +1388,8 @@
   function renderReports() {
     var list = $('reports');
     list.textContent = '';
+    // The list shows the newest 20: so does the count.
+    $('count-recent').textContent = String(Math.min(20, reports.length));
     var now = Date.now();
     reports.slice(0, 20).forEach(function (r) {
       var o = outcomeOf(r);
@@ -1403,6 +1408,7 @@
     info.textContent = '';
     // Without a list, say so; with one, keep it and say it may be old.
     if (pendingFailed) info.appendChild(el('p', { class: 'error small', text: t(pending ? 'waitingStale' : 'waitingFailed') }));
+    $('count-pending').textContent = pending ? String(pending.total != null ? pending.total : pending.decisions.length) : '';
     if (!pending) return;
     var now = Date.now();
     var byId = {};
@@ -1452,6 +1458,32 @@
     // Keyboards land in the panel when it opens (it comes after the page); its Close button puts focus back on the header button.
     if (open) $('activity-title').focus();
   }
+
+  // The reports panel's two lists, as tabs (remembered in the browser).
+  function setListTab(name, focus) {
+    ['pending', 'recent'].forEach(function (n) {
+      var on = n === name;
+      $('tab-' + n).setAttribute('aria-selected', String(on));
+      $('tab-' + n).tabIndex = on ? 0 : -1;
+      $('panel-' + n).hidden = !on;
+    });
+    if (focus) $('tab-' + name).focus();
+    try { localStorage.setItem('listTab', name); } catch (e) {}
+  }
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('listTab'); } catch (e) {}
+    if (saved === 'recent') setListTab('recent');
+    ['pending', 'recent'].forEach(function (n) {
+      $('tab-' + n).addEventListener('click', function () { setListTab(n); });
+      // Arrow keys move between the tabs.
+      $('tab-' + n).addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        setListTab(n === 'pending' ? 'recent' : 'pending', true);
+      });
+    });
+  })();
 
   /** The page makes room for the open side panel (body class, wide screens). */
   function sideOpen() {

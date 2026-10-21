@@ -100,7 +100,6 @@
         <ol class="timeline" id="timeline"></ol>
         <!-- For screen readers: one short line when the state changes, not the whole list. -->
         <p id="decide-status" class="sr-only" aria-live="polite"></p>
-        <div id="data"></div>
       </section>
 
       <section id="step-check" class="step" hidden>
@@ -123,7 +122,7 @@
 
     <aside class="map-card">
       <!-- The report itself, once the steps no longer show it (steps 3 and 4). -->
-      <div id="map-report" class="map-report" hidden><span class="kicker" id="map-report-kicker"></span><span id="map-report-text"></span></div>
+      <div id="map-report" class="map-report" hidden><span class="kicker" id="map-report-kicker"></span><strong id="map-report-title"></strong><span id="map-report-place"></span><blockquote id="map-report-text"></blockquote></div>
       <div class="map-head">
         <span class="kicker" data-i18n="mapTitle">The city map</span>
         <div class="toggle" role="group" aria-label="Whose map">
@@ -165,14 +164,17 @@
   </div>
   <p class="muted small" data-i18n="activityLead">What the demo has decided: every report of the last day, the ones waiting for a person, and the numbers of the last 7 days.</p>
   <div id="stats"></div>
-  <section>
-    <h3 data-i18n="waitingTitle">Waiting for a person</h3>
+  <!-- The two lists as tabs: one at a time, so neither pushes the other down. -->
+  <div class="tabs" role="tablist" data-i18n-label="listsLabel">
+    <button type="button" role="tab" id="tab-pending" aria-controls="panel-pending" aria-selected="true"><span data-i18n="waitingTitle">Waiting for a person</span> <span class="count" id="count-pending"></span></button>
+    <button type="button" role="tab" id="tab-recent" aria-controls="panel-recent" aria-selected="false" tabindex="-1"><span data-i18n="recent">Recent reports</span> <span class="count" id="count-recent"></span></button>
+  </div>
+  <section id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
     <p class="muted small" data-i18n="waitingNote"></p>
     <ul id="pending" class="reports pending"></ul>
     <div id="pending-info"></div>
   </section>
-  <section>
-    <h3 data-i18n="recent">Recent reports</h3>
+  <section id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" hidden>
     <p class="muted small" data-i18n="recentNote">Everyone sees the same reports. Demo data is deleted after a day.</p>
     <ul id="reports" class="reports"></ul>
   </section>
