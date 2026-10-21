@@ -457,7 +457,6 @@
     renderMapReport();
   }
 
-  /** Steps 3 and 4 no longer show the report: it stays above the map. */
   // The source popovers: one open at a time; Escape or a click elsewhere closes it.
   function closeSources(except) {
     document.querySelectorAll('details.src[open]').forEach(function (d) { if (d !== except) { d.open = false; } });
@@ -466,6 +465,7 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSources(null); });
   document.addEventListener('click', function (e) { if (!e.target.closest('details.src')) closeSources(null); });
 
+  /** Steps 3 and 4 no longer show the report: it stays above the map. */
   function renderMapReport() {
     var r = current && current.last;
     var keep = !!r && (step === 'check' || step === 'result');
@@ -1388,7 +1388,8 @@
   function renderReports() {
     var list = $('reports');
     list.textContent = '';
-    $('count-recent').textContent = String(reports.length);
+    // The list shows the newest 20: so does the count.
+    $('count-recent').textContent = String(Math.min(20, reports.length));
     var now = Date.now();
     reports.slice(0, 20).forEach(function (r) {
       var o = outcomeOf(r);
@@ -1407,7 +1408,7 @@
     info.textContent = '';
     // Without a list, say so; with one, keep it and say it may be old.
     if (pendingFailed) info.appendChild(el('p', { class: 'error small', text: t(pending ? 'waitingStale' : 'waitingFailed') }));
-    $('count-pending').textContent = pending ? String(pending.decisions.length) : '';
+    $('count-pending').textContent = pending ? String(pending.total != null ? pending.total : pending.decisions.length) : '';
     if (!pending) return;
     var now = Date.now();
     var byId = {};

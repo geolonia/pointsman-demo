@@ -293,7 +293,7 @@ footer { max-width: 1240px; margin: 0 auto; padding: 8px 24px 32px; }
 .side-grip:hover::after, .side-grip:focus-visible::after, body.resizing .side-grip::after { background: var(--muted); }
 .side-grip:focus-visible { outline: 2px solid var(--i-map); outline-offset: -2px; }
 body.resizing { cursor: col-resize; user-select: none; }
-/* The reports panel: each list scrolls by itself, so one long list does not push the other away. */
+/* The reports panel: the two lists as tabs; the open one scrolls by itself. */
 .side-reports section { display: grid; gap: 6px; }
 .side-reports h3 { margin: 6px 0 0; font-size: 1rem; }
 .side-reports .reports { max-height: max(240px, calc(100vh - 420px)); overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
@@ -336,7 +336,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 .ev-data pre { margin: 0; max-height: 260px; overflow: auto; background: var(--code-bg); padding: 8px; border-radius: 8px; font-size: 0.72rem; }
 /* Wide data scrolls inside its own box: the grids around it never grow past the panel. */
 .seq, .ev-text, .ev-data { grid-template-columns: minmax(0, 1fr); min-width: 0; }
-.ev, .ev-data details { min-width: 0; }
+.ev { min-width: 0; }
 .ev-data pre { max-width: 100%; }
 /* One step marked on the page and in the developer view. */
 .dev-hl { outline: 2px solid var(--i-map); outline-offset: 3px; border-radius: 10px; }
