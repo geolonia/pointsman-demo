@@ -170,30 +170,35 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 @keyframes pulse { from { opacity: 0.35; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .timeline li.active .mark { animation: none; } }
 .qa { display: grid; }
-.qa .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; padding: 8px 0; border-top: 1px solid var(--line); }
+.qa .row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: center; gap: 4px 16px; padding: 8px 0; border-top: 1px solid var(--line); }
 /* The question (and its rule tag) on the left; the answer with its chips on the right, kept together. */
 .qa .qcol { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
-.qa .acol { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px 10px; text-align: right; }
+.qa .acol { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px 10px; text-align: right; min-width: 0; }
+.qa .acol strong { min-width: 0; overflow-wrap: anywhere; }
 .qa .row > .fn { grid-column: 1 / -1; }
 @media (max-width: 560px) {
   .qa .row { grid-template-columns: 1fr; }
   .qa .acol { justify-content: flex-start; text-align: left; }
+  /* Narrow screens: the source as wide as the row. */
+  .src-pop { left: 0; right: 0; width: auto; max-width: none; }
 }
 .qa .row:first-child { border-top: none; }
 .qa .q { color: var(--fg-2); }
 .conf { font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; background: var(--panel-2); color: var(--fg-2); }
 .conf.vsure, .conf.sure { background: var(--t-publish); color: var(--i-publish); }
 .conf.unsure { background: var(--t-review); color: var(--i-review); }
-/* The map checks: question, answer and level, like the AI's answers; the sources as numbered notes. */
+/* The map checks: question, answer and level, like the AI's answers; the source behind an (i). */
 .facts .ftag { margin-right: 6px; font: 0.7rem var(--mono); color: var(--i-map); border: 1px solid var(--line-map); border-radius: 999px; padding: 1px 8px; }
-.facts .fn { flex-basis: 100%; font-size: 0.8rem; color: var(--muted); }
-.src { position: relative; }
+.facts .fn { font-size: 0.8rem; color: var(--muted); }
+/* The popover hangs from the whole row, so it never leaves the screen. */
+.qa .row { position: relative; }
+.src { position: static; }
 .src > summary { list-style: none; }
 .src > summary::-webkit-details-marker { display: none; }
-.src-btn { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); font: italic 600 12px/1 Georgia, serif; cursor: pointer; }
+.src-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); font: italic 600 12px/1 Georgia, serif; cursor: pointer; }
 .src-btn:hover, .src[open] .src-btn { color: var(--fg); border-color: var(--fg); }
 .src-btn:focus-visible { outline: 2px solid var(--i-map); outline-offset: 2px; }
-.src-pop { position: absolute; z-index: 3; right: 0; top: calc(100% + 6px); width: max-content; max-width: min(360px, 80vw); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); font: 0.75rem/1.45 var(--mono); color: var(--fg-2); text-align: left; overflow-wrap: anywhere; }
+.src-pop { position: absolute; z-index: 3; right: 0; top: calc(100% - 2px); width: max-content; max-width: min(420px, 100%); box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); font: 0.75rem/1.45 var(--mono); color: var(--fg-2); text-align: left; overflow-wrap: anywhere; }
 .map-checks .kicker { color: var(--i-map); }
 /* How much a map check matters, in the rules' terms (like the AI's confidence words). */
 .lvl { font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
@@ -291,7 +296,13 @@ body.resizing { cursor: col-resize; user-select: none; }
 /* The reports panel: each list scrolls by itself, so one long list does not push the other away. */
 .side-reports section { display: grid; gap: 6px; }
 .side-reports h3 { margin: 6px 0 0; font-size: 1rem; }
-.side-reports .reports { max-height: 34vh; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
+.side-reports .reports { max-height: max(240px, calc(100vh - 420px)); overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
+.tabs { display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid var(--line); }
+.tabs [role="tab"] { font: 600 0.9rem var(--sans); padding: 8px 12px; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); cursor: pointer; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+.tabs [role="tab"]:focus-visible { outline: 2px solid var(--i-map); outline-offset: -2px; }
+.tabs .count { font: 500 0.75rem var(--mono); padding: 1px 7px; border-radius: 999px; background: var(--panel-2); color: var(--fg-2); }
+.tabs .count:empty { display: none; }
 @media (min-width: 1100px) {
   body.dev-open main, body.dev-open footer { margin-right: calc(var(--side-w, 440px) + 16px); margin-left: 16px; }
 }
@@ -323,6 +334,10 @@ body.resizing { cursor: col-resize; user-select: none; }
 .ev-data { display: grid; gap: 4px; }
 .ev-data summary { cursor: pointer; font: 0.75rem var(--mono); color: var(--i-map); }
 .ev-data pre { margin: 0; max-height: 260px; overflow: auto; background: var(--code-bg); padding: 8px; border-radius: 8px; font-size: 0.72rem; }
+/* Wide data scrolls inside its own box: the grids around it never grow past the panel. */
+.seq, .ev-text, .ev-data { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.ev, .ev-data details { min-width: 0; }
+.ev-data pre { max-width: 100%; }
 /* One step marked on the page and in the developer view. */
 .dev-hl { outline: 2px solid var(--i-map); outline-offset: 3px; border-radius: 10px; }
 .ev.dev-hl { outline-offset: 1px; background: var(--t-map); }
@@ -367,5 +382,6 @@ body.resizing { cursor: col-resize; user-select: none; }
 .map-report[hidden] { display: none; }
 .map-report #map-report-title { font-size: 1.05rem; }
 .map-report #map-report-place { font-size: 0.88rem; color: var(--fg-2); }
+.map-report #map-report-title:empty, .map-report #map-report-place:empty { display: none; }
 /* The report itself is the key information: large, with a bar like a quote. */
 .map-report blockquote { margin: 10px 0 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--fg); font-size: 1.02rem; line-height: 1.5; color: var(--fg); }

@@ -24,7 +24,7 @@
       h3k: '3 · Pointsman', h3t: 'Questions, facts, rules', h3d: 'An AI answers fixed questions. Public map data gives facts. The city’s rules turn both into one action.',
       h4k: '4 · The result', h4t: 'Saved back, open to every app', h4d: 'Unclear or urgent reports go to a person. Their answer tells Pointsman how often the AI was right.',
       forDevs: 'For developers', lProfile: 'The questions and rules (profile)', lBridge: 'The connector (FIWARE bridge)', lStory: 'Why it works this way', lSource: 'Source of this demo', lQueue: 'The review queue',
-      recent: 'Recent reports', recentNote: 'Everyone sees the same reports. Demo data is deleted after a day.',
+      listsLabel: 'Lists of reports', recent: 'Recent reports', recentNote: 'Everyone sees the same reports. Demo data is deleted after a day.',
       waitingTitle: 'Waiting for a person',
       waitingNote: 'One search in the data platform finds them: every <code>Decision</code> entity whose <code>reviewStatus</code> is "pending". Any FIWARE app can do the same search.',
       waitingNone: 'Nothing is waiting right now.', showQuery: 'the query', more: function (n) { return n + ' more'; },
@@ -196,7 +196,7 @@
       h3k: '3・Pointsman', h3t: '質問、事実、規則', h3d: 'AI が決まった質問に答えます。場所の事実は公開の地図データから調べます。市の規則が、答えと事実から行動を 1 つ決めます。',
       h4k: '4・結果', h4t: 'データ基盤に戻し、どのアプリでも使える', h4d: 'はっきりしない報告と緊急の報告は人に回ります。人の答えから、AI がどのくらい正しかったかが分かります。',
       forDevs: '開発者向け', lProfile: '質問と規則（プロファイル）', lBridge: 'つなぎ役（FIWARE ブリッジ）', lStory: 'この仕組みの理由', lSource: 'このデモのソース', lQueue: '確認待ちの一覧',
-      recent: '最近の報告', recentNote: '全員が同じ報告を見ています。デモのデータは 1 日で消えます。',
+      listsLabel: '報告の一覧', recent: '最近の報告', recentNote: '全員が同じ報告を見ています。デモのデータは 1 日で消えます。',
       waitingTitle: '人の確認待ち',
       waitingNote: 'データ基盤での検索 1 回で見つけています。<code>reviewStatus</code> が "pending" の <code>Decision</code> エンティティを探します。ほかの FIWARE アプリも同じ検索ができます。',
       waitingNone: '今は確認待ちはありません。', showQuery: 'クエリ', more: function (n) { return 'ほか ' + n + ' 件'; },
@@ -458,13 +458,22 @@
   }
 
   /** Steps 3 and 4 no longer show the report: it stays above the map. */
+  // The source popovers: one open at a time; Escape or a click elsewhere closes it.
+  function closeSources(except) {
+    document.querySelectorAll('details.src[open]').forEach(function (d) { if (d !== except) { d.open = false; } });
+  }
+  document.addEventListener('toggle', function (e) { if (e.target.matches && e.target.matches('details.src') && e.target.open) closeSources(e.target); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSources(null); });
+  document.addEventListener('click', function (e) { if (!e.target.closest('details.src')) closeSources(null); });
+
   function renderMapReport() {
     var r = current && current.last;
     var keep = !!r && (step === 'check' || step === 'result');
     $('map-report').hidden = !keep;
     var p = current && current.prepared;
     $('map-report-kicker').textContent = keep ? (current.sentAt ? t('yourReport') : t('aReport')) : '';
-    $('map-report-title').textContent = keep ? (p ? titleOf(p) : r.roadName || t('noRoad')) : '';
+    // Free text may have no road name: then only the report itself.
+    $('map-report-title').textContent = keep ? (p ? titleOf(p) : r.roadName || '') : '';
     $('map-report-place').textContent = keep && p ? placeOf(p) : '';
     $('map-report-text').textContent = keep ? quote(r.description) : '';
   }
@@ -711,7 +720,6 @@
     return isFinite(a) && isFinite(b) ? ((b - a) / 1000).toFixed(1) + ' s' : '';
   }
 
-
   function renderCurrent() {
     var r = current.last;
     var p = current.prepared;
@@ -862,7 +870,6 @@
       ]),
     ]));
   }
-
 
   // --- Step 3: the additional check ---------------------------------------------------
 
@@ -1199,7 +1206,7 @@
   /**
    * One row per map check, laid out like the AI's answers: the question, the
    * answer and its level; the rows the rule used are tagged. Where the data
-   * comes from is one numbered note under the list.
+   * comes from is behind an (i) at the end of the row.
    */
   // `firstCheck`: the facts of the first check, where no rule uses the evacuation site.
   function renderFactList(facts, firstCheck, used) {
@@ -1212,7 +1219,7 @@
       // In the first check no rule reads the evacuation site: no colour for it there.
       if (level && firstCheck && !on && f.name === 'shelter') level = ['ctx', level[1]];
       // Where the data comes from: behind an (i), shown on hover (title) or a click.
-      var src = !f.missing && f.source ? details('src-' + (firstCheck ? '1-' : '2-') + f.name, { class: 'src' }, [
+      var src = !f.missing && f.source ? details(current.id + ':src-' + (firstCheck ? '1-' : '2-') + f.name, { class: 'src' }, [
         el('summary', { class: 'src-btn', title: t('fSource') + f.source, 'aria-label': t('srcShow') }, ['i']),
         el('span', { class: 'src-pop', text: t('fSource') + f.source }),
       ]) : null;
@@ -1381,6 +1388,7 @@
   function renderReports() {
     var list = $('reports');
     list.textContent = '';
+    $('count-recent').textContent = String(reports.length);
     var now = Date.now();
     reports.slice(0, 20).forEach(function (r) {
       var o = outcomeOf(r);
@@ -1399,6 +1407,7 @@
     info.textContent = '';
     // Without a list, say so; with one, keep it and say it may be old.
     if (pendingFailed) info.appendChild(el('p', { class: 'error small', text: t(pending ? 'waitingStale' : 'waitingFailed') }));
+    $('count-pending').textContent = pending ? String(pending.decisions.length) : '';
     if (!pending) return;
     var now = Date.now();
     var byId = {};
@@ -1448,6 +1457,32 @@
     // Keyboards land in the panel when it opens (it comes after the page); its Close button puts focus back on the header button.
     if (open) $('activity-title').focus();
   }
+
+  // The reports panel's two lists, as tabs (remembered in the browser).
+  function setListTab(name, focus) {
+    ['pending', 'recent'].forEach(function (n) {
+      var on = n === name;
+      $('tab-' + n).setAttribute('aria-selected', String(on));
+      $('tab-' + n).tabIndex = on ? 0 : -1;
+      $('panel-' + n).hidden = !on;
+    });
+    if (focus) $('tab-' + name).focus();
+    try { localStorage.setItem('listTab', name); } catch (e) {}
+  }
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('listTab'); } catch (e) {}
+    if (saved === 'recent') setListTab('recent');
+    ['pending', 'recent'].forEach(function (n) {
+      $('tab-' + n).addEventListener('click', function () { setListTab(n); });
+      // Arrow keys move between the tabs.
+      $('tab-' + n).addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        setListTab(n === 'pending' ? 'recent' : 'pending', true);
+      });
+    });
+  })();
 
   /** The page makes room for the open side panel (body class, wide screens). */
   function sideOpen() {
