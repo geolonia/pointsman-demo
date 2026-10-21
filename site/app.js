@@ -461,6 +461,7 @@
     });
     if (scroll) $('stepper').scrollIntoView({ behavior: 'smooth', block: 'start' });
     renderMapReport();
+    routeForStep();
   }
 
   // The source popovers: one open at a time; Escape or a click elsewhere closes it.
@@ -739,8 +740,7 @@
     renderAnswers(r);
     renderDecisionFacts(r);
     renderRule(r);
-    // The way around on foot is step 3's: drawn from there on.
-    if (r && r.evacuation && (step === 'check' || step === 'result')) showRoute(r.evacuation.facts || []);
+    routeForStep();
     if (step === 'check') renderCheck(r);
     if (step === 'result') renderResult(r);
     renderDev();
@@ -854,8 +854,7 @@
     var facts = renderFacts(r.facts || [], usedBy('check', r.check.policyRule));
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
-    // The way around by car is step 2's; from step 3 on the one on foot takes its place.
-    if (step === 'decide') showRoute(r.facts || [], 'drive');
+    routeForStep();
   }
 
   function renderRule(r) {
@@ -1670,9 +1669,7 @@
       m.demoReady = true;
       if (current && current.last && current.shown >= 3) {
         showShelter((current.last.facts || []).concat(current.last.evacuation ? current.last.evacuation.facts || [] : []));
-        // The route of the step on screen: by car in step 2, on foot from step 3 on.
-        if (step === 'decide') showRoute(current.last.facts || [], 'drive');
-        else if (current.last.evacuation && (step === 'check' || step === 'result')) showRoute(current.last.evacuation.facts || []);
+        routeForStep();
       }
       m.setLayoutProperty('flood', 'visibility', view === 'hq' ? 'visible' : 'none');
       updateMap();
@@ -1770,6 +1767,24 @@
       out.push([lon / factor, lat / factor]);
     }
     return out.length >= 2 ? out : null;
+  }
+
+  /**
+   * The way around of the step on screen: by car in step 2 (first check),
+   * on foot from step 3 on. Without an additional check (a report published
+   * at once) the car's way around goes when step 2 is left.
+   */
+  function routeForStep() {
+    var r = current && current.last;
+    if (!r) return;
+    if (step === 'decide') showRoute(r.facts || [], 'drive');
+    else if (step === 'check' || step === 'result') {
+      if (r.evacuation) showRoute(r.evacuation.facts || []);
+      else if (current.routeShown && current.routeShown.indexOf('|drive|') > 0 && map && map.demoReady) {
+        clearRoute();
+        current.routeShown = null;
+      }
+    }
   }
 
   /** The way around of a detour fact on the map: `walk` (the additional check, default) or `drive` (the first check). */
