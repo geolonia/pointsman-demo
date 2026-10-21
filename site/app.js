@@ -36,11 +36,11 @@
       decideTitle: 'First check', yourReport: 'Your report', aReport: 'A report', noRoad: '(no road name)',
       s1: 'Saved in the city’s data platform', s1d: 'The way any city app would save it.',
       s2: 'The AI answered four questions', s2d: 'It reads the text. It does not decide.',
-      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
+      s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section, also the way around by car (and on foot when a person checks it).',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…', together: 'Passed on to Pointsman; these two run at the same time', inAll: function (s) { return s + ' in all'; },
       useTag: 'rule', srcShow: 'Where the data comes from', usesMarked: 'The rule read the answers and map checks marked like this above.',
-      lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
+      lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around', ctx: 'context' },
       answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
       ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →',
       checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
@@ -132,7 +132,7 @@
       oFinalReject: 'Rejected after a check', eFinalReject: 'A person checked it. Residents never see it.',
       chainKicker: 'Started by the first check', chainTitle: 'Can people still walk to their evacuation site?',
       cAlert: 'Alert sent to the staff of the evacuation site.', cReview: 'The way around could not be checked: a person looks at it.',
-      fQ: { flood: 'Is the place in a river flood zone?', shelter: 'Where is the nearest flood evacuation site?', walk: 'For people who walk past here, how much longer is the way around?' },
+      fQ: { flood: 'Is the place in a river flood zone?', shelter: 'Where is the nearest flood evacuation site?', drive: 'For cars that drive past here, how much longer is the way around?', walk: 'For people who walk past here, how much longer is the way around?' },
       fFlood: function (c) { return 'Yes: water depth ' + c; },
       fNoFlood: 'No, not in a published flood zone',
       fShelter: function (n, m) { return n + ', ' + m + ' m away'; },
@@ -143,8 +143,11 @@
       fSource: 'Source: ',
       fShelterMap: function (n, m) { return 'Evacuation site: ' + n + ' · ' + m + ' m'; },
       floodClass: {},
-      mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', walk: 'way around on foot' },
+      mapChecks: 'map checks:', ch: { flood: 'flood zone', shelter: 'evacuation site', drive: 'way around by car', walk: 'way around on foot' },
       fRouteMap: function (m) { return 'Way around on foot: +' + m + ' m'; },
+      fCarMap: function (m) { return 'Way around by car: +' + m + ' m'; },
+      fDrive: function (m) { return m + ' m longer by car'; },
+      fDriveNote: 'Context for the person who checks; no rule uses it yet.', fNoDrive: 'No way around by car',
       fShelterNote: 'Context for the person who checks; the additional check uses it.',
       fSecond: 'second check',
       dutyTitle: 'You are the person on duty',
@@ -208,11 +211,11 @@
       decideTitle: '最初の確認', yourReport: 'あなたの報告', aReport: '報告', noRoad: '（道路名なし）',
       s1: '市のデータ基盤に保存', s1d: '市のアプリが保存するのと同じ方法です。',
       s2: 'AI が 4 つの質問に答えた', s2d: 'AI は本文を読むだけで、決めはしません。',
-      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
+      s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。通行止め区間では、車で迂回する道のりも調べます（人に回る報告では、歩いて迂回する道のりも）。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…', together: 'Pointsman に渡され、この 2 つは同時に進みます', inAll: function (s) { return '合計 ' + s; },
       useTag: '規則', srcShow: 'データの出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
-      lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
+      lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし', ctx: '参考' },
       answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
       ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →',
       checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
@@ -302,7 +305,7 @@
       oFinalReject: '確認のうえ非公開', eFinalReject: '人が確認しました。住民には見えません。',
       chainKicker: '最初の確認から始まる確認', chainTitle: '歩いて避難場所まで行けるか',
       cAlert: '避難場所の担当者に警報を送りました。', cReview: '迂回路を確認できなかったので、人が確認します。',
-      fQ: { flood: '洪水浸水想定区域の中か', shelter: '最寄りの指定緊急避難場所（洪水）はどこか', walk: 'ここを通って歩く人は、迂回するとどれだけ長くなるか' },
+      fQ: { flood: '洪水浸水想定区域の中か', shelter: '最寄りの指定緊急避難場所（洪水）はどこか', drive: 'ここを通る車は、迂回するとどれだけ長くなるか', walk: 'ここを通って歩く人は、迂回するとどれだけ長くなるか' },
       fFlood: function (c) { return 'はい：想定される深さ ' + c; },
       fNoFlood: 'いいえ（公開されている区域の外）',
       fShelter: function (n, m) { return n + '、' + m + ' m 先'; },
@@ -317,8 +320,11 @@
         'below 0.3 m': '0.3 m 未満', 'below 0.5 m': '0.5 m 未満', '0.5 to 1 m': '0.5〜1 m', '0.5 to 3 m': '0.5〜3 m',
         '3 to 5 m': '3〜5 m', '5 to 10 m': '5〜10 m', '10 to 20 m': '10〜20 m', '20 m or more': '20 m 以上',
       },
-      mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', walk: '歩いて迂回' },
+      mapChecks: '地図で調べること：', ch: { flood: '浸水想定区域', shelter: '避難場所', drive: '車で迂回', walk: '歩いて迂回' },
       fRouteMap: function (m) { return '歩いて迂回：+' + m + ' m'; },
+      fCarMap: function (m) { return '車で迂回：+' + m + ' m'; },
+      fDrive: function (m) { return '車で ' + m + ' m 長くなる'; },
+      fDriveNote: '確認する人のための参考情報です。まだどの規則も使いません。', fNoDrive: '車では迂回できない',
       fShelterNote: '確認する人のための参考情報です。追加の確認で使います。',
       fSecond: '2 つ目の確認',
       dutyTitle: 'あなたが担当者です',
@@ -455,6 +461,7 @@
     });
     if (scroll) $('stepper').scrollIntoView({ behavior: 'smooth', block: 'start' });
     renderMapReport();
+    routeForStep();
   }
 
   // The source popovers: one open at a time; Escape or a click elsewhere closes it.
@@ -587,7 +594,9 @@
   function placeOf(p) { return (p.place && p.place[lang]) || ''; }
 
   function checksOf(p) {
-    return ['flood', 'shelter'].concat(p.location.type === 'LineString' && p.expected !== 'publish' ? ['walk'] : []);
+    // A way around needs a closed section (a line): by car in the first check, on foot when the additional check runs.
+    var line = p.location.type === 'LineString';
+    return ['flood', 'shelter'].concat(line ? ['drive'] : [], line && p.expected !== 'publish' ? ['walk'] : []);
   }
 
   function send(p) {
@@ -731,8 +740,7 @@
     renderAnswers(r);
     renderDecisionFacts(r);
     renderRule(r);
-    // The way around on foot is step 3's: drawn from there on.
-    if (r && r.evacuation && (step === 'check' || step === 'result')) showRoute(r.evacuation.facts || []);
+    routeForStep();
     if (step === 'check') renderCheck(r);
     if (step === 'result') renderResult(r);
     renderDev();
@@ -846,6 +854,7 @@
     var facts = renderFacts(r.facts || [], usedBy('check', r.check.policyRule));
     if (facts) box.appendChild(facts);
     showShelter(r.facts || []);
+    routeForStep();
   }
 
   function renderRule(r) {
@@ -1184,11 +1193,12 @@
   // Facts come from the broker: shown only as text.
   function factText(f) {
     // A way around needs a closed road section; a point has none.
-    if (f.missing && f.name === 'walk' && f.reason === 'no_location') return t('fNotForPoint');
+    if (f.missing && (f.name === 'walk' || f.name === 'drive') && f.reason === 'no_location') return t('fNotForPoint');
     if (f.missing) return t('fMissing')(f.reason);
     if (f.name === 'flood') return f.values.inside ? t('fFlood')(t('floodClass')[f.values.class] || String(f.values.class)) : t('fNoFlood');
     if (f.name === 'shelter') return f.values.found ? t('fShelter')(String(f.values.name), f.values.distance_m) : t('fNoShelter');
     if (f.name === 'walk') return typeof f.values.extra_m === 'number' ? t('fWalk')(f.values.extra_m) : t('fNoWalk');
+    if (f.name === 'drive') return typeof f.values.extra_m === 'number' ? t('fDrive')(f.values.extra_m) : t('fNoDrive');
     return JSON.stringify(f.values);
   }
 
@@ -1200,6 +1210,8 @@
     if (f.name === 'flood') return !v.inside ? ['low', t('lvl').noZone] : v.rank >= 5 ? ['high', t('lvl').deep] : ['mid', t('lvl').shallow];
     if (f.name === 'shelter') return !v.found ? ['low', t('lvl').far] : v.distance_m <= 1000 ? ['mid', t('lvl').near] : ['low', t('lvl').far];
     if (f.name === 'walk') return typeof v.extra_m !== 'number' ? ['high', t('lvl').noWay] : v.extra_m >= 200 ? ['high', t('lvl').long] : ['low', t('lvl').short];
+    // No rule reads the way around by car (road-restriction-check v4): context only.
+    if (f.name === 'drive') return ['ctx', t('lvl').ctx];
     return null;
   }
 
@@ -1234,6 +1246,7 @@
           src,
         ]),
         firstCheck && f.name === 'shelter' && !f.missing && !f.second && !on ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
+        f.name === 'drive' && !f.missing && !on ? el('span', { class: 'fn', text: t('fDriveNote') }) : null,
       ]));
     });
     return rows;
@@ -1553,9 +1566,9 @@
   // z/x/y tiles (data of 2023-10) are only the fallback without pmtiles.js.
   var PALETTE = {
     light: { bg: '#F2EEE6', water: '#D9E1E6', minor: '#FFFFFF', major: '#E3DCCF', rail: '#C9C2B5', building: '#E7E1D6', label: '#7A756D', halo: '#F2EEE6', flood: 0.6,
-      current: '#171717', route: '#1f5fa8', shelter: '#1E6B48' },
+      current: '#171717', route: '#1f5fa8', drive: '#8a5a00', shelter: '#1E6B48' },
     dark: { bg: '#171717', water: '#1E2830', minor: '#2A2A2A', major: '#383838', rail: '#444444', building: '#202020', label: '#9A958C', halo: '#171717', flood: 0.6,
-      current: '#F5F2EC', route: '#7DB3EE', shelter: '#8ED6B2' },
+      current: '#F5F2EC', route: '#7DB3EE', drive: '#E0B46A', shelter: '#8ED6B2' },
   };
   // The place names GSI's own style writes horizontally (its 注記 layer filter).
   var LABEL_FILTER = ["step", ["zoom"], ["all", ["==", ["geometry-type"], "Point"], ["in", ["get", "vt_code"], ["literal", [110, 120, 130, 140, 210, 220, 311, 312, 314, 315, 316, 321, 322, 323, 331, 332, 333, 334, 341, 342, 343, 344, 345, 346, 347, 348, 351, 352, 411, 412, 421, 422, 431, 432, 441, 511, 521, 531, 532, 634, 651, 800, 810, 820, 822, 830, 831, 832, 840, 841, 842, 843, 850, 880, 881, 885, 889, 2943, 2944]]], ["any", ["any", ["==", ["get", "vt_arrng"], 1], ["==", ["get", "vt_arrng"], 3]], ["!", ["has", "vt_arrng"]]]], 16, ["all", ["==", ["geometry-type"], "Point"], ["in", ["get", "vt_flag17"], ["literal", [0, 1]]], ["in", ["get", "vt_code"], ["literal", [110, 120, 130, 140, 210, 220, 311, 312, 314, 315, 316, 321, 322, 323, 331, 332, 333, 334, 341, 342, 343, 344, 345, 346, 347, 348, 351, 352, 411, 412, 421, 422, 431, 432, 441, 511, 521, 531, 532, 634, 651, 800, 810, 820, 822, 830, 831, 832, 840, 841, 842, 843, 850, 880, 881, 885, 889, 2943, 2944]]], ["any", ["any", ["==", ["get", "vt_arrng"], 1], ["==", ["get", "vt_arrng"], 3]], ["!", ["has", "vt_arrng"]]]], 17, ["all", ["==", ["geometry-type"], "Point"], ["in", ["get", "vt_flag17"], ["literal", [1, 2]]], ["in", ["get", "vt_code"], ["literal", [110, 120, 130, 140, 210, 220, 311, 312, 314, 315, 316, 321, 322, 323, 331, 332, 333, 334, 341, 342, 343, 344, 345, 346, 347, 348, 351, 352, 411, 412, 421, 422, 431, 432, 441, 511, 521, 531, 532, 634, 651, 800, 810, 820, 822, 830, 831, 832, 840, 841, 842, 843, 850, 880, 881, 885, 889, 2943, 2944]]], ["any", ["any", ["==", ["get", "vt_arrng"], 1], ["==", ["get", "vt_arrng"], 3]], ["!", ["has", "vt_arrng"]]]]];
@@ -1576,7 +1589,8 @@
       labels: { 'text-color': c.label, 'text-halo-color': c.halo },
       // The app's own lines (added on load) against the base map.
       halo: { 'line-color': c.current },
-      'route-line': { 'line-color': c.route },
+      // The way around by car (first check) and on foot (additional check).
+      'route-line': { 'line-color': ['match', ['get', 'mode'], 'drive', c.drive, c.route] },
       'shelter-line': { 'line-color': c.shelter },
     };
   }
@@ -1648,14 +1662,14 @@
       });
       m.addSource('shelter', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       m.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1f5fa8', 'line-width': 4, 'line-dasharray': [2, 1.5] } }, 'halo');
+      m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': 4, 'line-dasharray': [2, 1.5] } }, 'halo');
       m.addLayer({ id: 'shelter-line', type: 'line', source: 'shelter', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#1E6B48', 'line-width': 3.5, 'line-dasharray': [0.5, 2] } });
       // Their colours for the current theme.
       applyTheme(m);
       m.demoReady = true;
       if (current && current.last && current.shown >= 3) {
         showShelter((current.last.facts || []).concat(current.last.evacuation ? current.last.evacuation.facts || [] : []));
-        if (current.last.evacuation) showRoute(current.last.evacuation.facts || []);
+        routeForStep();
       }
       m.setLayoutProperty('flood', 'visibility', view === 'hq' ? 'visible' : 'none');
       updateMap();
@@ -1755,10 +1769,38 @@
     return out.length >= 2 ? out : null;
   }
 
-  function showRoute(facts) {
-    var f = facts.filter(function (x) { return x.name === 'walk' && !x.missing && typeof x.values.route === 'string' && typeof x.values.extra_m === 'number'; })[0];
-    if (!f || !map || !map.demoReady || !current) return;
-    var key = current.id + '|' + f.values.route;
+  /**
+   * The way around of the step on screen: by car in step 2 (first check),
+   * on foot from step 3 on. Without an additional check (a report published
+   * at once) the car's way around goes when step 2 is left.
+   */
+  function routeForStep() {
+    var r = current && current.last;
+    if (!r) return;
+    if (step === 'decide') showRoute(r.facts || [], 'drive');
+    else if (step === 'check' || step === 'result') {
+      if (r.evacuation) showRoute(r.evacuation.facts || []);
+      else if (current.routeShown && current.routeShown.indexOf('|drive|') > 0 && map && map.demoReady) {
+        clearRoute();
+        current.routeShown = null;
+      }
+    }
+  }
+
+  /** The way around of a detour fact on the map: `walk` (the additional check, default) or `drive` (the first check). */
+  function showRoute(facts, name) {
+    name = name || 'walk';
+    var f = facts.filter(function (x) { return x.name === name && !x.missing && typeof x.values.route === 'string' && typeof x.values.extra_m === 'number'; })[0];
+    if (!map || !map.demoReady || !current) return;
+    if (!f) {
+      // The additional check came without a way around on foot: the car's way around (step 2's) goes too.
+      if (name === 'walk' && current.routeShown && current.routeShown.indexOf('|drive|') > 0) {
+        clearRoute();
+        current.routeShown = null;
+      }
+      return;
+    }
+    var key = current.id + '|' + name + '|' + f.values.route;
     if (current.routeShown === key) return;
     // Decoded once per value, also when it is refused. Pointsman keeps at most
     // 6,000 characters; anything over 20,000 is not decoded at all.
@@ -1769,11 +1811,13 @@
       clearRoute();
       return;
     }
-    map.getSource('route').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: {} }] });
+    map.getSource('route').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: line }, properties: { mode: name } }] });
     if (routeMarker) routeMarker.remove();
-    var node = el('div', { class: 'route-pin' }, [el('span', { class: 'name', text: t('fRouteMap')(f.values.extra_m) })]);
+    var label = name === 'drive' ? 'fCarMap' : 'fRouteMap';
+    var node = el('div', { class: 'route-pin' + (name === 'drive' ? ' car' : '') }, [el('span', { class: 'name', text: t(label)(f.values.extra_m) })]);
     routeMarker = new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat(line[Math.floor(line.length / 2)]).addTo(map);
     routeMarker.demoFact = f.values;
+    routeMarker.demoLabel = label;
     setShelterVisible();
     routeMarker.demoLine = line;
     fitMapChecks();
@@ -1820,7 +1864,7 @@
       var v = shelterMarker.demoFact;
       shelterMarker.getElement().querySelector('.name').textContent = t('fShelterMap')(String(v.name), v.distance_m);
     }
-    if (routeMarker) routeMarker.getElement().querySelector('.name').textContent = t('fRouteMap')(routeMarker.demoFact.extra_m);
+    if (routeMarker) routeMarker.getElement().querySelector('.name').textContent = t(routeMarker.demoLabel || 'fRouteMap')(routeMarker.demoFact.extra_m);
   }
 
   /** Like the flood zones, the evacuation site is for headquarters only. */

@@ -128,7 +128,10 @@ a guided flow in four steps, for visitors who know nothing about FIWARE or AI:
    sentence. On the headquarters map, the nearest evacuation site is marked
    with a dotted line to the report (its place from the same GSI data). In
    the first check no rule uses the site; the page says it is context for the person
-   who checks. The rule box says what the rule was based on: the AI answers
+   who checks. For a closed section (a line) the first check also asks for the
+   way around by car (road-restriction-check v4): shown with a grey "context"
+   chip, since no rule uses it yet, and drawn on the map in brown; from step 3
+   on the way around on foot takes its place. The rule box says what the rule was based on: the AI answers
    and the map checks it used, with their values. Open sections stay open
    when the page updates.
 3. **Additional check.** The first result in one line, then the way to the
