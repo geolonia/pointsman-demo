@@ -41,6 +41,15 @@ export interface Issue {
   html_url: string;
 }
 
+/** An open issue as listed, with its body (where the demo keeps its marker). */
+export interface ListedIssue {
+  number: number;
+  body: string | null;
+  state?: string;
+  user?: { type?: string } | null;
+  pull_request?: unknown;
+}
+
 export class GitHub {
   private token: { value: string; expires: number } | undefined;
 
@@ -79,6 +88,19 @@ export class GitHub {
 
   async comment(issue: number, body: string): Promise<void> {
     await this.request(`/repos/${this.env.GITHUB_REPOSITORY}/issues/${issue}/comments`, 'POST', { body });
+  }
+
+  /** Open issues with a label, newest first (the first 100: the demo keeps fewer, cleanup closes them after a day). */
+  async openIssues(label: string): Promise<ListedIssue[]> {
+    const res = await this.request(`/repos/${this.env.GITHUB_REPOSITORY}/issues?state=open&labels=${encodeURIComponent(label)}&per_page=100`);
+    // The issues API lists pull requests too.
+    return ((await res.json()) as ListedIssue[]).filter((i) => !i.pull_request);
+  }
+
+  /** One issue (for its state). */
+  async issue(issue: number): Promise<ListedIssue> {
+    const res = await this.request(`/repos/${this.env.GITHUB_REPOSITORY}/issues/${issue}`);
+    return (await res.json()) as ListedIssue;
   }
 
   async close(issue: number, labels?: string[]): Promise<void> {
