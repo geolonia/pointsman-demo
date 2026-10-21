@@ -226,6 +226,43 @@ describe('notifications (the bridge)', () => {
     await vi.waitFor(async () => expect(await env.DEMO.get('issue:7', 'json')).toMatchObject({ decision: '11111111-1111-4111-8111-111111111111', action: 'review' }));
   });
 
+  it('opens no issue for a decision a person has already answered', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
+    pointsmanSays('review');
+    const base = answer;
+    let asked = false;
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decisions/11111111-1111-4111-8111-111111111111') {
+        asked = true;
+        return Response.json({ review: { status: 'resolved', resolved_by: 'demo:visitor', final_action: 'reject' } });
+      }
+      return base(c);
+    };
+    await notify();
+    await vi.waitFor(() => expect(asked).toBe(true));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))).toBe(false);
+  });
+
+  it('closes the issue it just opened when the answer came in meanwhile', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
+    pointsmanSays('review');
+    const base = answer;
+    let reads = 0;
+    answer = (c) => {
+      if (c.url === 'https://pointsman.geolonia.workers.dev/v1/decisions/11111111-1111-4111-8111-111111111111') {
+        // Pending before the issue is opened, answered by the visitor right after.
+        return Response.json(++reads === 1 ? { review: { status: 'pending' } } : { review: { status: 'resolved', resolved_by: 'demo:visitor', final_action: 'publish' } });
+      }
+      return base(c);
+    };
+    await notify();
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))).toBe(true));
+    expect(calls.find((c) => c.url.endsWith('/issues/7/comments'))?.body.body).toBe('Decided on the demo page by the visitor who sent it: **publish**. Sent to Pointsman and written to the broker.');
+    expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))?.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'publish'] });
+    expect(await env.DEMO.get('issue:7')).not.toBeNull();
+  });
+
   it('lets a retry open the issue when GitHub failed the first time', async () => {
     await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
     pointsmanSays('review');
@@ -776,6 +813,46 @@ describe('a visitor decides their own report', () => {
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/issues/9'))).toBe(true));
     expect(await env.DEMO.get(`report:${id}`, 'json')).toMatchObject({ resolved: 'publish' });
     expect((await decide(id, { action: 'reject', key })).status).toBe(409);
+  });
+
+  it('closes the issue found on GitHub when KV does not show the link yet', async () => {
+    // KV shows a write from another location up to a minute late (#94): the
+    // issue is found by the decision marker in its body instead.
+    const { id, key } = await sendOne();
+    brokerHas(id, 'review');
+    const base = answer;
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.startsWith('https://api.github.com/repos/geolonia/pointsman-demo/issues?')) {
+        return Response.json([
+          { number: 11, body: '<!-- decision: 77777777-7777-4777-8777-777777777777 entity: x -->' },
+          { number: 12, body: `text\n\n<!-- decision: ${DECISION} entity: ${id} -->` },
+          { number: 13, body: null, pull_request: {} },
+        ]);
+      }
+      return base(c);
+    };
+    expect((await decide(id, { action: 'reject', key })).status).toBe(200);
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/issues/12'))).toBe(true));
+    const list = calls.find((c) => c.url.includes('/issues?'))!;
+    expect(new URL(list.url).searchParams.get('labels')).toBe('demo');
+    expect(new URL(list.url).searchParams.get('state')).toBe('open');
+    expect(calls.find((c) => c.url.endsWith('/issues/12/comments'))?.body.body).toBe('Decided on the demo page by the visitor who sent it: **reject**. Sent to Pointsman and written to the broker.');
+    expect(calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/issues/12'))?.body).toEqual({ state: 'closed', labels: ['demo', 'review', 'reject'] });
+    expect(calls.some((c) => c.url.endsWith('/issues/11') || c.url.endsWith('/issues/13'))).toBe(false);
+  });
+
+  it('closes nothing when neither KV nor GitHub has the issue yet, and still answers', async () => {
+    const { id, key } = await sendOne();
+    brokerHas(id, 'review');
+    const base = answer;
+    let listed = false;
+    answer = (c) => {
+      if (c.method === 'GET' && c.url.includes('/issues?')) { listed = true; return Response.json([]); }
+      return base(c);
+    };
+    expect((await decide(id, { action: 'publish', key })).status).toBe(200);
+    await vi.waitFor(() => expect(listed).toBe(true));
+    expect(calls.some((c) => c.method === 'PATCH' || c.url.endsWith('/comments'))).toBe(false);
   });
 
   it('resolves an urgent decision in Pointsman too (people_check review and urgent)', async () => {

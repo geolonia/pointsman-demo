@@ -255,6 +255,10 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // the final record are different keys, each written once.
   const [opened, inFlight] = await Promise.all([env.DEMO.get(`decision-issue:${decision}`), env.DEMO.get(`decision-pending:${decision}`)]);
   if (opened || inFlight) return;
+  // Already decided (a visitor can answer within seconds): no issue. Pointsman
+  // is asked, not KV, because KV can show another location's write up to a
+  // minute late. If Pointsman cannot say, the issue is opened.
+  if (await decidedIn(env, decision)) return;
   // Short-lived (60 s is the KV minimum): only guards against parallel retries.
   await env.DEMO.put(`decision-pending:${decision}`, '1', { expirationTtl: 60 });
   let issue: Issue;
@@ -271,7 +275,20 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   const record: IssueRecord = { decision, entity: entityId, action, corrections: [], createdAt: new Date().toISOString() };
   await env.DEMO.put(`decision-issue:${decision}`, String(issue.number), { expirationTtl: KV_TTL });
   await env.DEMO.put(`issue:${issue.number}`, JSON.stringify(record), { expirationTtl: KV_TTL });
+  // Answered while the issue was being opened: the visitor's request found no
+  // issue to close then, so it is closed here.
+  const review = await decidedIn(env, decision);
+  if (review?.final_action) await closeDecided(env, issue.number, action, review.final_action, review.resolved_by);
 }
+
+/** The review in Pointsman when a person has answered it; null when not, or when Pointsman cannot say. */
+async function decidedIn(env: Env, decision: string): Promise<PointsmanReview | null> {
+  const review = await reviewOf(env, decision);
+  return review && review !== 'unavailable' && review.status === 'resolved' ? review : null;
+}
+
+/** The marker createIssueFor puts in each issue body, to find an issue by its decision. */
+const issueMarker = (decision: string) => `<!-- decision: ${decision} entity: `;
 
 async function createIssueFor(env: Env, entityId: string, decision: string, action: string): Promise<Issue> {
   const entity = await new Broker(env).getRoadRestriction(entityId);
@@ -460,11 +477,28 @@ async function resolveByVisitor(request: Request, env: Env, ctx: ExecutionContex
 
 async function closeIssueFor(env: Env, decision: string, action: string, final: string): Promise<void> {
   const n = await env.DEMO.get(`decision-issue:${decision}`);
-  if (!n || !/^\d+$/.test(n)) return;
+  let number = n && /^\d+$/.test(n) ? Number(n) : undefined;
+  // KV can miss a link written moments ago at another location (it shows
+  // writes up to a minute late, and caches a miss as long): GitHub has the
+  // issue, with the decision in its body.
+  if (number === undefined) {
+    const marker = issueMarker(decision);
+    number = (await new GitHub(env).openIssues('demo')).find((i) => i.body?.includes(marker))?.number;
+  }
+  // None yet: openIssue closes it when it finds the decision answered.
+  if (number === undefined) {
+    console.warn(`issue for ${decision}: not found to close (openIssue closes it if it opens one)`);
+    return;
+  }
+  await closeDecided(env, number, action, final, 'demo:visitor');
+}
+
+async function closeDecided(env: Env, number: number, action: string, final: string, by: string | undefined): Promise<void> {
   const github = new GitHub(env);
   const sent = PERSON_ACTIONS.includes(action) ? 'Sent to Pointsman and written to the broker.' : 'Written to the broker.';
-  await github.comment(Number(n), `Decided on the demo page by the visitor who sent it: **${final}**. ${sent}`);
-  await github.close(Number(n), ['demo', action, final]);
+  const who = by === 'demo:visitor' ? 'on the demo page by the visitor who sent it' : `by ${by ?? 'a person'}`;
+  await github.comment(number, `Decided ${who}: **${final}**. ${sent}`);
+  await github.close(number, ['demo', action, final]);
 }
 
 // --- The page's API ------------------------------------------------------------
