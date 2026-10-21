@@ -100,7 +100,6 @@
         <ol class="timeline" id="timeline"></ol>
         <!-- For screen readers: one short line when the state changes, not the whole list. -->
         <p id="decide-status" class="sr-only" aria-live="polite"></p>
-        <div id="data"></div>
       </section>
 
       <section id="step-check" class="step" hidden>
@@ -123,7 +122,7 @@
 
     <aside class="map-card">
       <!-- The report itself, once the steps no longer show it (steps 3 and 4). -->
-      <div id="map-report" class="map-report" hidden><span class="kicker" id="map-report-kicker"></span><span id="map-report-text"></span></div>
+      <div id="map-report" class="map-report" hidden><span class="kicker" id="map-report-kicker"></span><strong id="map-report-title"></strong><span id="map-report-place"></span><blockquote id="map-report-text"></blockquote></div>
       <div class="map-head">
         <span class="kicker" data-i18n="mapTitle">The city map</span>
         <div class="toggle" role="group" aria-label="Whose map">

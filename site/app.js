@@ -39,10 +39,10 @@
       s3: 'Pointsman checked the place on maps', s3d: 'Flood zone and nearest evacuation site, from public map data; for a closed section that goes to a person, also the way around on foot.',
       s4: 'The city’s rule decided', s4d: 'Answers and facts in, one action out.',
       working: 'Working…', together: 'Passed on to Pointsman; these two run at the same time', inAll: function (s) { return s + ' in all'; },
-      useTag: 'rule', srSource: 'source', usesMarked: 'The rule read the answers and map checks marked like this above.',
+      useTag: 'rule', srcShow: 'Where the data comes from', usesMarked: 'The rule read the answers and map checks marked like this above.',
       lvl: { deep: 'deep (3 m or more)', shallow: 'under 3 m', noZone: 'no flood zone', near: 'within 1 km', far: 'over 1 km', long: '200 m or more', short: 'under 200 m', noWay: 'no way around' },
       answersTitle: 'What the AI answered', factsTitle: 'From public map data · the AI never sees it',
-      ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →', devOpen: 'Show the data (developer view)',
+      ruleTitle: 'The city’s rule', next: 'Additional check →', next2: 'Final result →',
       checkTitle: 'Additional check', secondNotNeeded: 'Not needed: the report was published at once. This check runs only for reports that go to a person.',
       secondRunning: 'The additional check is running…', cNone: 'The rules found no reason for an alert.',
       fNotForPoint: 'Not checked: the report marks a point, not a road section, so there is no way around to work out.',
@@ -211,10 +211,10 @@
       s3: 'Pointsman が地図で場所を調べた', s3d: '浸水想定区域と最寄りの避難場所を、公開の地図データから調べます。人に回る通行止め区間では、歩いて迂回する道のりも調べます。',
       s4: '市の規則が決めた', s4d: '答えと事実から、行動を 1 つ決めます。',
       working: '処理中…', together: 'Pointsman に渡され、この 2 つは同時に進みます', inAll: function (s) { return '合計 ' + s; },
-      useTag: '規則', srSource: '出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
+      useTag: '規則', srcShow: 'データの出典', usesMarked: '規則は、上でこの印のついた答えと地図での確認を読みました。',
       lvl: { deep: '深い（3 m 以上）', shallow: '3 m 未満', noZone: '浸水想定区域の外', near: '1 km 以内', far: '1 km より遠い', long: '200 m 以上', short: '200 m 未満', noWay: '迂回路なし' },
       answersTitle: 'AI の答え', factsTitle: '公開の地図データから・AI はこれを見ません',
-      ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →', devOpen: 'データを見る（開発者向け表示）',
+      ruleTitle: '市の規則', next: '追加の確認 →', next2: '最終結果 →',
       checkTitle: '追加の確認', secondNotNeeded: '不要です：報告はすぐに公開されました。この確認は、人に回る報告にだけ行います。',
       secondRunning: '追加の確認をしています…', cNone: '規則では、警報を出す理由はありませんでした。',
       fNotForPoint: '確認しません：報告は区間ではなく地点なので、迂回路は計算できません。',
@@ -462,7 +462,10 @@
     var r = current && current.last;
     var keep = !!r && (step === 'check' || step === 'result');
     $('map-report').hidden = !keep;
-    $('map-report-kicker').textContent = keep ? $('cur-kicker').textContent : '';
+    var p = current && current.prepared;
+    $('map-report-kicker').textContent = keep ? (current.sentAt ? t('yourReport') : t('aReport')) : '';
+    $('map-report-title').textContent = keep ? (p ? titleOf(p) : r.roadName || t('noRoad')) : '';
+    $('map-report-place').textContent = keep && p ? placeOf(p) : '';
     $('map-report-text').textContent = keep ? quote(r.description) : '';
   }
 
@@ -720,7 +723,6 @@
     renderAnswers(r);
     renderDecisionFacts(r);
     renderRule(r);
-    renderData(r);
     // The way around on foot is step 3's: drawn from there on.
     if (r && r.evacuation && (step === 'check' || step === 'result')) showRoute(r.evacuation.facts || []);
     if (step === 'check') renderCheck(r);
@@ -807,10 +809,11 @@
       var c = confidence(a.p);
       var on = used.indexOf(name) >= 0;
       list.appendChild(el('div', { class: 'row' + (on ? ' used-row' : '') }, [
-        el('span', { class: 'q', text: (t('q')[name] || name) }),
-        on ? usedTag() : null,
-        el('strong', { text: answerText(name, a.value) }),
-        c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
+        el('span', { class: 'qcol' }, [el('span', { class: 'q', text: (t('q')[name] || name) }), on ? usedTag() : null]),
+        el('span', { class: 'acol' }, [
+          el('strong', { text: answerText(name, a.value) }),
+          c ? el('span', { class: 'conf ' + c, text: t('conf')[c] }) : null,
+        ]),
       ]));
     });
     return list;
@@ -860,13 +863,6 @@
     ]));
   }
 
-  // The data itself is in the developer view, next to the steps.
-  function renderData(r) {
-    var box = $('data');
-    box.textContent = '';
-    if (!r || !r.ngsi || current.shown < 4 || devOn) return;
-    box.appendChild(el('button', { class: 'chip', type: 'button', text: t('devOpen'), onclick: function () { setDev(true); } }));
-  }
 
   // --- Step 3: the additional check ---------------------------------------------------
 
@@ -1209,30 +1205,31 @@
   function renderFactList(facts, firstCheck, used) {
     if (!facts.length) return null;
     used = used || [];
-    var sources = [];
     var rows = el('div', { class: 'qa facts' });
     facts.forEach(function (f) {
       var on = used.indexOf(f.name) >= 0;
       var level = factLevel(f);
       // In the first check no rule reads the evacuation site: no colour for it there.
       if (level && firstCheck && !on && f.name === 'shelter') level = ['ctx', level[1]];
-      var n = 0;
-      if (!f.missing && f.source) {
-        n = sources.indexOf(f.source) + 1 || sources.push(f.source);
-      }
+      // Where the data comes from: behind an (i), shown on hover (title) or a click.
+      var src = !f.missing && f.source ? details('src-' + (firstCheck ? '1-' : '2-') + f.name, { class: 'src' }, [
+        el('summary', { class: 'src-btn', title: t('fSource') + f.source, 'aria-label': t('srcShow') }, ['i']),
+        el('span', { class: 'src-pop', text: t('fSource') + f.source }),
+      ]) : null;
       rows.appendChild(el('div', { class: 'row fact ' + f.name + (on ? ' used-row' : '') }, [
-        el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
-        on ? usedTag() : null,
-        el('strong', { class: 'fa' }, [factText(f), n ? el('sup', { class: 'fnum' }, [el('span', { class: 'sr-only', text: ' ' + t('srSource') + ' ' }), String(n)]) : null]),
-        level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
+        el('span', { class: 'qcol' }, [
+          el('span', { class: 'q' }, [f.second ? el('span', { class: 'ftag', text: t('fSecond') }) : null, t('fQ')[f.name] || f.name]),
+          on ? usedTag() : null,
+        ]),
+        el('span', { class: 'acol' }, [
+          el('strong', { class: 'fa', text: factText(f) }),
+          level ? el('span', { class: 'lvl ' + level[0], text: level[1] }) : null,
+          src,
+        ]),
         firstCheck && f.name === 'shelter' && !f.missing && !f.second && !on ? el('span', { class: 'fn', text: t('fShelterNote') }) : null,
       ]));
     });
-    var wrap = el('div', { class: 'fact-wrap' }, [rows]);
-    if (sources.length) {
-      wrap.appendChild(el('ol', { class: 'sources', 'aria-label': t('fSource').replace(/[：:\s]+$/, '') }, sources.map(function (src) { return el('li', { text: src }); })));
-    }
-    return wrap;
+    return rows;
   }
 
   function renderFacts(facts, used) {
@@ -1362,7 +1359,6 @@
     devTag = null;
     devHighlight(null);
     renderDev();
-    if (current && current.last) renderData(current.last);
   }
 
   /** The page parts and the events of one step, marked together. */

@@ -170,18 +170,31 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 @keyframes pulse { from { opacity: 0.35; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .timeline li.active .mark { animation: none; } }
 .qa { display: grid; }
-.qa .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.qa .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; padding: 8px 0; border-top: 1px solid var(--line); }
+/* The question (and its rule tag) on the left; the answer with its chips on the right, kept together. */
+.qa .qcol { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.qa .acol { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px 10px; text-align: right; }
+.qa .row > .fn { grid-column: 1 / -1; }
+@media (max-width: 560px) {
+  .qa .row { grid-template-columns: 1fr; }
+  .qa .acol { justify-content: flex-start; text-align: left; }
+}
 .qa .row:first-child { border-top: none; }
-.qa .q { flex: 1 1 220px; color: var(--fg-2); }
+.qa .q { color: var(--fg-2); }
 .conf { font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; background: var(--panel-2); color: var(--fg-2); }
 .conf.vsure, .conf.sure { background: var(--t-publish); color: var(--i-publish); }
 .conf.unsure { background: var(--t-review); color: var(--i-review); }
 /* The map checks: question, answer and level, like the AI's answers; the sources as numbered notes. */
 .facts .ftag { margin-right: 6px; font: 0.7rem var(--mono); color: var(--i-map); border: 1px solid var(--line-map); border-radius: 999px; padding: 1px 8px; }
 .facts .fn { flex-basis: 100%; font-size: 0.8rem; color: var(--muted); }
-.facts .fnum { font: 0.65rem var(--mono); color: var(--muted); margin-left: 2px; }
+.src { position: relative; }
+.src > summary { list-style: none; }
+.src > summary::-webkit-details-marker { display: none; }
+.src-btn { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); font: italic 600 12px/1 Georgia, serif; cursor: pointer; }
+.src-btn:hover, .src[open] .src-btn { color: var(--fg); border-color: var(--fg); }
+.src-btn:focus-visible { outline: 2px solid var(--i-map); outline-offset: 2px; }
+.src-pop { position: absolute; z-index: 3; right: 0; top: calc(100% + 6px); width: max-content; max-width: min(360px, 80vw); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); font: 0.75rem/1.45 var(--mono); color: var(--fg-2); text-align: left; overflow-wrap: anywhere; }
 .map-checks .kicker { color: var(--i-map); }
-.sources { margin: 8px 0 0; padding-left: 1.4em; font: 0.7rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 /* How much a map check matters, in the rules' terms (like the AI's confidence words). */
 .lvl { font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
 .lvl.high { background: var(--t-urgent); color: var(--i-urgent); }
@@ -192,8 +205,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 12px; display: grid
 /* The answers and checks the rule used: the same mark here and in "Based on". */
 .qa .row.used-row { box-shadow: inset 3px 0 0 var(--fg); padding-left: 10px; }
 .use-tag { font: 500 0.7rem var(--mono); color: var(--fg-2); border: 1px solid var(--fg-2); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
-.qa .row.used-row .q { flex: 0 1 auto; }
-.qa .row.used-row .use-tag { margin-right: auto; }
+
 .shelter-pin { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; pointer-events: none; }
 .shelter-pin .mark { width: 16px; height: 16px; border-radius: 4px; background: #2E9E6B; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .route-pin { pointer-events: none; }
@@ -351,6 +363,9 @@ body.resizing { cursor: col-resize; user-select: none; }
 .badge.small { font-size: 0.78rem; padding: 1px 9px; }
 .badge.skip { background: var(--panel-2); color: var(--fg-2); }
 /* The report, above the map in steps 3 and 4. */
-.map-report { display: grid; gap: 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+.map-report { display: grid; gap: 2px; padding: 14px 16px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .map-report[hidden] { display: none; }
-.map-report #map-report-text { font-size: 0.98rem; }
+.map-report #map-report-title { font-size: 1.05rem; }
+.map-report #map-report-place { font-size: 0.88rem; color: var(--fg-2); }
+/* The report itself is the key information: large, with a bar like a quote. */
+.map-report blockquote { margin: 10px 0 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--fg); font-size: 1.02rem; line-height: 1.5; color: var(--fg); }
