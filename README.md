@@ -163,7 +163,8 @@ developer view adds the technical names in brackets.
 
 One map, switched between headquarters (every report) and residents (only
 what is published), on GSI's vector tiles (地理院タイル). Two panels from the
-header: "How it works" (the four parts of the system, the chain as a diagram
+header: "How it works" (what happens to a report in six steps, from GeonicDB
+through the connector to Pointsman and back, the chain as a diagram
 with the DMN file to download, why cities use it this way, links for
 developers) and "Reports" (the numbers of the last 7 days from Pointsman's
 decision log, recent reports, and the reports waiting for a person, with the

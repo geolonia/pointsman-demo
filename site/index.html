@@ -39,15 +39,17 @@
     <div class="how-head">
       <div>
         <h2 id="how-title" data-i18n="howTitle">How it works</h2>
-        <p data-i18n="howLead">Pointsman is a small service that takes decisions for a city’s apps. The AI only answers questions. Public data gives facts about the place. The city’s own rules decide. People have the last word.</p>
+        <p data-i18n="howLead">What happens to a report, step by step. GeonicDB, a FIWARE data platform, keeps the data and starts each step. A small connector passes the step to Pointsman, and Pointsman answers. The AI only answers fixed questions; public map data and the city’s rules do the rest.</p>
       </div>
       <button class="btn ghost" id="how-close" type="button" data-i18n="close">Close</button>
     </div>
     <ol class="how-steps">
-      <li><span class="kicker" data-i18n="h1k">1 · The report</span><strong data-i18n="h1t">A resident’s app saves it</strong><span data-i18n="h1d"></span></li>
-      <li><span class="kicker" data-i18n="h2k">2 · Passed on</span><strong data-i18n="h2t">The data platform tells Pointsman</strong><span data-i18n="h2d"></span></li>
-      <li class="accent"><span class="kicker" data-i18n="h3k">3 · Pointsman</span><strong data-i18n="h3t">Questions, facts, rules</strong><span data-i18n="h3d"></span></li>
-      <li><span class="kicker" data-i18n="h4k">4 · The result</span><strong data-i18n="h4t">Saved back, open to every app</strong><span data-i18n="h4d"></span></li>
+      <li><span class="kicker" data-i18n="h1k">1 · Saved</span><strong data-i18n="h1t">A city app saves the report in GeonicDB</strong><span data-i18n="h1d"></span></li>
+      <li><span class="kicker" data-i18n="h2k">2 · Notified</span><strong data-i18n="h2t">GeonicDB tells the connector</strong><span data-i18n="h2d"></span></li>
+      <li class="accent"><span class="kicker" data-i18n="h3k">3 · First check</span><strong data-i18n="h3t">Pointsman decides</strong><span data-i18n="h3d"></span></li>
+      <li><span class="kicker" data-i18n="h4k">4 · Written back</span><strong data-i18n="h4t">The result goes back into GeonicDB</strong><span data-i18n="h4d"></span></li>
+      <li><span class="kicker" data-i18n="h5k">5 · The next steps</span><strong data-i18n="h5t">The result starts the next check</strong><span data-i18n="h5d"></span></li>
+      <li><span class="kicker" data-i18n="h6k">6 · Used</span><strong data-i18n="h6t">Any app can read the results</strong><span data-i18n="h6d"></span></li>
     </ol>
     <p class="links"><span class="kicker" data-i18n="forDevs">For developers</span>
       <a href="https://github.com/geolonia/pointsman/blob/main/examples/profiles/road-restriction-check.yaml" data-i18n="lProfile">The questions and rules (profile)</a>
