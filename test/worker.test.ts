@@ -3,7 +3,7 @@
 import { env as cfEnv } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
-import { type BridgeMessage, taskEntityId } from '../engine/bridge/src/bridge';
+import { type BridgeMessage, taskEntityId } from '../engine/packages/fiware/src/bridge';
 import demo, { cleanup } from '../src/index';
 
 // Secrets come from vitest.config.ts; the generated types know only the vars.
