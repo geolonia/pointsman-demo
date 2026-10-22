@@ -1,6 +1,6 @@
 // Settings of the demo Worker (wrangler.jsonc vars and secrets).
 
-import type { BridgeMessage } from '../engine/bridge/src/bridge';
+import type { BridgeMessage } from '../engine/packages/fiware/src/bridge';
 
 export interface Env {
   // Vars

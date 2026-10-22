@@ -1,7 +1,7 @@
 // The context broker (GeonicDB): road restrictions and Decision entities of
 // the demo tenant.
 
-import { DECISION_CONTEXT } from '../engine/bridge/src/bridge';
+import { DECISION_CONTEXT } from '../engine/packages/fiware/src/bridge';
 import { type Env, trimUrl } from './env';
 import { fetchWithAgent } from './http';
 

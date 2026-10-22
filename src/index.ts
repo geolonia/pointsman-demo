@@ -4,7 +4,7 @@
 import {
   type BridgeConfig, type BridgeMessage, DECISION_CONTEXT, type EntityResult, type Route,
   decisionEntityId, handleMessage, handleRequest, retryDelay, taskEntityId,
-} from '../engine/bridge/src/bridge';
+} from '../engine/packages/fiware/src/bridge';
 import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
