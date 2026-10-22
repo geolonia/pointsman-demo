@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Checks out the Pointsman commit pinned in engine.json into engine/, for the
-// FIWARE bridge (engine/packages/fiware, the module @pointsman/fiware). The repository is fixed here: the build
-// runs its code.
+// FIWARE bridge (engine/packages/fiware, the module @pointsman/fiware). The
+// repository is fixed here: the build runs its code.
 //
 // Usage: node scripts/fetch-engine.mjs        (skips when engine/ exists)
 // For local development you can instead link a checkout: ln -s ../pointsman engine

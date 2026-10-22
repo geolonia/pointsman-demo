@@ -87,7 +87,7 @@ flowchart LR
    closed.
 
 Deploy order for the final step: Pointsman first (pointsman-config, with
-`road-closure-final` and `road-restriction-check` v3, and the token's scope),
+`road-closure-final` and `road-restriction-check` v3 or newer, v4 today, and the token's scope),
 then this Worker, then `node scripts/setup.mjs` for the new subscription.
 Without the profile, the final result's requests are refused and not retried.
 
