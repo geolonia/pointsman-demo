@@ -1,0 +1,11 @@
+# Headers for the page and its files (Workers static assets, #122).
+# The CSP allows what the page loads: its own files and API, MapLibre and
+# PMTiles from unpkg (exact versions, as in index.html), Google Fonts, and the
+# GSI tiles, glyphs and shelter data. MapLibre runs its worker from a blob:.
+# Inline styles stay allowed: the decision graph SVG from Pointsman has a
+# <style> element. test/headers.test.ts checks that index.html fits this.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://unpkg.com/maplibre-gl@5.24.0/ https://unpkg.com/pmtiles@4.4.1/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com/maplibre-gl@5.24.0/; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp https://disaportaldata.gsi.go.jp; connect-src 'self' https://cyberjapandata.gsi.go.jp https://disaportaldata.gsi.go.jp https://gsi-cyberjapan.github.io; worker-src blob:; child-src blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin

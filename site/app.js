@@ -162,6 +162,7 @@
       otherText: 'A team member checks this report in the review queue.',
       otherNoIssue: 'Only reports sent from this page go to the review queue.',
       otherOpening: 'It is being added to the review queue…',
+      otherLimit: 'The demo has opened as many GitHub issues today as it may. This report waits in the review queue without one.',
       openIssue: 'Open it in the review queue',
       whyTitle: 'Why cities use it this way',
       why1: 'The AI only answers fixed questions. It never decides alone.',
@@ -342,6 +343,7 @@
       otherText: 'チームのメンバーが確認待ちの一覧で確認します。',
       otherNoIssue: '確認待ちの一覧に回るのは、このページから送った報告だけです。',
       otherOpening: '確認待ちの一覧に追加しています…',
+      otherLimit: '今日はデモが作れる GitHub の issue の数に達しました。この報告は issue なしで確認待ちの一覧に残ります。',
       openIssue: '確認待ちの一覧で開く',
       whyTitle: '市がこの仕組みを使う理由',
       why1: 'AI は決まった質問に答えるだけで、ひとりでは決めません。',
@@ -981,7 +983,7 @@
     } else {
       person.appendChild(el('div', { class: 'box' }, [
         el('strong', { class: 'box-title', text: t('otherTitle') }),
-        el('span', { text: r.issue ? t('otherText') : r.prepared ? t('otherOpening') : t('otherNoIssue') }),
+        el('span', { text: r.issue ? t('otherText') : r.issueLimited ? t('otherLimit') : r.prepared ? t('otherOpening') : t('otherNoIssue') }),
         r.issue ? el('a', { href: r.issue, target: '_blank', rel: 'noopener', text: t('openIssue') + ' (#' + r.issue.split('/').pop() + ')' }) : null,
       ]));
     }
