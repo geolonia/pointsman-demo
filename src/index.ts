@@ -9,7 +9,7 @@ import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
 import { fetchWithAgent } from './http';
-import { todaysLimits } from './limits';
+import { todaysLimits, visitorKey } from './limits';
 import { AREA, PREPARED, parseReport, toEntity } from './reports';
 import { mayReview, parseCommand } from './review';
 import WORK_ORDERS from './work-orders.json';
@@ -71,12 +71,14 @@ const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 /** Demo data lives this long. */
 const KEEP_MS = 24 * 3600_000;
 const KV_TTL = 2 * 24 * 3600;
+/** Reports of one visitor a day that may open a GitHub issue (#111); the rest wait on the page only. */
+const VISITOR_ISSUES = 2;
 
 /**
  * keyHash: SHA-256 of the key the page got when it sent the report; with the
  * key, that visitor may decide the report themselves (resolved: their answer).
  */
-interface ReportRecord { prepared?: string; createdAt: string; keyHash?: string; resolved?: string }
+interface ReportRecord { prepared?: string; createdAt: string; keyHash?: string; resolved?: string; noIssue?: 'visitor' }
 interface IssueRecord { decision: string; entity: string; action: string; corrections: Correction[]; createdAt: string }
 interface Correction { name: string; value: string | boolean; by: string; at: string }
 
@@ -157,7 +159,7 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
   return Response.json(body, { status, headers });
 }
 
-/** The paths the Worker answers itself (wrangler.jsonc "run_worker_first"). */
+/** The paths the Worker answers itself; keep in step with wrangler.jsonc "run_worker_first". */
 const isWorkerPath = (path: string) => path === '/notify' || path === '/reviews' || path.startsWith('/api/') || path.startsWith('/github/');
 
 /** The Worker's own answers get the same basic headers as the page (#122). */
@@ -165,6 +167,8 @@ function secured(res: Response): Response {
   const out = new Response(res.body, res);
   out.headers.set('x-content-type-options', 'nosniff');
   out.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+  // JSON and the graph SVG: nothing to load or run when opened directly.
+  out.headers.set('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
   return out;
 }
 
@@ -266,6 +270,11 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   const report = await env.DEMO.get<ReportRecord>(`report:${entityId}`, 'json');
   // Free text from visitors never goes to GitHub: only prepared reports.
   if (!report?.prepared) return;
+  // This visitor's reports already opened their issues for today (#111).
+  if (report.noIssue === 'visitor') {
+    console.warn(`issue for ${decision}: no issue, the visitor reached ${VISITOR_ISSUES} issues today`);
+    return;
+  }
   // A retried notification must not open a second issue.
   // Workers KV takes one write per second per key, so the in-flight marker and
   // the final record are different keys, each written once.
@@ -279,11 +288,19 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // stays: it expires within a minute.
   if (await decidedIn(env, decision, 'before opening')) return;
   // Issues are public: at most DAILY_ISSUE_LIMIT a day, however many reports
-  // come in (#111). Beyond it the report waits for a person on the page only.
+  // come in (#111). Beyond it the report waits for a person on the page only,
+  // and the page says why (issue-limited).
   const limits = todaysLimits(env);
-  const slot = await limits.take('issues', Number(env.DAILY_ISSUE_LIMIT));
+  let slot: { ok: boolean };
+  try {
+    slot = await limits.take('issues', Number(env.DAILY_ISSUE_LIMIT));
+  } catch (err) {
+    await env.DEMO.delete(`decision-pending:${decision}`).catch(() => {});
+    throw err;
+  }
   if (!slot.ok) {
     console.warn(`issue for ${decision}: no issue, the daily limit of ${env.DAILY_ISSUE_LIMIT} issues is reached`);
+    await env.DEMO.put(`issue-limited:${decision}`, '1', { expirationTtl: KV_TTL });
     return;
   }
   let issue: Issue;
@@ -371,7 +388,7 @@ async function webhook(request: Request, env: Env): Promise<Response> {
   const github = new GitHub(env);
   if (!mayReview(p.comment.author_association)) {
     // Once per issue and day, so nobody can make the App post comments in a loop.
-    const first = await todaysLimits(env).take(`told:${p.issue.number}`, 1).catch(() => ({ ok: false }));
+    const first = await todaysLimits(env, 'visitors').take(`told:${p.issue.number}`, 1).catch(() => ({ ok: false }));
     if (first.ok) await github.comment(p.issue.number, `@${p.comment.user.login} only members of this repository can review demo reports.`);
     return json({ ignored: 'not a reviewer' });
   }
@@ -565,13 +582,25 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
   const limit = Number(env.DAILY_LIMIT);
 
   if (url.pathname === '/api/config' && request.method === 'GET') {
-    return json({
+    // Every page load asks: cached for a few seconds, so page loads do not
+    // reach the daily counter one by one. Without the counter the page still
+    // gets its configuration (used: null).
+    const key = new Request(new URL('/api/config', url).toString());
+    const hit = await caches.default.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
+    const used = await todaysLimits(env).used('reports').catch((err) => {
+      console.error(`daily count: ${(err as Error).message}`);
+      return null;
+    });
+    const res = json({
       prepared: PREPARED,
       area: AREA,
       freeText: Boolean(env.TURNSTILE_SECRET && env.TURNSTILE_SITE_KEY),
       turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? null,
-      today: { used: await todaysLimits(env).used('reports'), limit },
-    }, 200, cors);
+      today: { used, limit },
+    }, 200, { 'cache-control': 'max-age=10' });
+    if (used !== null) ctx.waitUntil(caches.default.put(key, res.clone()));
+    return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
   if (url.pathname === '/api/reports' && request.method === 'GET') {
@@ -657,10 +686,11 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     if (!entity) return json({ error: 'not found' }, 404, cors);
     const summary = summarize(entity);
     const decisionId = summary.check?.decision;
-    const [decisionEntity, issueNumber, report] = await Promise.all([
+    const [decisionEntity, issueNumber, report, dayLimited] = await Promise.all([
       decisionId ? broker.getDecision(decisionId) : null,
       decisionId ? env.DEMO.get(`decision-issue:${decisionId.split(':').pop()}`) : null,
       env.DEMO.get<ReportRecord>(`report:${entity.id}`, 'json'),
+      decisionId ? env.DEMO.get(`issue-limited:${decisionId.split(':').pop()}`) : null,
     ]);
     const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
     const [evacuation, finalResult, task] = await Promise.all([
@@ -669,10 +699,9 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       // Extra data for developers: the page still works without it.
       PERSON_ACTIONS.includes(summary.check?.action ?? '') ? taskIdOf(entity).then((id) => (id ? broker.getEntity(id) : null)).catch(() => null) : null,
     ]);
-    // No issue for a report that waits for a person: the page says when the
-    // daily issue limit is the reason (#111).
-    const issueLimited = !issue && Boolean(report?.prepared) && PERSON_ACTIONS.includes(summary.check?.action ?? '')
-      && (await todaysLimits(env).used('issues').catch(() => 0)) >= Number(env.DAILY_ISSUE_LIMIT);
+    // No issue for a report that waits for a person: the page says when an
+    // issue limit is the reason (#111).
+    const issueLimited = !issue && PERSON_ACTIONS.includes(summary.check?.action ?? '') && (Boolean(dayLimited) || report?.noIssue === 'visitor');
     // Only prepared reports go to the GitHub queue; the page says so.
     return json({ ...summary, prepared: Boolean(report?.prepared), visitorDecision: report?.resolved ?? null, issue, issueLimited, facts: factsOf(decisionEntity), evacuation, final: finalResult, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
   }
@@ -699,9 +728,19 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     const limits = todaysLimits(env);
     const slot = await limits.take('reports', limit);
     if (!slot.ok) return json({ error: 'the demo has reached its limit for today', today: { used: slot.used, limit } }, 429, cors);
+    // A prepared report that is meant for a person opens a public issue: at
+    // most VISITOR_ISSUES of them per visitor and day (#111), so one visitor
+    // cannot use up the day's issues. The address is kept only in the
+    // counter, which is deleted after two days.
+    const visitors = todaysLimits(env, 'visitors');
+    const forPerson = prepared !== undefined && PREPARED.find((p) => p.id === prepared)?.expected !== 'publish';
+    const visitorSlot = forPerson ? await visitors.take(`issues:${visitorKey(ip)}`, VISITOR_ISSUES).catch(() => ({ ok: false })) : null;
     // Lets this visitor decide the report later, if it waits for a person.
     const key = crypto.randomUUID();
-    const record: ReportRecord = { ...(prepared && { prepared }), createdAt: new Date().toISOString(), keyHash: await sha256(key) };
+    const record: ReportRecord = {
+      ...(prepared && { prepared }), createdAt: new Date().toISOString(), keyHash: await sha256(key),
+      ...(visitorSlot?.ok === false && { noIssue: 'visitor' as const }),
+    };
     try {
       // Before the entity: the notification may arrive before this call returns.
       await env.DEMO.put(`report:${entity.id}`, JSON.stringify(record), { expirationTtl: KV_TTL });
@@ -709,6 +748,7 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     } catch (err) {
       // Not accepted, so not counted.
       ctx.waitUntil(limits.giveBack('reports').catch((e) => console.error(`daily count: ${(e as Error).message}`)));
+      if (visitorSlot?.ok) ctx.waitUntil(visitors.giveBack(`issues:${visitorKey(ip)}`).catch(() => {}));
       throw err;
     }
     return json({ id: entity.id, key }, 201, cors);

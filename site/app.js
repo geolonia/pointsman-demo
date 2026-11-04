@@ -162,7 +162,7 @@
       otherText: 'A team member checks this report in the review queue.',
       otherNoIssue: 'Only reports sent from this page go to the review queue.',
       otherOpening: 'It is being added to the review queue…',
-      otherLimit: 'The demo has opened as many GitHub issues today as it may. This report waits in the review queue without one.',
+      otherLimit: 'The demo opens only a few GitHub issues a day, and this report is over that limit. It waits in the review queue without an issue.',
       openIssue: 'Open it in the review queue',
       whyTitle: 'Why cities use it this way',
       why1: 'The AI only answers fixed questions. It never decides alone.',
@@ -343,7 +343,7 @@
       otherText: 'チームのメンバーが確認待ちの一覧で確認します。',
       otherNoIssue: '確認待ちの一覧に回るのは、このページから送った報告だけです。',
       otherOpening: '確認待ちの一覧に追加しています…',
-      otherLimit: '今日はデモが作れる GitHub の issue の数に達しました。この報告は issue なしで確認待ちの一覧に残ります。',
+      otherLimit: 'デモが 1 日に作る GitHub の issue の数には上限があり、この報告は上限を超えました。issue なしで確認待ちの一覧に残ります。',
       openIssue: '確認待ちの一覧で開く',
       whyTitle: '市がこの仕組みを使う理由',
       why1: 'AI は決まった質問に答えるだけで、ひとりでは決めません。',
@@ -539,7 +539,7 @@
   }
 
   function renderUsage() {
-    $('usage').textContent = config ? t('usage')(config.today.used, config.today.limit) : '';
+    $('usage').textContent = config && typeof config.today.used === 'number' ? t('usage')(config.today.used, config.today.limit) : '';
   }
 
   function loadReports() {

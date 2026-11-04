@@ -197,12 +197,16 @@ Same origin as the page; other origins must be listed in `ALLOWED_ORIGINS`.
   is two Pointsman calls (the first check and the final result, which needs
   no model), or three when the first check decides `urgent` or `review` and
   the additional check runs.
-- `DAILY_ISSUE_LIMIT` GitHub issues a day (UTC). Beyond it, a report that
-  waits for a person gets no issue: it waits in the review queue on the page,
-  and the visitor who sent it can still decide it there.
-- Both daily limits are counted in a Durable Object (`DailyLimits` in
-  [src/limits.ts](src/limits.ts), one per UTC day), so they hold also under
-  many parallel requests. If the counter cannot be reached, reports are refused.
+- `DAILY_ISSUE_LIMIT` GitHub issues a day (UTC), and issues for at most 2
+  reports per visitor a day (an IPv4 address, or an IPv6 /64). Beyond that, a
+  report that waits for a person gets no issue: it waits in the review queue
+  on the page, the page says why, and the visitor who sent it can still
+  decide it there. Someone with many addresses can still use up the day's issues.
+- The daily limits are counted in Durable Objects (`DailyLimits` in
+  [src/limits.ts](src/limits.ts), two per UTC day: totals, and per visitor or
+  issue), so they hold also under many parallel requests. The visitor's
+  address is kept only there, and deleted after two days. If the counter
+  cannot be reached, reports are refused.
 - Slash commands are read only on open issues with the `demo` label. A person
   who may not review gets one answer per issue and day.
 - The page is served with a Content-Security-Policy and other security
@@ -268,6 +272,8 @@ Secrets are not part of the build; they stay on the Worker (`wrangler secret put
 
 The Durable Object class `DailyLimits` comes with the Worker: the migration in
 wrangler.jsonc creates it on the first deploy, with no resource id to set.
+Since then, a rollback to a Worker version from before that migration is not
+possible; fix forward instead.
 
 ## Examples check
 

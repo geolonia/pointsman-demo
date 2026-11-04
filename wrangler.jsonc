@@ -28,7 +28,7 @@
   "assets": {
     "directory": "./site",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/notify", "/github/*"]
+    "run_worker_first": ["/api/*", "/notify", "/reviews", "/github/*"]
   },
   "kv_namespaces": [{ "binding": "DEMO", "id": "local-dev-only" }],
   // The daily counters (src/limits.ts, #112): one Durable Object per UTC day.

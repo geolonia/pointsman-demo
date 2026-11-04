@@ -39,7 +39,22 @@ export class DailyLimits extends DurableObject<Env> {
   }
 }
 
-/** The counters of the current UTC day. */
-export function todaysLimits(env: Env, now = new Date()): DurableObjectStub<DailyLimits> {
-  return env.LIMITS.get(env.LIMITS.idFromName(now.toISOString().slice(0, 10)));
+/**
+ * The counters of the current UTC day. Two objects a day, so a flood of
+ * comments or of one visitor's reports cannot slow down the daily totals:
+ * 'totals' (reports, issues) and 'visitors' (per visitor and per issue).
+ */
+export function todaysLimits(env: Env, scope: 'totals' | 'visitors' = 'totals', now = new Date()): DurableObjectStub<DailyLimits> {
+  const day = now.toISOString().slice(0, 10);
+  return env.LIMITS.get(env.LIMITS.idFromName(scope === 'totals' ? day : `${day}:${scope}`));
+}
+
+/** One visitor for the limits: the IPv4 address, or the /64 of an IPv6 address (one home or phone). */
+export function visitorKey(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const [head = '', tail = ''] = ip.toLowerCase().split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const full = ip.includes('::') ? [...left, ...Array(8 - left.length - right.length).fill('0'), ...right] : left;
+  return `${full.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':')}::/64`;
 }

@@ -38,6 +38,7 @@ describe('security headers (#122)', () => {
     const res = await get('/api/nothing');
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+    expect(directives(res.headers.get('content-security-policy') ?? '')['default-src']).toEqual(["'none'"]);
   });
 
   it('allow what index.html and app.js load, and the page has no inline script', async () => {
