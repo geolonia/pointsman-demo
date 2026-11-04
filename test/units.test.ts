@@ -5,8 +5,19 @@ import { appJwt, verifyWebhook } from '../src/github';
 import { factsOf, summarize } from '../src/index';
 import { AREA, PREPARED, parseReport, toEntity } from '../src/reports';
 import { mayReview, parseCommand } from '../src/review';
+import { visitorKey } from '../src/limits';
 // @ts-expect-error plain JavaScript without types
 import { checkExamples, report } from '../scripts/lib/examples-check.mjs';
+
+describe('visitorKey (one visitor for the issue limit)', () => {
+  it('is the IPv4 address, or the /64 of an IPv6 address in one spelling', () => {
+    expect(visitorKey('192.0.2.7')).toBe('192.0.2.7');
+    for (const ip of ['2001:db8:1:2::5', '2001:0DB8:0001:0002:aaaa:bbbb:cccc:dddd', '2001:db8:1:2:0:0:0:1']) expect(visitorKey(ip)).toBe('2001:db8:1:2::/64');
+    expect(visitorKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(visitorKey('::1')).toBe('0:0:0:0::/64');
+    expect(visitorKey('unknown')).toBe('unknown');
+  });
+});
 
 describe('reports', () => {
   const free = { roadName: '靖国通り', status: 'closed', description: '冠水のため通行止め', location: { type: 'Point', coordinates: [139.75, 35.69] } };

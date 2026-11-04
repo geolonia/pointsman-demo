@@ -1,6 +1,7 @@
 // Settings of the demo Worker (wrangler.jsonc vars and secrets).
 
 import type { BridgeMessage } from '../engine/packages/fiware/src/bridge';
+import type { DailyLimits } from './limits';
 
 export interface Env {
   // Vars
@@ -11,8 +12,10 @@ export interface Env {
   GITHUB_REPOSITORY: string;
   GITHUB_APP_ID: string;
   GITHUB_INSTALLATION_ID: string;
-  /** Pointsman calls allowed per UTC day; reports beyond it are refused. */
+  /** Reports allowed per UTC day; reports beyond it are refused. */
   DAILY_LIMIT: string;
+  /** GitHub issues the demo opens per UTC day; reports beyond it wait on the page only. */
+  DAILY_ISSUE_LIMIT: string;
   /** Origins allowed to call /api (the demo page). */
   ALLOWED_ORIGINS: string;
   TURNSTILE_SITE_KEY?: string;
@@ -31,13 +34,15 @@ export interface Env {
   ASSETS: Fetcher;
   DEMO: KVNamespace;
   REPORT_LIMIT: RateLimit;
+  /** The daily counters (src/limits.ts), one Durable Object per UTC day. */
+  LIMITS: DurableObjectNamespace<DailyLimits>;
   /** Optional: the bridge's queue (pointsman#88), producer and consumer. */
   BRIDGE_QUEUE?: Queue<BridgeMessage>;
 }
 
 const REQUIRED = [
   'POINTSMAN_URL', 'BROKER_URL', 'BROKER_TENANT', 'GITHUB_REPOSITORY', 'GITHUB_APP_ID', 'GITHUB_INSTALLATION_ID',
-  'DAILY_LIMIT', 'ALLOWED_ORIGINS', 'POINTSMAN_TOKEN', 'BROKER_API_KEY', 'NOTIFY_SECRET', 'GITHUB_WEBHOOK_SECRET',
+  'DAILY_LIMIT', 'DAILY_ISSUE_LIMIT', 'ALLOWED_ORIGINS', 'POINTSMAN_TOKEN', 'BROKER_API_KEY', 'NOTIFY_SECRET', 'GITHUB_WEBHOOK_SECRET',
   'GITHUB_APP_PRIVATE_KEY',
 ] as const;
 
@@ -51,7 +56,9 @@ export function checkEnv(env: Env): void {
     }
   }
   if (!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY)) throw new Error('GITHUB_REPOSITORY must be owner/name');
-  if (!(Number(env.DAILY_LIMIT) > 0)) throw new Error('DAILY_LIMIT must be a positive number');
+  for (const name of ['DAILY_LIMIT', 'DAILY_ISSUE_LIMIT'] as const) {
+    if (!(Number(env[name]) > 0)) throw new Error(`${name} must be a positive number`);
+  }
 }
 
 export const trimUrl = (u: string) => u.replace(/\/+$/, '');

@@ -1,10 +1,12 @@
 // The Worker end to end, with a fake broker, Pointsman and GitHub (global fetch stubbed).
 
+import { runInDurableObject } from 'cloudflare:test';
 import { env as cfEnv } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
 import { type BridgeMessage, taskEntityId } from '../engine/packages/fiware/src/bridge';
 import demo, { cleanup } from '../src/index';
+import { todaysLimits } from '../src/limits';
 
 // Secrets come from vitest.config.ts; the generated types know only the vars.
 const env = cfEnv as unknown as Env;
@@ -40,8 +42,14 @@ beforeEach(async () => {
     return new Response('unexpected', { status: 599 });
   });
   for (const k of (await env.DEMO.list()).keys) await env.DEMO.delete(k.name);
+  for (const scope of ['totals', 'visitors'] as const) await runInDurableObject(todaysLimits(env, scope), (_o, state) => state.storage.deleteAll());
+  await caches.default.delete(new Request('https://pointsman-demo.test/api/config'));
 });
 afterEach(() => vi.restoreAllMocks());
+
+/** Today's daily counters (src/limits.ts). */
+const used = (name: string) => todaysLimits(env).used(name);
+const setUsed = (name: string, n: number) => runInDurableObject(todaysLimits(env), (_o, state) => state.storage.kv.put(name, n));
 
 // wrangler.jsonc binds the bridge's queue. Most tests run without it, so the
 // bridge handles each notification at once; 'the bridge's queue' below uses it.
@@ -64,20 +72,47 @@ describe('reports from the page', () => {
     expect(create.headers.get('link')).toContain('https://datamodels.jp/context/transportation/v1.jsonld');
     expect(create.body).toMatchObject({ id, type: 'RoadRestriction', roadName: P('紀尾井町通り') });
     expect(await env.DEMO.get(`report:${id}`, 'json')).toMatchObject({ prepared: 'car-trapped' });
-    expect(await env.DEMO.get(`day:${new Date().toISOString().slice(0, 10)}`)).toBe('1');
+    expect(await used('reports')).toBe(1);
   });
 
   it('does not count a report the broker refused', async () => {
     answer = (c) => (c.url === `${BROKER}/entities` ? new Response(null, { status: 503 }) : undefined);
     expect((await post('/api/reports', { prepared: 'vague', lang: 'en' })).status).toBe(502);
-    expect(await env.DEMO.get(`day:${new Date().toISOString().slice(0, 10)}`)).toBeNull();
+    await vi.waitFor(async () => expect(await used('reports')).toBe(0));
+  });
+
+  it('holds the daily limit under parallel requests (#112)', async () => {
+    const e = { ...direct, DAILY_LIMIT: '5' } as Env;
+    // From 20 visitors, so the per-visitor limit (10 a minute) does not count here.
+    const send = (_: unknown, i: number) => demo.fetch(new Request('https://pointsman-demo.test/api/reports', {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: PAGE, 'cf-connecting-ip': `192.0.2.${i + 1}` }, body: JSON.stringify({ prepared: 'vague', lang: 'en' }),
+    }), e, ctx);
+    const answers = await Promise.all(Array.from({ length: 20 }, send));
+    const statuses = answers.map((r) => r.status);
+    expect(statuses.filter((st) => st === 201)).toHaveLength(5);
+    expect(statuses.filter((st) => st === 429)).toHaveLength(15);
+    expect(calls.filter((c) => c.url === `${BROKER}/entities`)).toHaveLength(5);
+    expect(await used('reports')).toBe(5);
+    const refused = await answers.find((r) => r.status === 429)!.json<any>();
+    expect(refused.today).toEqual({ used: 5, limit: 5 });
+  });
+
+  it('refuses reports when the daily counter cannot be reached, without calling the broker', async () => {
+    const e = { ...direct, LIMITS: { idFromName: () => ({}), get: () => ({ take: () => Promise.reject(new Error('object down')) }) } } as unknown as Env;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await demo.fetch(new Request('https://pointsman-demo.test/api/reports', {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: PAGE, 'cf-connecting-ip': '192.0.2.100' }, body: JSON.stringify({ prepared: 'vague', lang: 'en' }),
+    }), e, ctx);
+    expect(res.status).toBe(502);
+    expect(calls).toHaveLength(0);
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('object down'));
   });
 
   it('refuses other origins, free text without Turnstile, and the day after the limit', async () => {
     expect((await post('/api/reports', { prepared: 'vague', lang: 'en' }, { origin: 'https://evil.example' })).status).toBe(403);
     const free = { roadName: 'x', status: 'closed', description: 'road blocked', location: { type: 'Point', coordinates: [139.75, 35.69] } };
     expect((await post('/api/reports', free)).status).toBe(403);
-    await env.DEMO.put(`day:${new Date().toISOString().slice(0, 10)}`, '300');
+    await setUsed('reports', 300);
     expect((await post('/api/reports', { prepared: 'vague', lang: 'en' })).status).toBe(429);
     expect(calls).toHaveLength(0);
   });
@@ -103,6 +138,46 @@ describe('reports from the page', () => {
     expect(r.ngsi.entity.id).toBe(id);
     expect(r.ngsi.decision.type).toBe('https://datamodels.jp/ns/decision/Decision');
     expect(r.ngsi.task.id).toBe(taskId);
+    expect(r.issueLimited).toBe(false);
+  });
+
+  it('says when a prepared report has no issue because of an issue limit (#111)', async () => {
+    const id = 'urn:ngsi-ld:RoadRestriction:demo-00000000-0000-4000-8000-0000000000ac';
+    const record = { prepared: 'vague', createdAt: new Date().toISOString() };
+    await env.DEMO.put(`report:${id}`, JSON.stringify(record));
+    answer = (c) => {
+      if (c.url.startsWith(`${BROKER}/entities/${encodeURIComponent(id)}`)) {
+        return Response.json({ id, type: 'RoadRestriction', description: P('blocked'), check: { type: 'Property', value: 'review', decision: { type: 'Relationship', object: 'urn:ngsi-ld:Decision:d-10' } } });
+      }
+      if (c.method === 'GET' && c.url.startsWith(`${BROKER}/entities/`)) return new Response(null, { status: 404 });
+      return undefined;
+    };
+    const read = async () => (await (await worker(`/api/reports/${encodeURIComponent(id)}`)).json<any>()).issueLimited;
+    // The day's issues all used, but not by this report's turn: no claim.
+    await setUsed('issues', 20);
+    expect(await read()).toBe(false);
+    // This visitor's issues were used up when they sent it.
+    await env.DEMO.put(`report:${id}`, JSON.stringify({ ...record, noIssue: 'visitor' }));
+    expect(await read()).toBe(true);
+    // The day's limit stopped this report's issue.
+    await env.DEMO.put(`report:${id}`, JSON.stringify(record));
+    await env.DEMO.put('issue-limited:d-10', '1');
+    expect(await read()).toBe(true);
+  });
+
+  it('opens issues for at most two reports of one visitor a day (#111)', async () => {
+    const send = (prepared: string, ip: string) => post('/api/reports', { prepared, lang: 'en' }, { 'cf-connecting-ip': ip });
+    const ids: string[] = [];
+    for (const ip of ['2001:db8:1:2::5', '2001:db8:1:2:aaaa::9', '2001:0db8:0001:0002::7']) ids.push((await (await send('vague', ip)).json<{ id: string }>()).id);
+    // Same /64: the third report gets no issue. Reports meant to be published do not count.
+    expect((await send('flooded-underpass', '2001:db8:1:2::5')).status).toBe(201);
+    const records = await Promise.all(ids.map((id) => env.DEMO.get<any>(`report:${id}`, 'json')));
+    expect(records.map((r) => r.noIssue ?? null)).toEqual([null, null, 'visitor']);
+    // Another visitor still gets theirs.
+    const other = (await (await send('vague', '2001:db8:1:3::5')).json<{ id: string }>()).id;
+    expect((await env.DEMO.get<any>(`report:${other}`, 'json')).noIssue).toBeUndefined();
+    // The address is not in the report's record.
+    expect(JSON.stringify(records)).not.toContain('2001');
   });
 
   it('shows the report when its Task cannot be read', async () => {
@@ -168,6 +243,22 @@ describe('reports from the page', () => {
     expect(c.prepared).toHaveLength(9);
     expect(c.freeText).toBe(false);
     expect(c.today).toEqual({ used: 0, limit: 300 });
+    // Cached for a few seconds: page loads do not reach the counter one by one.
+    await setUsed('reports', 12);
+    expect((await (await worker('/api/config', { headers: { origin: PAGE } })).json<any>()).today).toEqual({ used: 0, limit: 300 });
+    await caches.default.delete(new Request('https://pointsman-demo.test/api/config'));
+    expect((await (await worker('/api/config', { headers: { origin: PAGE } })).json<any>()).today).toEqual({ used: 12, limit: 300 });
+  });
+
+  it('serves the configuration without the count when the daily counter cannot be reached', async () => {
+    const e = { ...direct, LIMITS: { idFromName: () => ({}), get: () => ({ used: () => Promise.reject(new Error('object down')) }) } } as unknown as Env;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await demo.fetch(new Request('https://pointsman-demo.test/api/config', { headers: { origin: PAGE } }), e, ctx);
+    expect(res.status).toBe(200);
+    expect((await res.json<any>()).today).toEqual({ used: null, limit: 300 });
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('object down'));
+    // Not cached: the next page load asks again.
+    expect(await caches.default.match(new Request('https://pointsman-demo.test/api/config'))).toBeUndefined();
   });
 });
 
@@ -316,7 +407,7 @@ describe('notifications (the bridge)', () => {
     expect(calls.some((c) => c.url.endsWith('/issues/7/comments') || (c.method === 'PATCH' && c.url.endsWith('/issues/7')))).toBe(false);
   });
 
-  it('lets a retry open the issue when GitHub failed the first time', async () => {
+  it('lets a retry open the issue when GitHub failed the first time, and counts only the issue opened', async () => {
     await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
     pointsmanSays('review');
     const decide = answer;
@@ -325,9 +416,48 @@ describe('notifications (the bridge)', () => {
     await notify();
     await vi.waitFor(() => expect(issueCalls).toBe(1));
     await vi.waitFor(async () => expect(await env.DEMO.get('decision-pending:11111111-1111-4111-8111-111111111111')).toBeNull());
+    // The failed try does not count against the daily issue limit.
+    expect(await used('issues')).toBe(0);
     await notify();
     await vi.waitFor(async () => expect(await env.DEMO.get('issue:7')).not.toBeNull());
     expect(issueCalls).toBe(2);
+    expect(await used('issues')).toBe(1);
+  });
+
+  it('opens no issue once the daily issue limit is reached, and says so in the log (#111)', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
+    await setUsed('issues', 20);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pointsmanSays('review');
+    expect((await notify()).status).toBe(200);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('daily limit of 20 issues')));
+    expect(calls.some((c) => c.url.endsWith('/issues') && c.method === 'POST')).toBe(false);
+    expect(await used('issues')).toBe(20);
+    // For the page: why there is no issue.
+    expect(await env.DEMO.get('issue-limited:11111111-1111-4111-8111-111111111111')).toBe('1');
+  });
+
+  it("opens no issue for a report over its visitor's issue limit (#111)", async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString(), noIssue: 'visitor' }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pointsmanSays('review');
+    expect((await notify()).status).toBe(200);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('the visitor reached 2 issues today')));
+    expect(calls.some((c) => c.url.startsWith('https://api.github.com/'))).toBe(false);
+    expect(await used('issues')).toBe(0);
+  });
+
+  it('lets a retry try again when the issue counter cannot be reached', async () => {
+    await env.DEMO.put(`report:${report.id}`, JSON.stringify({ prepared: 'status-contradicts', createdAt: new Date().toISOString() }));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    pointsmanSays('review');
+    const e = { ...direct, LIMITS: { idFromName: () => ({}), get: () => ({ take: () => Promise.reject(new Error('object down')) }) } } as unknown as Env;
+    await worker('/notify', { method: 'POST', headers: { 'x-bridge-secret': env.NOTIFY_SECRET, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'Notification', data: [report] }) }, e);
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('object down')));
+    await vi.waitFor(async () => expect(await env.DEMO.get('decision-pending:11111111-1111-4111-8111-111111111111')).toBeNull());
+    expect(calls.some((c) => c.url.endsWith('/issues') && c.method === 'POST')).toBe(false);
+    await notify();
+    await vi.waitFor(async () => expect(await env.DEMO.get('issue:7')).not.toBeNull());
   });
 
   it('never opens an issue for free text, or for publish', async () => {
@@ -355,8 +485,8 @@ describe('reviews from GitHub', () => {
     const mac = [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body)))].map((b) => b.toString(16).padStart(2, '0')).join('');
     return worker('/github/webhook', { method: 'POST', headers: { 'x-github-event': 'issue_comment', 'x-hub-signature-256': `sha256=${mac}` }, body });
   }
-  const comment = (text: string, association = 'MEMBER') => ({
-    action: 'created', issue: { number: 7, state: 'open' },
+  const comment = (text: string, association = 'MEMBER', issue: Record<string, unknown> = {}) => ({
+    action: 'created', issue: { number: 7, state: 'open', labels: [{ name: 'demo' }, { name: 'review' }], ...issue },
     comment: { body: text, user: { login: 'reviewer', type: 'User' }, author_association: association },
   });
 
@@ -444,6 +574,26 @@ describe('reviews from GitHub', () => {
     expect(calls.find((c) => c.url.endsWith(`/v1/decisions/${decision}/feedback`))!.body).toEqual({ correct: { danger: true }, by: 'github:reviewer' });
     expect(calls.some((c) => c.url.endsWith('/resolve') || c.url.endsWith('/attrs/check'))).toBe(false);
     expect(calls.some((c) => c.method === 'PATCH' && c.url.endsWith('/issues/7'))).toBe(false);
+  });
+
+  it('ignores slash comments on issues without the demo label and on pull requests (#120)', async () => {
+    for (const issue of [{ labels: [] }, { labels: [{ name: 'bug' }] }, { labels: undefined }, { pull_request: { url: 'x' } }]) {
+      for (const association of ['NONE', 'MEMBER']) {
+        const res = await signed(comment('/publish', association, issue));
+        expect(await res.json()).toEqual({ ignored: 'not a demo issue' });
+      }
+    }
+    expect(calls.filter((c) => c.url.startsWith('https://api.github.com') || c.url.startsWith('https://pointsman') || c.url.startsWith(BROKER))).toHaveLength(0);
+  });
+
+  it('answers a person who may not review once per issue, not for every comment (#120)', async () => {
+    for (let i = 0; i < 3; i += 1) await signed(comment('/publish', 'NONE'));
+    await Promise.all(Array.from({ length: 5 }, () => signed(comment('/reject', 'NONE'))));
+    expect(calls.filter((c) => c.url.endsWith('/issues/7/comments'))).toHaveLength(1);
+    // Another issue gets its own answer.
+    await env.DEMO.put('issue:8', JSON.stringify({ decision, entity: entityId, action: 'review', corrections: [] }));
+    await signed(comment('/publish', 'NONE', { number: 8 }));
+    expect(calls.filter((c) => c.url.endsWith('/issues/8/comments'))).toHaveLength(1);
   });
 
   it('answers people who may not review, and refuses bad signatures', async () => {

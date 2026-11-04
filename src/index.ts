@@ -9,9 +9,13 @@ import { Broker, type Entity, TRANSPORTATION_CONTEXT } from './broker';
 import { type Env, checkEnv, trimUrl } from './env';
 import { GitHub, type Issue, verifyWebhook } from './github';
 import { fetchWithAgent } from './http';
+import { todaysLimits, visitorKey } from './limits';
 import { AREA, PREPARED, parseReport, toEntity } from './reports';
 import { mayReview, parseCommand } from './review';
 import WORK_ORDERS from './work-orders.json';
+
+// The Durable Object class must be exported by the Worker's main module.
+export { DailyLimits } from './limits';
 
 const PROFILE = 'road-restriction-check';
 /** Actions a person looks at; they become issues (prepared reports only). */
@@ -67,12 +71,14 @@ const alertId = (decision: string) => `urn:ngsi-ld:Alert:demo-${decision}`;
 /** Demo data lives this long. */
 const KEEP_MS = 24 * 3600_000;
 const KV_TTL = 2 * 24 * 3600;
+/** Reports of one visitor a day that may open a GitHub issue (#111); the rest wait on the page only. */
+const VISITOR_ISSUES = 2;
 
 /**
  * keyHash: SHA-256 of the key the page got when it sent the report; with the
  * key, that visitor may decide the report themselves (resolved: their answer).
  */
-interface ReportRecord { prepared?: string; createdAt: string; keyHash?: string; resolved?: string }
+interface ReportRecord { prepared?: string; createdAt: string; keyHash?: string; resolved?: string; noIssue?: 'visitor' }
 interface IssueRecord { decision: string; entity: string; action: string; corrections: Correction[]; createdAt: string }
 interface Correction { name: string; value: string | boolean; by: string; at: string }
 
@@ -85,18 +91,19 @@ export default {
       return json({ error: 'the demo is not configured' }, 500);
     }
     const url = new URL(request.url);
+    // The page and its files (wrangler.jsonc "assets"); their headers are in site/_headers.
+    if (!isWorkerPath(url.pathname)) return env.ASSETS.fetch(request);
     try {
-      if (url.pathname === '/notify') return await notify(request, env, ctx);
+      if (url.pathname === '/notify') return secured(await notify(request, env, ctx));
       // Decisions a person resolved (pointsman#83): the bridge resolves them in
       // Pointsman, writes the final action to the report and completes its Task.
-      if (url.pathname === '/reviews') return await handleRequest(request, bridgeConfig(env));
-      if (url.pathname === '/github/webhook' && request.method === 'POST') return await webhook(request, env);
-      if (url.pathname.startsWith('/api/')) return await api(request, url, env, ctx);
-      // The page and its files (wrangler.jsonc "assets").
-      return env.ASSETS.fetch(request);
+      if (url.pathname === '/reviews') return secured(await handleRequest(request, bridgeConfig(env)));
+      if (url.pathname === '/github/webhook' && request.method === 'POST') return secured(await webhook(request, env));
+      if (url.pathname.startsWith('/api/')) return secured(await api(request, url, env, ctx));
+      return secured(json({ error: 'not found' }, 404));
     } catch (err) {
       console.error(`${request.method} ${url.pathname}: ${(err as Error).message}`);
-      return json({ error: 'something went wrong' }, 502);
+      return secured(json({ error: 'something went wrong' }, 502));
     }
   },
 
@@ -150,6 +157,19 @@ export default {
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
+}
+
+/** The paths the Worker answers itself; keep in step with wrangler.jsonc "run_worker_first". */
+const isWorkerPath = (path: string) => path === '/notify' || path === '/reviews' || path.startsWith('/api/') || path.startsWith('/github/');
+
+/** The Worker's own answers get the same basic headers as the page (#122). */
+function secured(res: Response): Response {
+  const out = new Response(res.body, res);
+  out.headers.set('x-content-type-options', 'nosniff');
+  out.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+  // JSON and the graph SVG: nothing to load or run when opened directly.
+  out.headers.set('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
+  return out;
 }
 
 // --- The bridge -------------------------------------------------------------
@@ -250,6 +270,11 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   const report = await env.DEMO.get<ReportRecord>(`report:${entityId}`, 'json');
   // Free text from visitors never goes to GitHub: only prepared reports.
   if (!report?.prepared) return;
+  // This visitor's reports already opened their issues for today (#111).
+  if (report.noIssue === 'visitor') {
+    console.warn(`issue for ${decision}: no issue, the visitor reached ${VISITOR_ISSUES} issues today`);
+    return;
+  }
   // A retried notification must not open a second issue.
   // Workers KV takes one write per second per key, so the in-flight marker and
   // the final record are different keys, each written once.
@@ -262,12 +287,29 @@ async function openIssue(env: Env, entityId: string, decision: string, action: s
   // minute late. If Pointsman cannot say, the issue is opened. The marker
   // stays: it expires within a minute.
   if (await decidedIn(env, decision, 'before opening')) return;
+  // Issues are public: at most DAILY_ISSUE_LIMIT a day, however many reports
+  // come in (#111). Beyond it the report waits for a person on the page only,
+  // and the page says why (issue-limited).
+  const limits = todaysLimits(env);
+  let slot: { ok: boolean };
+  try {
+    slot = await limits.take('issues', Number(env.DAILY_ISSUE_LIMIT));
+  } catch (err) {
+    await env.DEMO.delete(`decision-pending:${decision}`).catch(() => {});
+    throw err;
+  }
+  if (!slot.ok) {
+    console.warn(`issue for ${decision}: no issue, the daily limit of ${env.DAILY_ISSUE_LIMIT} issues is reached`);
+    await env.DEMO.put(`issue-limited:${decision}`, '1', { expirationTtl: KV_TTL });
+    return;
+  }
   let issue: Issue;
   try {
     issue = await createIssueFor(env, entityId, decision, action);
   } catch (err) {
     // No issue was created: let a retried notification try again (if this
     // delete is refused, the marker expires within a minute anyway).
+    await limits.giveBack('issues').catch(() => {});
     await env.DEMO.delete(`decision-pending:${decision}`).catch(() => {});
     throw err;
   }
@@ -335,15 +377,19 @@ async function webhook(request: Request, env: Env): Promise<Response> {
   if (request.headers.get('x-github-event') !== 'issue_comment') return json({ ignored: 'event' });
   const p = JSON.parse(body) as {
     action: string;
-    issue: { number: number; state: string };
+    issue: { number: number; state: string; labels?: { name?: string }[]; pull_request?: unknown };
     comment: { body: string; user: { login: string; type: string }; author_association: string };
   };
   if (p.action !== 'created' || p.comment.user.type === 'Bot' || p.issue.state !== 'open') return json({ ignored: 'comment' });
+  // Only the demo's own issues (#120): only members can set the demo label.
+  if (p.issue.pull_request || !p.issue.labels?.some((l) => l.name === 'demo')) return json({ ignored: 'not a demo issue' });
   const command = parseCommand(p.comment.body);
   if (command === null) return json({ ignored: 'no command' });
   const github = new GitHub(env);
   if (!mayReview(p.comment.author_association)) {
-    await github.comment(p.issue.number, `@${p.comment.user.login} only members of this repository can review demo reports.`);
+    // Once per issue and day, so nobody can make the App post comments in a loop.
+    const first = await todaysLimits(env, 'visitors').take(`told:${p.issue.number}`, 1).catch(() => ({ ok: false }));
+    if (first.ok) await github.comment(p.issue.number, `@${p.comment.user.login} only members of this repository can review demo reports.`);
     return json({ ignored: 'not a reviewer' });
   }
   if (typeof command === 'string') {
@@ -533,18 +579,28 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' } });
   }
-  const today = new Date().toISOString().slice(0, 10);
-  const used = Number(await env.DEMO.get(`day:${today}`)) || 0;
   const limit = Number(env.DAILY_LIMIT);
 
   if (url.pathname === '/api/config' && request.method === 'GET') {
-    return json({
+    // Every page load asks: cached for a few seconds, so page loads do not
+    // reach the daily counter one by one. Without the counter the page still
+    // gets its configuration (used: null).
+    const key = new Request(new URL('/api/config', url).toString());
+    const hit = await caches.default.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
+    const used = await todaysLimits(env).used('reports').catch((err) => {
+      console.error(`daily count: ${(err as Error).message}`);
+      return null;
+    });
+    const res = json({
       prepared: PREPARED,
       area: AREA,
       freeText: Boolean(env.TURNSTILE_SECRET && env.TURNSTILE_SITE_KEY),
       turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? null,
       today: { used, limit },
-    }, 200, cors);
+    }, 200, { 'cache-control': 'max-age=10' });
+    if (used !== null) ctx.waitUntil(caches.default.put(key, res.clone()));
+    return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors } });
   }
 
   if (url.pathname === '/api/reports' && request.method === 'GET') {
@@ -630,10 +686,11 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
     if (!entity) return json({ error: 'not found' }, 404, cors);
     const summary = summarize(entity);
     const decisionId = summary.check?.decision;
-    const [decisionEntity, issueNumber, report] = await Promise.all([
+    const [decisionEntity, issueNumber, report, dayLimited] = await Promise.all([
       decisionId ? broker.getDecision(decisionId) : null,
       decisionId ? env.DEMO.get(`decision-issue:${decisionId.split(':').pop()}`) : null,
       env.DEMO.get<ReportRecord>(`report:${entity.id}`, 'json'),
+      decisionId ? env.DEMO.get(`issue-limited:${decisionId.split(':').pop()}`) : null,
     ]);
     const issue = issueNumber && /^\d+$/.test(issueNumber) ? `https://github.com/${env.GITHUB_REPOSITORY}/issues/${issueNumber}` : null;
     const [evacuation, finalResult, task] = await Promise.all([
@@ -642,14 +699,16 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       // Extra data for developers: the page still works without it.
       PERSON_ACTIONS.includes(summary.check?.action ?? '') ? taskIdOf(entity).then((id) => (id ? broker.getEntity(id) : null)).catch(() => null) : null,
     ]);
+    // No issue for a report that waits for a person: the page says when an
+    // issue limit is the reason (#111).
+    const issueLimited = !issue && PERSON_ACTIONS.includes(summary.check?.action ?? '') && (Boolean(dayLimited) || report?.noIssue === 'visitor');
     // Only prepared reports go to the GitHub queue; the page says so.
-    return json({ ...summary, prepared: Boolean(report?.prepared), visitorDecision: report?.resolved ?? null, issue, facts: factsOf(decisionEntity), evacuation, final: finalResult, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
+    return json({ ...summary, prepared: Boolean(report?.prepared), visitorDecision: report?.resolved ?? null, issue, issueLimited, facts: factsOf(decisionEntity), evacuation, final: finalResult, ngsi: { entity, decision: decisionEntity, task } }, 200, cors);
   }
 
   if (url.pathname === '/api/reports' && request.method === 'POST') {
     const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
     if (!(await env.REPORT_LIMIT.limit({ key: ip })).success) return json({ error: 'too many reports, try again in a minute' }, 429, cors);
-    if (used >= limit) return json({ error: 'the demo has reached its limit for today', today: { used, limit } }, 429, cors);
     let raw: unknown;
     try {
       raw = await request.json();
@@ -664,18 +723,34 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
       if (!(await turnstileOk(env.TURNSTILE_SECRET, turnstile, ip))) return json({ error: 'please confirm you are human' }, 403, cors);
     }
     const { entity, prepared } = toEntity(input);
+    // Each report is two or three Pointsman calls: at most DAILY_LIMIT a day,
+    // counted in a Durable Object, which holds under parallel requests (#112).
+    const limits = todaysLimits(env);
+    const slot = await limits.take('reports', limit);
+    if (!slot.ok) return json({ error: 'the demo has reached its limit for today', today: { used: slot.used, limit } }, 429, cors);
+    // A prepared report that is meant for a person opens a public issue: at
+    // most VISITOR_ISSUES of them per visitor and day (#111), so one visitor
+    // cannot use up the day's issues. The address is kept only in the
+    // counter, which is deleted after two days.
+    const visitors = todaysLimits(env, 'visitors');
+    const forPerson = prepared !== undefined && PREPARED.find((p) => p.id === prepared)?.expected !== 'publish';
+    const visitorSlot = forPerson ? await visitors.take(`issues:${visitorKey(ip)}`, VISITOR_ISSUES).catch(() => ({ ok: false })) : null;
     // Lets this visitor decide the report later, if it waits for a person.
     const key = crypto.randomUUID();
-    const record: ReportRecord = { ...(prepared && { prepared }), createdAt: new Date().toISOString(), keyHash: await sha256(key) };
-    // Before the entity: the notification may arrive before this call returns.
-    await env.DEMO.put(`report:${entity.id}`, JSON.stringify(record), { expirationTtl: KV_TTL });
-    await new Broker(env).createRoadRestriction(entity);
-    // Counted once the broker has the report (each one is a Pointsman call).
-    // Best effort: KV is eventually consistent and takes one write per second
-    // per key, so at busy moments a count is lost; the ceiling is approximate,
-    // and an accepted report must never answer with an error.
-    ctx.waitUntil(env.DEMO.put(`day:${today}`, String(used + 1), { expirationTtl: KV_TTL })
-      .catch((err) => console.error(`daily count: ${(err as Error).message}`)));
+    const record: ReportRecord = {
+      ...(prepared && { prepared }), createdAt: new Date().toISOString(), keyHash: await sha256(key),
+      ...(visitorSlot?.ok === false && { noIssue: 'visitor' as const }),
+    };
+    try {
+      // Before the entity: the notification may arrive before this call returns.
+      await env.DEMO.put(`report:${entity.id}`, JSON.stringify(record), { expirationTtl: KV_TTL });
+      await new Broker(env).createRoadRestriction(entity);
+    } catch (err) {
+      // Not accepted, so not counted.
+      ctx.waitUntil(limits.giveBack('reports').catch((e) => console.error(`daily count: ${(e as Error).message}`)));
+      if (visitorSlot?.ok) ctx.waitUntil(visitors.giveBack(`issues:${visitorKey(ip)}`).catch(() => {}));
+      throw err;
+    }
     return json({ id: entity.id, key }, 201, cors);
   }
 
