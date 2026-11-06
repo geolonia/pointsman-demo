@@ -640,8 +640,10 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext):
 
   if (url.pathname === '/api/stats' && request.method === 'GET') {
     // The last 7 days from Pointsman's decision log (GET /v1/stats/{profile}),
-    // for the page: counts only. Browsers keep it for a minute (the Cache API
-    // only helps on a custom domain, not on workers.dev).
+    // for the page: counts only. Browsers keep it for a minute; on the custom
+    // domain (roads.demo.pointsman.net) the Worker's cache keeps it too, so
+    // the answers there can be up to that old. On workers.dev the Cache API
+    // stores nothing.
     const key = new Request(new URL('/api/stats', url).toString());
     const hit = await caches.default.match(key);
     if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), ...cors } });
