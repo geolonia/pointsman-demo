@@ -25,7 +25,7 @@ export async function checkExamples({ prepared, toEntity, url, token, fetch: fet
       try {
         const res = await fetchFn(`${url.replace(/\/+$/, '')}/v1/decide/${PROFILE}`, {
           method: 'POST',
-          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'user-agent': 'pointsman-demo-examples-check (+https://github.com/geolonia/pointsman-demo)' },
+          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'user-agent': 'pointsman-demo-examples-check (+https://github.com/geolonia/pointsman-demo-roads)' },
           body: JSON.stringify({ state: entity, ref: entity.id }),
           signal: AbortSignal.timeout(TIMEOUT_MS),
         });

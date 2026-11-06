@@ -34,7 +34,7 @@ if (!values.delete && !values.open && !Object.hasOwn(mapping, status)) {
 const { BROKER_API_KEY } = process.env;
 if (!BROKER_API_KEY) throw new Error('set BROKER_API_KEY');
 const { vars } = parse(readFileSync('wrangler.jsonc', 'utf8'));
-const headers = { 'x-api-key': BROKER_API_KEY, 'NGSILD-Tenant': vars.BROKER_TENANT, 'user-agent': 'pointsman-demo (+https://github.com/geolonia/pointsman-demo)' };
+const headers = { 'x-api-key': BROKER_API_KEY, 'NGSILD-Tenant': vars.BROKER_TENANT, 'user-agent': 'pointsman-demo (+https://github.com/geolonia/pointsman-demo-roads)' };
 
 // As GTT names it: urn:ngsi-ld:Issue:redmine:<instance>:<issue>.
 const id = `urn:ngsi-ld:Issue:redmine:demo:${values.issue}`;

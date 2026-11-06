@@ -13,8 +13,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parse } from 'jsonc-parser';
 
-const { vars, name } = parse(readFileSync('wrangler.jsonc', 'utf8'));
-const WORKER_URL = process.env.WORKER_URL ?? `https://${name}.geolonia.workers.dev`;
+const { vars } = parse(readFileSync('wrangler.jsonc', 'utf8'));
+// The page's custom domain (wrangler.jsonc routes); the subscriptions point here
+// since 2026-11-06. workers.dev still works but is no longer used by them.
+const WORKER_URL = process.env.WORKER_URL ?? 'https://roads.demo.pointsman.net';
 const { BROKER_API_KEY, NOTIFY_SECRET } = process.env;
 if (!BROKER_API_KEY || !NOTIFY_SECRET) throw new Error('set BROKER_API_KEY and NOTIFY_SECRET');
 

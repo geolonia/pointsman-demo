@@ -33,7 +33,7 @@ beforeEach(async () => {
     const custom = answer(c);
     if (custom) return custom;
     if (c.url.startsWith('https://api.github.com/app/installations/')) return Response.json({ token: GH_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() });
-    if (c.url.endsWith('/issues') && c.method === 'POST') return Response.json({ number: 7, html_url: 'https://github.com/geolonia/pointsman-demo/issues/7' }, { status: 201 });
+    if (c.url.endsWith('/issues') && c.method === 'POST') return Response.json({ number: 7, html_url: 'https://github.com/geolonia/pointsman-demo-roads/issues/7' }, { status: 201 });
     if (c.method === 'GET' && c.url.startsWith('https://api.github.com/repos/') && c.url.includes('/issues?')) return Response.json([]);
     if (c.method === 'GET' && /^https:\/\/api\.github\.com\/repos\/.+\/issues\/\d+$/.test(c.url)) return Response.json({ state: 'open' });
     if (c.url.startsWith('https://api.github.com/')) return Response.json({});
@@ -142,7 +142,7 @@ describe('reports from the page', () => {
     };
     // As the page asks: percent-encoded.
     const r = await (await worker(`/api/reports/${encodeURIComponent(id)}`)).json<any>();
-    expect(r).toMatchObject({ id, prepared: false, check: { action: 'review', decision: 'urn:ngsi-ld:Decision:d-9' }, issue: 'https://github.com/geolonia/pointsman-demo/issues/12' });
+    expect(r).toMatchObject({ id, prepared: false, check: { action: 'review', decision: 'urn:ngsi-ld:Decision:d-9' }, issue: 'https://github.com/geolonia/pointsman-demo-roads/issues/12' });
     expect(r.ngsi.entity.id).toBe(id);
     expect(r.ngsi.decision.type).toBe('https://datamodels.jp/ns/decision/Decision');
     expect(r.ngsi.task.id).toBe(taskId);
@@ -228,7 +228,7 @@ describe('reports from the page', () => {
     expect(body.request).toMatchObject({ method: 'GET', tenant: 'pointsman_demo', pages: 1, link: 'https://datamodels.jp/context/decision/v1.jsonld' });
     expect(body.request.url).toBe(list.url);
     expect(body.decisions).toEqual([
-      { id: 'urn:ngsi-ld:Decision:d-2', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-2', action: 'urgent', decidedAt: '2026-10-07T02:00:00Z', issue: 'https://github.com/geolonia/pointsman-demo/issues/21' },
+      { id: 'urn:ngsi-ld:Decision:d-2', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-2', action: 'urgent', decidedAt: '2026-10-07T02:00:00Z', issue: 'https://github.com/geolonia/pointsman-demo-roads/issues/21' },
       { id: 'urn:ngsi-ld:Decision:d-1', refersTo: 'urn:ngsi-ld:RoadRestriction:demo-d-1', action: 'review', decidedAt: '2026-10-07T01:00:00Z', issue: null },
     ]);
   });
@@ -296,7 +296,7 @@ describe('notifications (the bridge)', () => {
     pointsmanSays('review');
     const res = await notify();
     expect(res.status).toBe(200);
-    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))).toBe(true));
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/repos/geolonia/pointsman-demo-roads/issues'))).toBe(true));
     const decide = calls.find((c) => c.url.includes('/v1/decide/'))!;
     expect(decide.headers.get('authorization')).toBe(`Bearer ${env.POINTSMAN_TOKEN}`);
     // The bridge names itself on the requests it makes (pointsman#61).
@@ -344,7 +344,7 @@ describe('notifications (the bridge)', () => {
     // The check comes after the in-flight marker; nothing follows it.
     expect(await env.DEMO.get('decision-pending:11111111-1111-4111-8111-111111111111')).toBe('1');
     await new Promise((r) => setTimeout(r, 50));
-    expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))).toBe(false);
+    expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/repos/geolonia/pointsman-demo-roads/issues'))).toBe(false);
     expect(await env.DEMO.get('decision-issue:11111111-1111-4111-8111-111111111111')).toBeNull();
   });
 
@@ -845,7 +845,7 @@ describe("the bridge's queue (pointsman#88)", () => {
     expect(m.retry).not.toHaveBeenCalled();
     expect(calls.some((c) => c.url.endsWith('/v1/decide/road-restriction-check'))).toBe(true);
     // Awaited in the consumer, not after it.
-    expect(calls.find((c) => c.url.endsWith('/repos/geolonia/pointsman-demo/issues'))?.body.labels).toEqual(['demo', 'urgent']);
+    expect(calls.find((c) => c.url.endsWith('/repos/geolonia/pointsman-demo-roads/issues'))?.body.labels).toEqual(['demo', 'urgent']);
     expect(await env.DEMO.get('issue:7', 'json')).toMatchObject({ decision: '44444444-4444-4444-8444-444444444444', action: 'urgent' });
   });
 
@@ -1033,7 +1033,7 @@ describe('a visitor decides their own report', () => {
     brokerHas(id, 'review');
     const base = answer;
     answer = (c) => {
-      if (c.method === 'GET' && c.url.startsWith('https://api.github.com/repos/geolonia/pointsman-demo/issues?')) {
+      if (c.method === 'GET' && c.url.startsWith('https://api.github.com/repos/geolonia/pointsman-demo-roads/issues?')) {
         return Response.json([
           { number: 11, body: '<!-- decision: 77777777-7777-4777-8777-777777777777 entity: x -->', user: { type: 'Bot' } },
           // A newer issue by a person that quotes the body: not the demo's.

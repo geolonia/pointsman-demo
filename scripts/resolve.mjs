@@ -47,7 +47,7 @@ const body = {
 };
 const res = await fetch(`${vars.BROKER_URL}/ngsi-ld/v1/entities/${encodeURIComponent(id)}/attrs`, {
   method: 'POST',
-  headers: { 'x-api-key': BROKER_API_KEY, 'NGSILD-Tenant': vars.BROKER_TENANT, 'content-type': 'application/ld+json', 'user-agent': 'pointsman-demo (+https://github.com/geolonia/pointsman-demo)' },
+  headers: { 'x-api-key': BROKER_API_KEY, 'NGSILD-Tenant': vars.BROKER_TENANT, 'content-type': 'application/ld+json', 'user-agent': 'pointsman-demo (+https://github.com/geolonia/pointsman-demo-roads)' },
   body: JSON.stringify(body),
 });
 // Only the status: the body may echo the request.
