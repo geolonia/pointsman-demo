@@ -18,7 +18,7 @@
     "POINTSMAN_URL": "https://pointsman.geolonia.workers.dev",
     "BROKER_URL": "https://geolonia-demo.geonicdb.jp",
     "BROKER_TENANT": "pointsman_demo",
-    "GITHUB_REPOSITORY": "geolonia/pointsman-demo",
+    "GITHUB_REPOSITORY": "geolonia/pointsman-demo-roads",
     "GITHUB_APP_ID": "5219531",
     "GITHUB_INSTALLATION_ID": "168739763",
     "DAILY_LIMIT": "300",

@@ -3,7 +3,7 @@
 // from the demo carries one. A wrapper also keeps `fetch` unbound from any
 // object ("Illegal invocation", see Broker).
 
-export const USER_AGENT = 'pointsman-demo (+https://github.com/geolonia/pointsman-demo)';
+export const USER_AGENT = 'pointsman-demo (+https://github.com/geolonia/pointsman-demo-roads)';
 
 export const fetchWithAgent: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));

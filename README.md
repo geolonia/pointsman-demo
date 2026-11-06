@@ -33,7 +33,7 @@ flowchart LR
   P -->|"fixed questions"| AI["AI model<br/>(Workers AI)"]
   P -->|"flood zone, evacuation site,<br/>way around on foot"| Geo["Public map data<br/>(GSI, Valhalla on OpenStreetMap)"]
   W -->|"write check, evacuation, final,<br/>Decision, Task, Alert"| B
-  W -->|"urgent / review<br/>(prepared reports only)"| G["GitHub issues<br/>(geolonia/pointsman-demo)"]
+  W -->|"urgent / review<br/>(prepared reports only)"| G["GitHub issues<br/>(geolonia/pointsman-demo-roads)"]
   G -->|"/publish, /reject<br/>(webhook)"| W
 ```
 
@@ -262,7 +262,7 @@ credential lives in GitHub, and CI only runs a dry-run deploy. Settings of the
 
 | Setting | Value |
 |---|---|
-| Git repository | `geolonia/pointsman-demo`, production branch `main` |
+| Git repository | `geolonia/pointsman-demo-roads`, production branch `main` |
 | Build command | `node scripts/fetch-engine.mjs && pnpm install --frozen-lockfile` |
 | Deploy command | `node scripts/deploy-config.mjs && npx wrangler deploy --config wrangler.deploy.json` |
 | Build variables | `DEMO_KV_ID` (the KV namespace id, kept out of this public repository), `NODE_VERSION` `24` |
