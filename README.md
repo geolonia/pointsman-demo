@@ -258,7 +258,7 @@ The GitHub issue of that report stays open (a later `/publish` there gets
 
 Cloudflare Workers Builds watches this repository and deploys `main`; no
 credential lives in GitHub, and CI only runs a dry-run deploy. Settings of the
-`pointsman-demo` Worker (Settings → Build):
+`pointsman-demo-roads` Worker (Settings → Build):
 
 | Setting | Value |
 |---|---|
