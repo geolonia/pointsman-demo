@@ -15,7 +15,7 @@ type Call = { method: string; url: string; headers: Headers; body: any };
 let calls: Call[] = [];
 let answer: (c: Call) => Response | undefined;
 const P = (value: unknown) => ({ type: 'Property', value });
-const PAGE = 'https://pointsman-demo.geolonia.workers.dev';
+const PAGE = 'https://pointsman-demo-roads.geolonia.workers.dev';
 const BROKER = 'https://geolonia-demo.geonicdb.jp/ngsi-ld/v1';
 // Made at run time: no token-looking literal in the repository.
 const GH_TOKEN = `ghs_${crypto.randomUUID().replaceAll('-', '')}`;

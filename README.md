@@ -112,7 +112,7 @@ always written last.
 
 ## The page
 
-https://roads.demo.pointsman.net (also https://pointsman-demo.geolonia.workers.dev) — `site/`, served by the Worker
+https://roads.demo.pointsman.net (also https://pointsman-demo-roads.geolonia.workers.dev) — `site/`, served by the Worker
 (static assets), in English and Japanese, light and dark:
 
 a guided flow in four steps, for visitors who know nothing about FIWARE or AI:

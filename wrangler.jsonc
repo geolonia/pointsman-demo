@@ -3,15 +3,17 @@
 // in at deploy time (scripts/deploy-config.mjs). Secrets: see README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pointsman-demo",
+  "name": "pointsman-demo-roads",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   // Pointsman runs on workers.dev in the same account: without this, a fetch
   // to it would not leave the account's own network.
   "compatibility_flags": ["global_fetch_strictly_public"],
   "observability": { "enabled": true },
-  // The page's address. workers.dev stays on: the broker's subscriptions and
-  // the GitHub webhook still point there, and old links keep working.
+  // The page's address. The broker's subscriptions and the GitHub webhook use
+  // it too. workers.dev stays on as a second address
+  // (pointsman-demo-roads.geolonia.workers.dev since the Worker was renamed
+  // from pointsman-demo on 2026-11-06).
   "routes": [{ "pattern": "roads.demo.pointsman.net", "custom_domain": true }],
   "workers_dev": true,
   "vars": {
@@ -24,7 +26,7 @@
     "DAILY_LIMIT": "300",
     // Issues are public and notify everyone who watches the repository (#111).
     "DAILY_ISSUE_LIMIT": "20",
-    "ALLOWED_ORIGINS": "https://roads.demo.pointsman.net,https://pointsman-demo.geolonia.workers.dev,http://localhost:8787"
+    "ALLOWED_ORIGINS": "https://roads.demo.pointsman.net,https://pointsman-demo-roads.geolonia.workers.dev,http://localhost:8787"
   },
   // The demo page (site/). The Worker answers only the API, the bridge and
   // the GitHub webhook; everything else is a static file.

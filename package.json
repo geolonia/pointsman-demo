@@ -1,5 +1,5 @@
 {
-  "name": "pointsman-demo",
+  "name": "pointsman-demo-roads",
   "private": true,
   "description": "Demo of Pointsman with an NGSI-LD context broker: road restriction reports checked before they are published.",
   "license": "MIT",
