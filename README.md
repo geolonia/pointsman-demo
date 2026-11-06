@@ -6,7 +6,7 @@ Pointsman checks each report within seconds. Clear reports go straight to
 the residents' map. Unclear reports go to a person, and urgent reports go to
 a person first.
 
-Try it: https://pointsman-demo.geolonia.workers.dev
+Try it: https://roads.demo.pointsman.net (all demos: https://pointsman.net/demos/)
 
 In FIWARE terms: the reports are `RoadRestriction` entities
 ([datamodels.jp](https://datamodels.jp/models/transportation/RoadRestriction/))
@@ -112,7 +112,7 @@ always written last.
 
 ## The page
 
-https://pointsman-demo.geolonia.workers.dev — `site/`, served by the Worker
+https://roads.demo.pointsman.net (also https://pointsman-demo.geolonia.workers.dev) — `site/`, served by the Worker
 (static assets), in English and Japanese, light and dark:
 
 a guided flow in four steps, for visitors who know nothing about FIWARE or AI:

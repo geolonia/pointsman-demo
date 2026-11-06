@@ -108,6 +108,14 @@ describe('reports from the page', () => {
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('object down'));
   });
 
+  it('accepts the page on its custom domain and on workers.dev', async () => {
+    for (const origin of ['https://roads.demo.pointsman.net', PAGE]) {
+      const res = await worker('/api/reports', { method: 'OPTIONS', headers: { origin } });
+      expect(res.status).toBe(204);
+      expect(res.headers.get('access-control-allow-origin')).toBe(origin);
+    }
+  });
+
   it('refuses other origins, free text without Turnstile, and the day after the limit', async () => {
     expect((await post('/api/reports', { prepared: 'vague', lang: 'en' }, { origin: 'https://evil.example' })).status).toBe(403);
     const free = { roadName: 'x', status: 'closed', description: 'road blocked', location: { type: 'Point', coordinates: [139.75, 35.69] } };
